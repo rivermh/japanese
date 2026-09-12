@@ -22,3 +22,12 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# Local application secrets
+/secrets.yml
+/japanese/secrets.yml
+/config/secrets.yml
+
+# Local source archives and generated visual review captures
+*.apkg
+/docs/ui-review/*.png

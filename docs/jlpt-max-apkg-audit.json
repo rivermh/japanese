@@ -1,0 +1,1093 @@
+{
+  "apkg": "..\\JLPT-MAX-Deck-2.1.1.apkg",
+  "models": [
+    {
+      "id": 1788413546601,
+      "name": "Basic",
+      "notes": 0,
+      "fieldCount": 2,
+      "fields": [
+        {
+          "name": "Front",
+          "empty": 0,
+          "html": 0,
+          "maxLength": 0,
+          "examples": []
+        },
+        {
+          "name": "Back",
+          "empty": 0,
+          "html": 0,
+          "maxLength": 0,
+          "examples": []
+        }
+      ],
+      "tags": []
+    },
+    {
+      "id": 4390372477005572550,
+      "name": "JLPT MAX덱 문법",
+      "notes": 3605,
+      "fieldCount": 9,
+      "fields": [
+        {
+          "name": "Level",
+          "empty": 0,
+          "html": 0,
+          "maxLength": 2,
+          "examples": [
+            "N5",
+            "N5",
+            "N5"
+          ]
+        },
+        {
+          "name": "Kind",
+          "empty": 3605,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "UnitID",
+          "empty": 0,
+          "html": 0,
+          "maxLength": 65,
+          "examples": [
+            "basic-gr-n5-1931ddc74a20",
+            "basic-gr-n5-add28ed8e517",
+            "basic-gr-n5-28457b3c7775"
+          ]
+        },
+        {
+          "name": "FrontHTML",
+          "empty": 0,
+          "html": 3605,
+          "maxLength": 1800,
+          "examples": [
+            "<section class=\"_j4t\"><div class=\"_j4u\" lang=\"ja\"><mark class=\"_j4y\">あの</mark>かばんは田中さんのです。</div></section>",
+            "<section class=\"_j4t\"><div class=\"_j4u\" lang=\"ja\">私は苦いコーヒーを<mark class=\"_j4y\">あまり飲みません</mark>。</div></section>",
+            "<section class=\"_j4t\"><div class=\"_j4u\" lang=\"ja\">ここに三つのかばんがあります。<mark class=\"_j4y\">どの</mark>かばんがあなたのですか。</div></section>"
+          ]
+        },
+        {
+          "name": "BackHTML",
+          "empty": 0,
+          "html": 3605,
+          "maxLength": 10908,
+          "examples": [
+            "<section class=\"_j4r\"><div class=\"_j4u\" lang=\"ja\"><mark class=\"_j4y\">あの</mark>かばんは<ruby><rb>田中</rb><rt>たなか</rt></ruby>さんのです。</div><div class=\"_j4z\">저 가방은 다나카 씨의 것입니다.</div><div class=\"_j51 _j4x\">저~</div><section class=\"_j4a _j4w\"><div class=\"_jcq\">뉘앙스</div><div class=\"_j4v\">화자와 청자에게서 모두 멀리 있는 대상을 가리킨다.</div></section><section class=\"_j4a _j4w\"><div class=\"_jcq\">접속</div><div class=\"_j4v\">명사 앞에 붙어 지시한다</div></section><section class=\"_j4a _j4w\"><div class=\"_jcq\">헷갈리는 문형</div><ul class=\"_j1d\"><li class=\"_j1f\"><span class=\"_j1e\" lang=\"ja\">どの～</span><span>どの～는 여러 선택지 중 어느 대상을 고르는지 물을 때 쓰며, 이미 가리킨 먼 ",
+            "<section class=\"_j4r\"><div class=\"_j4u\" lang=\"ja\"><ruby><rb>私</rb><rt>わたし</rt></ruby>は<ruby><rb>苦</rb><rt>にが</rt></ruby>いコーヒーを<mark class=\"_j4y\">あまり<ruby><rb>飲</rb><rt>の</rt></ruby>みません</mark>。</div><div class=\"_j4z\">저는 쓴 커피를 별로 마시지 않습니다.</div><div class=\"_j51 _j4x\">별로 ~않다</div><section class=\"_j4a _j4w\"><div class=\"_jcq\">뉘앙스</div><div class=\"_j4v\">정도가 높지 않음을 나타내며 보통 부정 표현과 함께 쓴다.</div></section><section class=\"_j4a _j4w\"><div class=\"_jcq\">접속</div><div class=\"_j4v\">あまり + 술어를 쓰고 뒤를 부정형으로 만든다</div></section><section class=\"_j4a _j4w\"><div class=\"_jcq\">헷갈리는 문형</div><ul class=\"_j1d\"><li class=\"_j1",
+            "<section class=\"_j4r\"><div class=\"_j4u\" lang=\"ja\">ここに<ruby><rb>三</rb><rt>みっ</rt></ruby>つのかばんがあります。<mark class=\"_j4y\">どの</mark>かばんがあなたのですか。</div><div class=\"_j4z\">여기에 가방이 세 개 있습니다. 어느 가방이 당신 것입니까?</div><div class=\"_j51 _j4x\">어느 ~</div><section class=\"_j4a _j4w\"><div class=\"_jcq\">뉘앙스</div><div class=\"_j4v\">여러 선택지 중 하나를 물을 때 명사를 꾸민다.</div></section><section class=\"_j4a _j4w\"><div class=\"_jcq\">접속</div><div class=\"_j4v\">どの + 명사</div></section><section class=\"_j4a _j4w\"><div class=\"_jcq\">헷갈리는 문형</div><ul class=\"_j1d\"><li class=\"_j1f\"><span class=\"_j1e\" lang=\"ja\">あの～</span><span>「あの～」는 떨어져 있는 특정 대상을 "
+          ]
+        },
+        {
+          "name": "IsBasic",
+          "empty": 2527,
+          "html": 0,
+          "maxLength": 1,
+          "examples": [
+            "1",
+            "1",
+            "1"
+          ]
+        },
+        {
+          "name": "IsGrammarForm",
+          "empty": 2527,
+          "html": 0,
+          "maxLength": 1,
+          "examples": [
+            "1",
+            "1",
+            "1"
+          ]
+        },
+        {
+          "name": "IsSentenceArrangement",
+          "empty": 3234,
+          "html": 0,
+          "maxLength": 1,
+          "examples": [
+            "1",
+            "1",
+            "1"
+          ]
+        },
+        {
+          "name": "IsPassageBlank",
+          "empty": 2527,
+          "html": 0,
+          "maxLength": 1,
+          "examples": [
+            "1",
+            "1",
+            "1"
+          ]
+        }
+      ],
+      "tags": [
+        [
+          "jlpt-max-grammar",
+          3605
+        ],
+        [
+          "N1",
+          1360
+        ],
+        [
+          "grammar::basic",
+          1078
+        ],
+        [
+          "grammar::grammar_form",
+          1078
+        ],
+        [
+          "grammar::passage_blank",
+          1078
+        ],
+        [
+          "N2",
+          899
+        ],
+        [
+          "N3",
+          759
+        ],
+        [
+          "grammar::sentence_arrangement",
+          371
+        ],
+        [
+          "N5",
+          340
+        ],
+        [
+          "N4",
+          247
+        ]
+      ]
+    },
+    {
+      "id": 362224986279207015,
+      "name": "JLPT MAX덱 어휘",
+      "notes": 9160,
+      "fieldCount": 59,
+      "fields": [
+        {
+          "name": "EntryID",
+          "empty": 0,
+          "html": 0,
+          "maxLength": 23,
+          "examples": [
+            "ci-6933711b14d138fface7",
+            "ci-edea122215fa7bb389ff",
+            "ci-cd834dd1df122b1ef860"
+          ]
+        },
+        {
+          "name": "Word",
+          "empty": 1,
+          "html": 0,
+          "maxLength": 12,
+          "examples": [
+            "する",
+            "なる",
+            "ある"
+          ]
+        },
+        {
+          "name": "VocabularyContext",
+          "empty": 9154,
+          "html": 6,
+          "maxLength": 56,
+          "examples": [
+            "店を<span class=\"_je3\" aria-label=\"표제어 자리\">［　］</span>",
+            "店は毎朝九時に<span class=\"_je3\" aria-label=\"표제어 자리\">［　］</span>",
+            "<span class=\"_je3\" aria-label=\"표제어 자리\">［　］</span>が始まった"
+          ]
+        },
+        {
+          "name": "Reading",
+          "empty": 1,
+          "html": 0,
+          "maxLength": 12,
+          "examples": [
+            "する",
+            "なる",
+            "ある"
+          ]
+        },
+        {
+          "name": "PitchAccent",
+          "empty": 1,
+          "html": 9159,
+          "maxLength": 425,
+          "examples": [
+            "<span class=\"_jb5 _jbb\" data-pitch-align data-pitch-source=\"kanjium\" data-pitch-terminal-states=\"[true]\"><span class=\"_jaz _jb2\" aria-hidden=\"true\"><span class=\"_jb1\" j0=\"[&quot;す&quot;,&quot;る&quot;]\" j1=\"[[0,1]]\">する</span></span><span class=\"_jb3\"></span></span>",
+            "<span class=\"_jb5 _jbb\" data-pitch-align data-pitch-source=\"kanjium\" data-pitch-terminal-states=\"[false]\"><span class=\"_jaz _jb2\" aria-hidden=\"true\"><span class=\"_jb1\" j0=\"[&quot;な&quot;,&quot;る&quot;]\" j1=\"[[1,0]]\">なる</span></span><span class=\"_jb3\"></span></span>",
+            "<span class=\"_jb5 _jbb\" data-pitch-align data-pitch-source=\"kanjium\" data-pitch-terminal-states=\"[false]\"><span class=\"_jaz _jb2\" aria-hidden=\"true\"><span class=\"_jb1\" j0=\"[&quot;あ&quot;,&quot;る&quot;]\" j1=\"[[1,0]]\">ある</span></span><span class=\"_jb3\"></span></span>"
+          ]
+        },
+        {
+          "name": "Meaning",
+          "empty": 1,
+          "html": 0,
+          "maxLength": 70,
+          "examples": [
+            "하다 / (냄새나 소리가) 나다 / ~로 하다(Nにする)",
+            "되다 / ~로 이루어지다〔～からなる〕",
+            "있다"
+          ]
+        },
+        {
+          "name": "MeaningV2",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "ExamplesV2",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "ExamplesRendered",
+          "empty": 1,
+          "html": 9159,
+          "maxLength": 11824,
+          "examples": [
+            "<section class=\"_j47\" aria-label=\"뜻 묶음: 하다\"><section class=\"_j4a audio-scope\"><div class=\"_j4c\">하다</div><div class=\"_j46 _jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"예문 1 음성 재생\"><div class=\"_j48 _jbd\" lang=\"ja\"><ruby><rb>毎朝運動</rb><rt>まいあさうんどう</rt></ruby>をする。</div><div class=\"_jau _j4b\" lang=\"ja\"><span class=\"_jb5 _jay\" data-pitch-align data-pitch-source=\"aivis_estimated\"><span class=\"_jaz _jb0\" aria-hidden=\"true\"><span class=\"_jb1\" j0=\"[&quot;ま&quot;,&quot;い&quot;,&quot;あ&quot;,&quot;さ&quot;,&quot;う&quot;,&quot;ん&quot;,&quot;ど&quot;,&quot;ー&quot;]\" j1=\"[[1,0,0,0,0,1,1,1]]\"><ruby><rb>毎朝",
+            "<section class=\"_j47\" aria-label=\"뜻 묶음: 되다\"><section class=\"_j4a audio-scope\"><div class=\"_j4c\">되다</div><div class=\"_j46 _jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"예문 1 음성 재생\"><div class=\"_j48 _jbd\" lang=\"ja\"><ruby><rb>私</rb><rt>わたし</rt></ruby>は<ruby><rb>来年</rb><rt>らいねん</rt></ruby>、<ruby><rb>大学生</rb><rt>だいがくせい</rt></ruby>になる。</div><div class=\"_jau _j4b\" lang=\"ja\"><span class=\"_jb5 _jay\" data-pitch-align data-pitch-source=\"aivis_estimated\"><span class=\"_jaz _jb0\" aria-hidden=\"true\"><span class=\"_jb1\" j0=\"[&quot;わ&quot;,&quot;た&quot;,&quot;し&quot;]\" j1=\"[[0,1,1]]\"><ruby><rb>私</rb><rt>わ",
+            "<section class=\"_j47\" aria-label=\"뜻 묶음: 있다\"><section class=\"_j4a audio-scope\"><div class=\"_j4c\">있다</div><div class=\"_j46 _jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"예문 1 음성 재생\"><div class=\"_j48 _jbd\" lang=\"ja\"><ruby><rb>机</rb><rt>つくえ</rt></ruby>の<ruby><rb>上</rb><rt>うえ</rt></ruby>に<ruby><rb>本</rb><rt>ほん</rt></ruby>がある。</div><div class=\"_jau _j4b\" lang=\"ja\"><span class=\"_jb5 _jay\" data-pitch-align data-pitch-source=\"aivis_estimated\"><span class=\"_jaz _jb0\" aria-hidden=\"true\"><span class=\"_jb1\" j0=\"[&quot;つ&quot;,&quot;く&quot;,&quot;え&quot;]\" j1=\"[[0,1,1]]\"><ruby><rb>机</rb><rt>つくえ</rt></"
+          ]
+        },
+        {
+          "name": "MediaIntentsV2",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "PartOfSpeech",
+          "empty": 1,
+          "html": 0,
+          "maxLength": 36,
+          "examples": [
+            "サ변동사 · 자동사",
+            "5단동사 · 자동사",
+            "5단동사 · 자동사"
+          ]
+        },
+        {
+          "name": "KanjiDetails",
+          "empty": 1342,
+          "html": 7818,
+          "maxLength": 3944,
+          "examples": [
+            "<div class=\"_j62\"><article class=\"_j5s\"><a class=\"_j5y _j7b\" href=\"https://nihongokanji.com/search/%E8%A8%80\" target=\"_blank\" rel=\"noopener noreferrer\" aria-label=\"일본어 한자 공부방에서 言 한자 설명을 새 창으로 보기\"><span lang=\"ja\">言</span><span class=\"_j7a\" aria-hidden=\"true\">↗</span></a><div class=\"_j5p\"><div class=\"_j61\">말(씀) 언 · 언어 언</div><dl class=\"_j77\"><div class=\"_j6h\"><dt>음</dt><dd lang=\"ja\">ゲン・ゴン・ギン</dd></div><div class=\"_j6h\"><dt>훈</dt><dd lang=\"ja\">い（う）・こと・ことば</dd></div></dl><div class=\"_j7c\"><span class=\"_j7j\">모양</span><span class=\"_j7l\">亖(넉 사) + 口(입 구)</span></div><div class=\"_j7w\"><span class=\"_j7x",
+            "<div class=\"_j62\"><article class=\"_j5s\"><a class=\"_j5y _j7b\" href=\"https://nihongokanji.com/search/%E7%89%A9\" target=\"_blank\" rel=\"noopener noreferrer\" aria-label=\"일본어 한자 공부방에서 物 한자 설명을 새 창으로 보기\"><span lang=\"ja\">物</span><span class=\"_j7a\" aria-hidden=\"true\">↗</span></a><div class=\"_j5p\"><div class=\"_j61\">물건 물</div><dl class=\"_j77\"><div class=\"_j6h\"><dt>음</dt><dd lang=\"ja\">ブツ・モツ</dd></div><div class=\"_j6h\"><dt>훈</dt><dd lang=\"ja\">もの</dd></div></dl><div class=\"_j7c\"><span class=\"_j7j\">모양</span><span class=\"_j7l\">牛(소 우) + 勿(말 물)</span></div><div class=\"_j7w\"><span class=\"_j7x\">부수</span><span clas",
+            "<div class=\"_j62\"><article class=\"_j5s\"><a class=\"_j5y _j7b\" href=\"https://nihongokanji.com/search/%E6%80%9D\" target=\"_blank\" rel=\"noopener noreferrer\" aria-label=\"일본어 한자 공부방에서 思 한자 설명을 새 창으로 보기\"><span lang=\"ja\">思</span><span class=\"_j7a\" aria-hidden=\"true\">↗</span></a><div class=\"_j5p\"><div class=\"_j61\">생각 사</div><dl class=\"_j77\"><div class=\"_j6h\"><dt>음</dt><dd lang=\"ja\">シ</dd></div><div class=\"_j6h\"><dt>훈</dt><dd lang=\"ja\">おも（う）・おぼ（しい）</dd></div></dl><div class=\"_j7c\"><span class=\"_j7j\">모양</span><span class=\"_j7l\">心(마음 심) + 田(밭 전)</span></div><div class=\"_j7w\"><span class=\"_j7x\">부수</span><sp"
+          ]
+        },
+        {
+          "name": "JLPT",
+          "empty": 1,
+          "html": 0,
+          "maxLength": 2,
+          "examples": [
+            "N5",
+            "N5",
+            "N5"
+          ]
+        },
+        {
+          "name": "CanonicalRecordHash",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "WordAudio",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "WordAudioFile",
+          "empty": 1,
+          "html": 9159,
+          "maxLength": 99,
+          "examples": [
+            "<audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-word-ci-edea122215fa7bb389ff.mp3\"></audio>",
+            "<audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-word-ci-cd834dd1df122b1ef860.mp3\"></audio>",
+            "<audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-word-ci-b2bcbb317298b574e91d.mp3\"></audio>"
+          ]
+        },
+        {
+          "name": "Example1JP",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example1Reading",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example1KO",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example1Sense",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example1Audio",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example1PitchAccent",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example2JP",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example2Reading",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example2KO",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example2Sense",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example2Audio",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example2PitchAccent",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example3JP",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example3Reading",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example3KO",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example3Sense",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example3Audio",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example3PitchAccent",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example4JP",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example4Reading",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example4KO",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example4Sense",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example4Audio",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example4PitchAccent",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example5JP",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example5Reading",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example5KO",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example5Sense",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example5Audio",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "Example5PitchAccent",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "UsageRegister",
+          "empty": 9067,
+          "html": 93,
+          "maxLength": 96,
+          "examples": [
+            "<span class=\"_jdm is-style\">구어(일부 뜻)</span>",
+            "<span class=\"_jdm is-honorific\">정중어</span>",
+            "<span class=\"_jdm is-honorific\">겸양어</span>"
+          ]
+        },
+        {
+          "name": "ConjugationDetails",
+          "empty": 7317,
+          "html": 1843,
+          "maxLength": 1219,
+          "examples": [
+            "<details class=\"_j1j tappable\" data-study-panel-key=\"conjugation\"><summary class=\"tappable\">활용 · サ변동사</summary><div class=\"_j1g\"><div class=\"_j1h\"><div class=\"_j1k\"><span class=\"_j1i\">ます형</span><span class=\"_j1l\" lang=\"ja\">します</span></div><div class=\"_j1k\"><span class=\"_j1i\">ない형</span><span class=\"_j1l\" lang=\"ja\">しない</span></div><div class=\"_j1k\"><span class=\"_j1i\">て형</span><span class=\"_j1l\" lang=\"ja\">して</span></div><div class=\"_j1k\"><span class=\"_j1i\">た형</span><span class=\"_j1l\" lang=\"ja\">した</span></div></div></div></details>",
+            "<details class=\"_j1j tappable\" data-study-panel-key=\"conjugation\"><summary class=\"tappable\">활용 · 5단동사</summary><div class=\"_j1g\"><div class=\"_j1h\"><div class=\"_j1k\"><span class=\"_j1i\">ます형</span><span class=\"_j1l\" lang=\"ja\">なります</span></div><div class=\"_j1k\"><span class=\"_j1i\">ない형</span><span class=\"_j1l\" lang=\"ja\">ならない</span></div><div class=\"_j1k\"><span class=\"_j1i\">て형</span><span class=\"_j1l\" lang=\"ja\">なって</span></div><div class=\"_j1k\"><span class=\"_j1i\">た형</span><span class=\"_j1l\" lang=\"ja\">なった</span></div></div></div></details>",
+            "<details class=\"_j1j tappable\" data-study-panel-key=\"conjugation\"><summary class=\"tappable\">활용 · 5단동사</summary><div class=\"_j1g\"><div class=\"_j1h\"><div class=\"_j1k\"><span class=\"_j1i\">ます형</span><span class=\"_j1l\" lang=\"ja\">あります</span></div><div class=\"_j1k\"><span class=\"_j1i\">ない형</span><span class=\"_j1l\" lang=\"ja\">ない</span></div><div class=\"_j1k\"><span class=\"_j1i\">て형</span><span class=\"_j1l\" lang=\"ja\">あって</span></div><div class=\"_j1k\"><span class=\"_j1i\">た형</span><span class=\"_j1l\" lang=\"ja\">あった</span></div></div></div></details>"
+          ]
+        },
+        {
+          "name": "StudyPriority",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "UsageDetails",
+          "empty": 9071,
+          "html": 89,
+          "maxLength": 1710,
+          "examples": [
+            "<details class=\"_jcv usage-details tappable\" data-study-panel-key=\"usage\"><summary class=\"tappable\">핵심 용법</summary><div class=\"_jcw\"><section class=\"_jdh\"><div class=\"_jcu audio-scope\"><div class=\"_jdg _jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"핵심 용법 음성 재생\"><div class=\"_jdj\" lang=\"ja\"><span class=\"_jdk\">おおい</span></div></div><audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-usage-e66ba2855d19ee5c7ae1cb50.mp3\"></audio></div><div class=\"_jdi\">많다</div><div class=\"_jdf\"><div class=\"_jd3\">비슷한 표현</div><ul class=\"_jdc\"><li class=\"_jda\"><div class=\"_jcu audio-scope\"><div class=\"_jd8 _jo tappab",
+            "<details class=\"_jcv usage-details tappable\" data-study-panel-key=\"usage\"><summary class=\"tappable\">핵심 용법</summary><div class=\"_jcw\"><section class=\"_jdh\"><div class=\"_jcu audio-scope\"><div class=\"_jdg _jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"핵심 용법 음성 재생\"><div class=\"_jdj\" lang=\"ja\"><span class=\"_jdk\"><ruby><rb>本当</rb><rt>ほんとう</rt></ruby>じゃない</span></div></div><audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-usage-3a19c07d217976ffef86f786.mp3\"></audio></div><div class=\"_jdi\">사실이 아니다</div><div class=\"_jdf\"><div class=\"_jd3\">비슷한 표현</div><ul class=\"_jdc\"><li class=\"_jda\"><div class=\"_j",
+            "<details class=\"_jcv usage-details tappable\" data-study-panel-key=\"usage\"><summary class=\"tappable\">핵심 용법</summary><div class=\"_jcw\"><section class=\"_jdh\"><div class=\"_jcu audio-scope\"><div class=\"_jdg _jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"핵심 용법 음성 재생\"><div class=\"_jdj\" lang=\"ja\"><span class=\"_jdk\"><ruby><rb>買</rb><rt>か</rt></ruby>う</span></div></div><audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-usage-3d8cb7014327854eb3183c96.mp3\"></audio></div><div class=\"_jdi\">사다</div><div class=\"_jdf\"><div class=\"_jd3\">비슷한 표현</div><ul class=\"_jdc\"><li class=\"_jda\"><div class=\"_jcu audio-sco"
+          ]
+        },
+        {
+          "name": "WordFormationDetails",
+          "empty": 9132,
+          "html": 28,
+          "maxLength": 1067,
+          "examples": [
+            "<details class=\"_jcv word-formation-details tappable\" data-study-panel-key=\"formation\"><summary class=\"tappable\">단어 구성</summary><div class=\"_jcw\"><div class=\"_j4m\"><span class=\"_jd2\">접두</span><div class=\"_j4g\"><div class=\"_j4f\"><span class=\"_j4l\">접두</span><div class=\"_jcu audio-scope\"><div class=\"_j4h _jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"半 음성 재생\"><span class=\"_j4n\" lang=\"ja\"><span class=\"_j4o\">半</span><span class=\"_j4k\">はん</span></span></div><audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-word-ci-d4cec3c4275c6380ebaf.mp3\"></audio></div><span class=\"_j4i\">반</span></div><span cla",
+            "<details class=\"_jcv word-formation-details tappable\" data-study-panel-key=\"formation\"><summary class=\"tappable\">단어 구성</summary><div class=\"_jcw\"><div class=\"_j4m\"><span class=\"_jd2\">접미</span><div class=\"_j4g\"><div class=\"_j4f\"><span class=\"_j4l\">어근</span><div class=\"_jcu audio-scope\"><div class=\"_j4h _jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"考え 음성 재생\"><span class=\"_j4n\" lang=\"ja\"><span class=\"_j4o\">考え</span><span class=\"_j4k\">かんがえ</span></span></div><audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-word-ci-fd1a5849acdfed791336.mp3\"></audio></div><span class=\"_j4i\">생각</span></div><spa",
+            "<details class=\"_jcv word-formation-details tappable\" data-study-panel-key=\"formation\"><summary class=\"tappable\">단어 구성</summary><div class=\"_jcw\"><div class=\"_j4m\"><span class=\"_jd2\">접두</span><div class=\"_j4g\"><div class=\"_j4f\"><span class=\"_j4l\">접두</span><div class=\"_jcu audio-scope\"><div class=\"_j4h _jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"半 음성 재생\"><span class=\"_j4n\" lang=\"ja\"><span class=\"_j4o\">半</span><span class=\"_j4k\">はん</span></span></div><audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-word-ci-d4cec3c4275c6380ebaf.mp3\"></audio></div><span class=\"_j4i\">반</span></div><span cla"
+          ]
+        },
+        {
+          "name": "RelatedWords",
+          "empty": 7936,
+          "html": 1224,
+          "maxLength": 1383,
+          "examples": [
+            "<details class=\"_jcv related-words-details tappable\" data-study-panel-key=\"related\"><summary class=\"tappable\">헷갈리는 단어</summary><div class=\"_jcw\"><div class=\"_jco\"><span class=\"_jd2\">자동사·타동사</span><div class=\"_jcu audio-scope\"><div class=\"_jck _jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"やる 음성 재생\"><span class=\"_jcl\" lang=\"ja\"><span class=\"_jcp\">やる</span><span class=\"_jcn\">やる</span></span></div><audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-word-ci-294d0c16a0bbafe55dd4.mp3\"></audio></div><span class=\"_jcm\">하다 / (아랫사람이나 동식물에게) 주다</span></div></div></details>",
+            "<details class=\"_jcv related-words-details tappable\" data-study-panel-key=\"related\"><summary class=\"tappable\">헷갈리는 단어</summary><div class=\"_jcw\"><div class=\"_jco\"><span class=\"_jd2\">반의어</span><div class=\"_jcu audio-scope\"><div class=\"_jck _jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"去る 음성 재생\"><span class=\"_jcl\" lang=\"ja\"><span class=\"_jcp\">去る</span><span class=\"_jcn\">さる</span></span></div><audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-word-ci-37bb8efe383a6ffd9a7d.mp3\"></audio></div><span class=\"_jcm\">떠나다 / 지나가다</span></div></div></details>",
+            "<details class=\"_jcv related-words-details tappable\" data-study-panel-key=\"related\"><summary class=\"tappable\">헷갈리는 단어</summary><div class=\"_jcw\"><div class=\"_jco\"><span class=\"_jd2\">동음어</span><div class=\"_jcu audio-scope\"><div class=\"_jck _jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"仲 음성 재생\"><span class=\"_jcl\" lang=\"ja\"><span class=\"_jcp\">仲</span><span class=\"_jcn\">なか</span></span></div><audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-word-ci-6fe5e3c9592b505664a0.mp3\"></audio></div><span class=\"_jcm\">관계</span></div></div></details>"
+          ]
+        },
+        {
+          "name": "WordJLPT",
+          "empty": 1,
+          "html": 0,
+          "maxLength": 2,
+          "examples": [
+            "N5",
+            "N5",
+            "N5"
+          ]
+        },
+        {
+          "name": "KanaAuxiliaryWord",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "KanaAuxiliaryReading",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "KanaAuxiliaryContext",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "KanaAuxiliaryJLPT",
+          "empty": 9160,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "RetiredKanaAuxiliaryCard",
+          "empty": 9159,
+          "html": 0,
+          "maxLength": 27,
+          "examples": [
+            "JLPT_MAX_RETIRED_VOCABULARY"
+          ]
+        },
+        {
+          "name": "KoreanRecallPrompt",
+          "empty": 1,
+          "html": 9159,
+          "maxLength": 907,
+          "examples": [
+            "<div class=\"_j9f\"><section class=\"_j9l\" aria-label=\"뜻 묶음: 하다\"><div class=\"_j9m\">하다</div><ul class=\"_j9j\"><li class=\"_j9i\">매일 아침 운동을 한다.</li></ul></section><section class=\"_j9l\" aria-label=\"뜻 묶음: (냄새나 소리가) 나다\"><div class=\"_j9m\">(냄새나 소리가) 나다</div><ul class=\"_j9j\"><li class=\"_j9i\">밖에서 이상한 소리가 난다.</li></ul></section><section class=\"_j9l\" aria-label=\"뜻 묶음: ~로 하다(Nにする)\"><div class=\"_j9m\">~로 하다(Nにする)</div><ul class=\"_j9j\"><li class=\"_j9i\">마실 것은 물로 한다.</li></ul></section></div>",
+            "<div class=\"_j9f\"><section class=\"_j9l\" aria-label=\"뜻 묶음: 되다\"><div class=\"_j9m\">되다</div><ul class=\"_j9j\"><li class=\"_j9i\">나는 내년에 대학생이 된다.</li></ul></section><section class=\"_j9l\" aria-label=\"뜻 묶음: ~로 이루어지다〔～からなる〕\"><div class=\"_j9m\">~로 이루어지다〔～からなる〕</div><ul class=\"_j9j\"><li class=\"_j9i\">이 팀은 다섯 명으로 이루어진다.</li></ul></section></div>",
+            "<div class=\"_j9f _j9g\"><section class=\"_j9l\" aria-label=\"뜻 묶음: 있다\"><div class=\"_j9m\">있다</div><ul class=\"_j9j\"><li class=\"_j9i\">책상 위에 책이 있다.</li></ul></section></div>"
+          ]
+        }
+      ],
+      "tags": [
+        [
+          "release::1_3_0",
+          6016
+        ],
+        [
+          "jlpt::N1",
+          3151
+        ],
+        [
+          "release::publisher-integration",
+          3143
+        ],
+        [
+          "jlpt::N2",
+          2632
+        ],
+        [
+          "jlpt::N3",
+          1719
+        ],
+        [
+          "jlpt::N4",
+          878
+        ],
+        [
+          "jlpt::N5",
+          779
+        ],
+        [
+          "jlpt-max-vocabulary-retired",
+          1
+        ]
+      ]
+    },
+    {
+      "id": 63885644901894881,
+      "name": "JLPT MAX덱 어휘문제",
+      "notes": 7876,
+      "fieldCount": 20,
+      "fields": [
+        {
+          "name": "SortKey",
+          "empty": 0,
+          "html": 0,
+          "maxLength": 50,
+          "examples": [
+            "expression:pq:context_defined:0087824faa98fd3b8dda",
+            "expression:pq:context_defined:00d66dd51c88ab4b57f0",
+            "expression:pq:context_defined:010c42e5c5fa07590150"
+          ]
+        },
+        {
+          "name": "JLPT",
+          "empty": 0,
+          "html": 0,
+          "maxLength": 2,
+          "examples": [
+            "N1",
+            "N1",
+            "N1"
+          ]
+        },
+        {
+          "name": "QuestionType",
+          "empty": 0,
+          "html": 0,
+          "maxLength": 15,
+          "examples": [
+            "context_defined",
+            "context_defined",
+            "context_defined"
+          ]
+        },
+        {
+          "name": "QuestionLabel",
+          "empty": 0,
+          "html": 0,
+          "maxLength": 5,
+          "examples": [
+            "문맥 규정",
+            "문맥 규정",
+            "문맥 규정"
+          ]
+        },
+        {
+          "name": "Instruction",
+          "empty": 0,
+          "html": 0,
+          "maxLength": 29,
+          "examples": [
+            "빈칸에 들어갈 가장 알맞은 표현을 고르세요.",
+            "빈칸에 들어갈 가장 알맞은 표현을 고르세요.",
+            "빈칸에 들어갈 가장 알맞은 표현을 고르세요."
+          ]
+        },
+        {
+          "name": "PromptJP",
+          "empty": 0,
+          "html": 7661,
+          "maxLength": 89,
+          "examples": [
+            "同じ事故を繰り返さないために、今回の失敗から得た<span class=\"_jbm\">(　)</span>を全員で共有した。",
+            "税収が減り続け、この国の<span class=\"_jbm\">(　)</span>は非常に厳しい状況にある。",
+            "新しいことを何でも知りたがる彼は、好奇心が<span class=\"_jbm\">(　)</span>。"
+          ]
+        },
+        {
+          "name": "PromptKO",
+          "empty": 7876,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "ChoicesHTML",
+          "empty": 215,
+          "html": 7661,
+          "maxLength": 1018,
+          "examples": [
+            "<ol class=\"_jbx\" data-review-shuffle=\"choices\" data-shuffle-unit-id=\"pq:context_defined:0087824faa98fd3b8dda\" data-shuffle-side=\"front\"><li class=\"_jbr\" data-choice-id=\"choice-0\"><span class=\"_jbu\"><span class=\"_jbv\">①</span></span><span class=\"_jbs\"><span class=\"_jbt\" lang=\"ja\">検査</span></span></li><li class=\"_jbr\" data-choice-id=\"choice-1\"><span class=\"_jbu\"><span class=\"_jbv\">②</span></span><span class=\"_jbs\"><span class=\"_jbt\" lang=\"ja\">勝負</span></span></li><li class=\"_jbr\" data-choice-id=\"choice-2\"><span class=\"_jbu\"><span class=\"_jbv\">③</span></span><span class=\"_jbs\"><span class=\"_jbt\" ",
+            "<ol class=\"_jbx\" data-review-shuffle=\"choices\" data-shuffle-unit-id=\"pq:context_defined:00d66dd51c88ab4b57f0\" data-shuffle-side=\"front\"><li class=\"_jbr\" data-choice-id=\"choice-0\"><span class=\"_jbu\"><span class=\"_jbv\">①</span></span><span class=\"_jbs\"><span class=\"_jbt\" lang=\"ja\">財政</span></span></li><li class=\"_jbr\" data-choice-id=\"choice-1\"><span class=\"_jbu\"><span class=\"_jbv\">②</span></span><span class=\"_jbs\"><span class=\"_jbt\" lang=\"ja\">天候</span></span></li><li class=\"_jbr\" data-choice-id=\"choice-2\"><span class=\"_jbu\"><span class=\"_jbv\">③</span></span><span class=\"_jbs\"><span class=\"_jbt\" ",
+            "<ol class=\"_jbx\" data-review-shuffle=\"choices\" data-shuffle-unit-id=\"pq:context_defined:010c42e5c5fa07590150\" data-shuffle-side=\"front\"><li class=\"_jbr\" data-choice-id=\"choice-0\"><span class=\"_jbu\"><span class=\"_jbv\">①</span></span><span class=\"_jbs\"><span class=\"_jbt\" lang=\"ja\">旺盛だ</span></span></li><li class=\"_jbr\" data-choice-id=\"choice-1\"><span class=\"_jbu\"><span class=\"_jbv\">②</span></span><span class=\"_jbs\"><span class=\"_jbt\" lang=\"ja\">不安だ</span></span></li><li class=\"_jbr\" data-choice-id=\"choice-2\"><span class=\"_jbu\"><span class=\"_jbv\">③</span></span><span class=\"_jbs\"><span class=\"_jbt"
+          ]
+        },
+        {
+          "name": "AnswerJP",
+          "empty": 7876,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "AnswerKO",
+          "empty": 7876,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "ExplanationHTML",
+          "empty": 7876,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "AnswerAudio",
+          "empty": 0,
+          "html": 7876,
+          "maxLength": 102,
+          "examples": [
+            "<audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-practice-answer-185fb966c966caddf40f5db9.mp3\"></audio>",
+            "<audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-practice-answer-f1a2e5db7b719407bcc24f5e.mp3\"></audio>",
+            "<audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-practice-answer-f83ba8171af4f0f7423ebed0.mp3\"></audio>"
+          ]
+        },
+        {
+          "name": "PromptRuby",
+          "empty": 0,
+          "html": 7661,
+          "maxLength": 602,
+          "examples": [
+            "<ruby><rb>同</rb><rt>おな</rt></ruby>じ<ruby><rb>事故</rb><rt>じこ</rt></ruby>を<ruby><rb>繰</rb><rt>く</rt></ruby>り<ruby><rb>返</rb><rt>かえ</rt></ruby>さないために、<ruby><rb>今回</rb><rt>こんかい</rt></ruby>の<ruby><rb>失敗</rb><rt>しっぱい</rt></ruby>から<ruby><rb>得</rb><rt>え</rt></ruby>た<span class=\"_jbm\">(　)</span>を<ruby><rb>全員</rb><rt>ぜんいん</rt></ruby>で<ruby><rb>共有</rb><rt>きょうゆう</rt></ruby>した。",
+            "<ruby><rb>税収</rb><rt>ぜいしゅう</rt></ruby>が<ruby><rb>減</rb><rt>へ</rt></ruby>り<ruby><rb>続</rb><rt>つづ</rt></ruby>け、この<ruby><rb>国</rb><rt>くに</rt></ruby>の<span class=\"_jbm\">(　)</span>は<ruby><rb>非常</rb><rt>ひじょう</rt></ruby>に<ruby><rb>厳</rb><rt>きび</rt></ruby>しい<ruby><rb>状況</rb><rt>じょうきょう</rt></ruby>にある。",
+            "<ruby><rb>新</rb><rt>あたら</rt></ruby>しいことを<ruby><rb>何</rb><rt>なん</rt></ruby>でも<ruby><rb>知</rb><rt>し</rt></ruby>りたがる<ruby><rb>彼</rb><rt>かれ</rt></ruby>は、<ruby><rb>好奇心</rb><rt>こうきしん</rt></ruby>が<span class=\"_jbm\">(　)</span>。"
+          ]
+        },
+        {
+          "name": "PromptKORuby",
+          "empty": 215,
+          "html": 1732,
+          "maxLength": 135,
+          "examples": [
+            "같은 사고를 반복하지 않기 위해 이번 실패에서 얻은 （　）을 모두가 공유했다.",
+            "세수가 계속 감소하여 이 나라의 （　）은 매우 어려운 상황에 놓여 있다.",
+            "새로운 것은 무엇이든 알고 싶어 하는 그는 호기심이 （　）."
+          ]
+        },
+        {
+          "name": "ChoicesRubyHTML",
+          "empty": 215,
+          "html": 7661,
+          "maxLength": 2261,
+          "examples": [
+            "<ol class=\"_jbx\" data-review-shuffle=\"choices\" data-shuffle-unit-id=\"pq:context_defined:0087824faa98fd3b8dda\" data-shuffle-side=\"back\"><li class=\"_jbr\" data-choice-id=\"choice-0\"><span class=\"_jbu\"><span class=\"_jbv\">①</span></span><span class=\"_jbs\"><span class=\"_jbt\" lang=\"ja\"><ruby><rb>検査</rb><rt>けんさ</rt></ruby></span><span class=\"_jbw\" lang=\"ko\">검사</span></span></li><li class=\"_jbr\" data-choice-id=\"choice-1\"><span class=\"_jbu\"><span class=\"_jbv\">②</span></span><span class=\"_jbs\"><span class=\"_jbt\" lang=\"ja\"><ruby><rb>勝負</rb><rt>しょうぶ</rt></ruby></span><span class=\"_jbw\" lang=\"ko\">승부</span></",
+            "<ol class=\"_jbx\" data-review-shuffle=\"choices\" data-shuffle-unit-id=\"pq:context_defined:00d66dd51c88ab4b57f0\" data-shuffle-side=\"back\"><li class=\"_jbr is-correct\" data-choice-id=\"choice-0\"><span class=\"_jbu\"><span class=\"_jbv\">①</span></span><span class=\"_jbs\"><span class=\"_jbt\" lang=\"ja\"><ruby><rb>財政</rb><rt>ざいせい</rt></ruby></span><span class=\"_jbw\" lang=\"ko\">재정</span></span></li><li class=\"_jbr\" data-choice-id=\"choice-1\"><span class=\"_jbu\"><span class=\"_jbv\">②</span></span><span class=\"_jbs\"><span class=\"_jbt\" lang=\"ja\"><ruby><rb>天候</rb><rt>てんこう</rt></ruby></span><span class=\"_jbw\" lang=\"ko\"",
+            "<ol class=\"_jbx\" data-review-shuffle=\"choices\" data-shuffle-unit-id=\"pq:context_defined:010c42e5c5fa07590150\" data-shuffle-side=\"back\"><li class=\"_jbr is-correct\" data-choice-id=\"choice-0\"><span class=\"_jbu\"><span class=\"_jbv\">①</span></span><span class=\"_jbs\"><span class=\"_jbt\" lang=\"ja\"><ruby><rb>旺盛</rb><rt>おうせい</rt></ruby>だ</span><span class=\"_jbw\" lang=\"ko\">왕성하다</span></span></li><li class=\"_jbr\" data-choice-id=\"choice-1\"><span class=\"_jbu\"><span class=\"_jbv\">②</span></span><span class=\"_jbs\"><span class=\"_jbt\" lang=\"ja\"><ruby><rb>不安</rb><rt>ふあん</rt></ruby>だ</span><span class=\"_jbw\" lang=\""
+          ]
+        },
+        {
+          "name": "AnswerRuby",
+          "empty": 0,
+          "html": 7648,
+          "maxLength": 479,
+          "examples": [
+            "<ruby><rb>同</rb><rt>おな</rt></ruby>じ<ruby><rb>事故</rb><rt>じこ</rt></ruby>を<ruby><rb>繰</rb><rt>く</rt></ruby>り<ruby><rb>返</rb><rt>かえ</rt></ruby>さないために、<ruby><rb>今回</rb><rt>こんかい</rt></ruby>の<ruby><rb>失敗</rb><rt>しっぱい</rt></ruby>から<ruby><rb>得</rb><rt>え</rt></ruby>た<ruby><rb>教訓</rb><rt>きょうくん</rt></ruby>を<ruby><rb>全員</rb><rt>ぜんいん</rt></ruby>で<ruby><rb>共有</rb><rt>きょうゆう</rt></ruby>した。",
+            "<ruby><rb>税収</rb><rt>ぜいしゅう</rt></ruby>が<ruby><rb>減</rb><rt>へ</rt></ruby>り<ruby><rb>続</rb><rt>つづ</rt></ruby>け、この<ruby><rb>国</rb><rt>くに</rt></ruby>の<ruby><rb>財政</rb><rt>ざいせい</rt></ruby>は<ruby><rb>非常</rb><rt>ひじょう</rt></ruby>に<ruby><rb>厳</rb><rt>きび</rt></ruby>しい<ruby><rb>状況</rb><rt>じょうきょう</rt></ruby>にある。",
+            "<ruby><rb>新</rb><rt>あたら</rt></ruby>しいことを<ruby><rb>何</rb><rt>なん</rt></ruby>でも<ruby><rb>知</rb><rt>し</rt></ruby>りたがる<ruby><rb>彼</rb><rt>かれ</rt></ruby>は、<ruby><rb>好奇心</rb><rt>こうきしん</rt></ruby>が<ruby><rb>旺盛</rb><rt>おうせい</rt></ruby>だ。"
+          ]
+        },
+        {
+          "name": "AnswerKORuby",
+          "empty": 0,
+          "html": 62,
+          "maxLength": 149,
+          "examples": [
+            "같은 사고를 반복하지 않기 위해 이번 실패에서 얻은 교훈을 모두가 공유했다.",
+            "세수가 계속 감소하여 이 나라의 재정은 매우 어려운 상황에 놓여 있다.",
+            "새로운 것은 무엇이든 알고 싶어 하는 그는 호기심이 왕성하다."
+          ]
+        },
+        {
+          "name": "ExplanationRubyHTML",
+          "empty": 215,
+          "html": 7661,
+          "maxLength": 1601,
+          "examples": [
+            "<div>실패를 통해 배우고 다음 사고를 막는 데 활용할 가르침이므로 「<ruby><rb>教訓</rb><rt>きょうくん</rt></ruby>」이 알맞다.</div><ol class=\"_j1b\" data-review-shuffle=\"choices\" data-shuffle-unit-id=\"pq:context_defined:0087824faa98fd3b8dda\" data-shuffle-side=\"back\"><li class=\"_j18\" data-choice-id=\"choice-0\"><span class=\"_j19\"><span class=\"_j1a\">①</span></span><span>상태나 품질을 조사하는 일을 뜻하므로 실패에서 얻는 내용과 맞지 않는다.</span></li><li class=\"_j18\" data-choice-id=\"choice-1\"><span class=\"_j19\"><span class=\"_j1a\">②</span></span><span>승패를 겨루는 일을 뜻하므로 맞지 않는다.</span></li><li class=\"_j18\" data-choice-id=\"choice-2\"><span class=\"_j19\"><span class=\"_j1a\">③<",
+            "<div>세수가 줄어 국가의 수입과 지출 사정이 어려워졌다는 내용이므로 ‘재정’을 뜻하는 ‘<ruby><rb>財政</rb><rt>ざいせい</rt></ruby>’이 알맞다.</div><ol class=\"_j1b\" data-review-shuffle=\"choices\" data-shuffle-unit-id=\"pq:context_defined:00d66dd51c88ab4b57f0\" data-shuffle-side=\"back\"><li class=\"_j18\" data-choice-id=\"choice-0\"><span class=\"_j19\"><span class=\"_j1a\">①</span></span><span>세수 감소로 어려워지는 국가의 자금 사정을 가리키므로 알맞다.</span></li><li class=\"_j18\" data-choice-id=\"choice-1\"><span class=\"_j19\"><span class=\"_j1a\">②</span></span><span>날씨는 세수 감소의 직접적인 결과로 설명되지 않는다.</span></li><li class=\"_j18\" data-choice-id=\"choice-2\"><span class=\"_j19\"><span class",
+            "<div>「<ruby><rb>旺盛</rb><rt>おうせい</rt></ruby>だ」는 식욕이나 호기심 같은 힘이나 의욕이 매우 활발하고 강한 상태를 나타낸다.</div><ol class=\"_j1b\" data-review-shuffle=\"choices\" data-shuffle-unit-id=\"pq:context_defined:010c42e5c5fa07590150\" data-shuffle-side=\"back\"><li class=\"_j18\" data-choice-id=\"choice-0\"><span class=\"_j19\"><span class=\"_j1a\">①</span></span><span>새로운 것을 적극적으로 알고 싶어 하는 강한 호기심을 나타낸다.</span></li><li class=\"_j18\" data-choice-id=\"choice-1\"><span class=\"_j19\"><span class=\"_j1a\">②</span></span><span>불안하다는 뜻으로 「<ruby><rb>好奇心</rb><rt>こうきしん</rt></ruby>」의 강한 정도를 나타내지 못한다.</span></li><li class=\"_j18\" data-choice-id=\"choice-"
+          ]
+        },
+        {
+          "name": "QuestionV2",
+          "empty": 7876,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        },
+        {
+          "name": "MediaIntentsV2",
+          "empty": 7876,
+          "html": 0,
+          "maxLength": 1,
+          "examples": []
+        }
+      ],
+      "tags": [
+        [
+          "practice",
+          7876
+        ],
+        [
+          "release::1_3_0",
+          7876
+        ],
+        [
+          "vocabulary_question",
+          7876
+        ],
+        [
+          "question::usage",
+          2083
+        ],
+        [
+          "jlpt::N1",
+          2020
+        ],
+        [
+          "question::kanji_reading",
+          1748
+        ],
+        [
+          "jlpt::N2",
+          1742
+        ],
+        [
+          "jlpt::N4",
+          1661
+        ],
+        [
+          "question::context_defined",
+          1638
+        ],
+        [
+          "jlpt::N3",
+          1621
+        ],
+        [
+          "question::orthography",
+          1090
+        ],
+        [
+          "question::paraphrase",
+          855
+        ],
+        [
+          "jlpt::N5",
+          832
+        ],
+        [
+          "question::word_formation",
+          247
+        ],
+        [
+          "question::counter_reading",
+          165
+        ],
+        [
+          "question::date_reading",
+          31
+        ],
+        [
+          "question::month_reading",
+          12
+        ],
+        [
+          "question::weekday_reading",
+          7
+        ]
+      ]
+    },
+    {
+      "id": 1784513787349779093,
+      "name": "JLPT MAX덱 참조표",
+      "notes": 9,
+      "fieldCount": 5,
+      "fields": [
+        {
+          "name": "Title",
+          "empty": 0,
+          "html": 0,
+          "maxLength": 10,
+          "examples": [
+            "수 세기 참조표 1",
+            "수 세기 참조표 1",
+            "수 세기 참조표 1"
+          ]
+        },
+        {
+          "name": "PartLabel",
+          "empty": 0,
+          "html": 0,
+          "maxLength": 11,
+          "examples": [
+            "1 / 8",
+            "2 / 8",
+            "3 / 8"
+          ]
+        },
+        {
+          "name": "JLPT",
+          "empty": 0,
+          "html": 0,
+          "maxLength": 2,
+          "examples": [
+            "N5",
+            "N5",
+            "N5"
+          ]
+        },
+        {
+          "name": "TableKind",
+          "empty": 0,
+          "html": 0,
+          "maxLength": 14,
+          "examples": [
+            "counter_matrix",
+            "counter_matrix",
+            "counter_matrix"
+          ]
+        },
+        {
+          "name": "TableHTML",
+          "empty": 0,
+          "html": 9,
+          "maxLength": 14712,
+          "examples": [
+            "<section class=\"_jc9\"><div class=\"_jcb\"><span class=\"reference-group-title audio-scope\"><span class=\"_jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"분류 음성 재생\" lang=\"ja\">~こ (個)~개</span><audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-reference-c2e9437a35381a9431ee6a7f.mp3\"></audio></span><span class=\"_jca\">11개</span></div><div class=\"_jci\"><div class=\"_jch\"><span class=\"_jcd audio-scope\"><span class=\"_jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"수 음성 재생\" lang=\"ja\">いち (一)1</span><audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-reference-33215348e0c6ee3a8bd9a4f1.mp3\"></audio></span><spa",
+            "<section class=\"_jc9\"><div class=\"_jcb\"><span class=\"reference-group-title audio-scope\"><span class=\"_jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"분류 음성 재생\" lang=\"ja\">~さつ (冊)~권</span><audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-reference-7bd1289a44ea74671c8f5e6d.mp3\"></audio></span><span class=\"_jca\">11개</span></div><div class=\"_jci\"><div class=\"_jch\"><span class=\"_jcd audio-scope\"><span class=\"_jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"수 음성 재생\" lang=\"ja\">いち (一)1</span><audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-reference-33215348e0c6ee3a8bd9a4f1.mp3\"></audio></span><sp",
+            "<section class=\"_jc9\"><div class=\"_jcb\"><span class=\"reference-group-title audio-scope\"><span class=\"_jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"분류 음성 재생\" lang=\"ja\">~はい (杯)~잔</span><audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-reference-c6bb41e979f7b4849649d777.mp3\"></audio></span><span class=\"_jca\">11개</span></div><div class=\"_jci\"><div class=\"_jch\"><span class=\"_jcd audio-scope\"><span class=\"_jo tappable\" role=\"button\" tabindex=\"0\" aria-label=\"수 음성 재생\" lang=\"ja\">いち (一)1</span><audio class=\"_j1c\" preload=\"none\" src=\"jlpt-v2-reference-33215348e0c6ee3a8bd9a4f1.mp3\"></audio></span><sp"
+          ]
+        }
+      ],
+      "tags": [
+        [
+          "jlpt::N5",
+          9
+        ],
+        [
+          "reference",
+          9
+        ],
+        [
+          "reference_table",
+          9
+        ],
+        [
+          "release::1_3_0",
+          9
+        ],
+        [
+          "reference_part::01",
+          1
+        ],
+        [
+          "reference_part::02",
+          1
+        ],
+        [
+          "reference_part::03",
+          1
+        ],
+        [
+          "reference_part::04",
+          1
+        ],
+        [
+          "reference_part::05",
+          1
+        ],
+        [
+          "reference_part::06",
+          1
+        ],
+        [
+          "reference_part::07",
+          1
+        ],
+        [
+          "reference_part::08",
+          1
+        ]
+      ]
+    }
+  ]
+}
