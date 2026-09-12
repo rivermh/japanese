@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(${comparison.left.pattern + ' · ' + comparison.right.pattern})}"></head>
+<body><header th:replace="~{fragments/layout :: header('search')}"></header>
+<main id="main-content" class="page-shell detail-shell">
+  <div class="breadcrumb"><a href="/#library">문법</a><span aria-hidden="true">/</span><span>비교</span></div>
+  <article class="surface lesson-paper comparison-paper">
+    <header class="lesson-heading"><div><p class="eyebrow" th:text="${comparison.relationType}"></p><h1><span lang="ja" th:text="${comparison.left.pattern}"></span><span aria-hidden="true"> · </span><span lang="ja" th:text="${comparison.right.pattern}"></span></h1></div></header>
+    <p class="prose" th:if="${comparison.summary != null and !comparison.summary.isBlank()}" th:text="${comparison.summary}"></p>
+    <section class="comparison-pair"><article><h2 lang="ja" th:text="${comparison.left.pattern}"></h2><p th:text="${comparison.left.explanation}"></p></article><article><h2 lang="ja" th:text="${comparison.right.pattern}"></h2><p th:text="${comparison.right.explanation}"></p></article></section>
+    <section class="detail-section" th:if="${comparison.keyDifference != null and !comparison.keyDifference.isBlank()}"><h2>핵심 차이</h2><p class="prose" th:text="${comparison.keyDifference}"></p></section>
+    <section class="detail-section" th:if="${comparison.usageDifference != null and !comparison.usageDifference.isBlank()}"><h2>사용 차이</h2><p class="prose" th:text="${comparison.usageDifference}"></p></section>
+    <section class="detail-section" th:if="${comparison.commonConfusion != null and !comparison.commonConfusion.isBlank()}"><h2>헷갈리기 쉬운 점</h2><p class="prose" th:text="${comparison.commonConfusion}"></p></section>
+    <p class="subtle" th:if="${comparison.sourceRef != null}" th:text="${'검토된 보강 출처: ' + comparison.sourceRef}"></p>
+    <div class="toolbar"><a class="button-secondary" th:href="@{/contents/{slug}(slug=${comparison.left.slug})}">첫 문법으로</a><a class="button-secondary" th:href="@{/contents/{slug}(slug=${comparison.right.slug})}">둘째 문법으로</a></div>
+  </article>
+</main><footer th:replace="~{fragments/layout :: footer}"></footer></body></html>

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('확인 문제')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('search')}"></header>
+<main id="main-content" class="page-shell detail-shell">
+    <a class="back-link" href="/quiz">← 문제 목록</a>
+    <article class="detail-card quiz-detail-card">
+        <header class="page-heading">
+            <p class="eyebrow">확인 문제 · 선택 학습</p>
+            <div class="card-meta">
+                <span class="type-pill" th:text="${question.questionType}">어휘</span>
+                <span class="level-pill" th:text="${question.level}">N5</span>
+                <span class="level-pill" th:text="${question.label}">문제</span>
+            </div>
+            <p class="quiz-instruction" th:text="${question.instruction}">알맞은 답을 고르세요.</p>
+            <h1 class="quiz-prompt" th:text="${question.promptJapanese}">問題文</h1>
+            <p class="quiz-prompt-korean" th:if="${question.promptKorean != ''}" th:text="${question.promptKorean}">문제 지문</p>
+        </header>
+
+        <form class="quiz-answer-form" th:action="@{/quiz/{id}/answer(id=${question.id})}" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <div class="quiz-choices">
+                <label th:each="choice : ${question.choices}" class="quiz-choice">
+                    <input type="radio" name="answer" th:value="${choice}" required>
+                    <span th:text="${choice}">선택지</span>
+                </label>
+            </div>
+            <button type="submit">정답 확인</button>
+        </form>
+
+        <section class="quiz-answer-guide" th:if="${question.answerKorean != '' or question.explanation != ''}">
+            <h2>정답과 해설</h2>
+            <p th:if="${question.answerJapanese != ''}" th:text="${'정답: ' + question.answerJapanese}">정답</p>
+            <p th:if="${question.answerKorean != ''}" th:text="${question.answerKorean}">정답 뜻</p>
+            <p th:if="${question.explanation != ''}" th:text="${question.explanation}">해설</p>
+        </section>
+    </article>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

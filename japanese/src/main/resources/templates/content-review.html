@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('콘텐츠 검토')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('search')}"></header>
+<main id="main-content" class="page-shell review-shell">
+    <header class="page-heading">
+        <div>
+            <p class="eyebrow">IMPORT REVIEW</p>
+            <h1>가져온 콘텐츠 검토</h1>
+            <p class="subtle">아직 공개되지 않은 콘텐츠입니다. 원자료와 변환 결과를 확인하세요.</p>
+        </div>
+        <a class="api-link" href="/">서비스 화면</a>
+    </header>
+
+    <section class="content-section" aria-labelledby="review-title">
+        <div class="section-heading">
+            <h2 id="review-title">검토 대기</h2>
+            <span class="count" th:text="${totalCount} + '개'">0개</span>
+        </div>
+        <p class="review-message" th:if="${reviewMessage}" th:text="${reviewMessage}">공개 처리 결과</p>
+        <nav class="review-filters" aria-label="검토 상태 필터">
+            <a th:classappend="${status == '' ? ' active' : ''}" href="/review">전체</a>
+            <a th:classappend="${status == 'PENDING' ? ' active' : ''}" href="/review?status=PENDING" th:text="${'대기 ' + pendingCount}">대기 0</a>
+            <a th:classappend="${status == 'REJECTED' ? ' active' : ''}" href="/review?status=REJECTED" th:text="${'반려 ' + rejectedCount}">반려 0</a>
+        </nav>
+        <form class="review-content-filters" method="get" action="/review">
+            <select name="type" aria-label="콘텐츠 유형">
+                <option value="">모든 유형</option>
+                <option value="WORD" th:selected="${type == 'WORD'}">단어</option>
+                <option value="GRAMMAR" th:selected="${type == 'GRAMMAR'}">문법</option>
+            </select>
+            <select name="level" aria-label="JLPT 레벨">
+                <option value="">모든 레벨</option>
+                <option th:each="code : ${ {'N5','N4','N3','N2','N1'} }" th:value="${code}" th:text="${code}" th:selected="${level == code}">N5</option>
+            </select>
+            <input type="hidden" name="status" th:value="${status}">
+            <button type="submit">필터 적용</button>
+        </form>
+        <div class="review-batch-bar">
+            <label><input type="checkbox" data-select-all> 현재 페이지 전체 선택</label>
+            <form id="batch-publish-form" action="/review/publish-selected" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <input type="hidden" name="status" th:value="${status}">
+                <input type="hidden" name="type" th:value="${type}">
+                <input type="hidden" name="level" th:value="${level}">
+                <button class="publish-button" type="submit" data-batch-submit disabled>선택 항목 공개</button>
+            </form>
+        </div>
+        <div class="review-list">
+            <article class="review-row" th:each="content : ${contents}">
+                <div class="review-main">
+                    <label class="review-select">
+                        <input type="checkbox" name="contentIds" th:value="${content.id}" form="batch-publish-form" data-review-checkbox>
+                        <span class="sr-only" th:text="${content.title + ' 선택'}">콘텐츠 선택</span>
+                    </label>
+                    <div class="card-meta">
+                        <span class="type-pill" th:text="${content.type == T(com.japanese.content.entity.ContentType).WORD ? '단어' : '문법'}">단어</span>
+                        <span class="level-pill" th:text="${content.level}">JLPT N5</span>
+                        <span class="status-pill" th:text="${content.reviewStatus == T(com.japanese.content.entity.ReviewStatus).REJECTED ? '반려됨' : '검토 대기'}">검토 대기</span>
+                    </div>
+                    <h2 th:text="${content.title}">食べる</h2>
+                    <p class="reading" th:if="${content.reading != null}" th:text="${content.reading}">たべる</p>
+                    <p class="description" th:text="${content.meaning}">먹다</p>
+                    <a class="review-detail-link" th:href="@{/review/{id}(id=${content.id})}">상세 검토 →</a>
+                    <p class="review-note" th:if="${content.reviewNote != null and !content.reviewNote.isBlank()}" th:text="${'반려 사유: ' + content.reviewNote}">반려 사유</p>
+                </div>
+                <div class="review-meta">
+                    <span th:text="${'예문 ' + content.exampleCount + '개'}">예문 1개</span>
+                    <span th:text="${content.sourceRef}">JLPT-MAX-Deck-2.1.1.apkg</span>
+                    <code th:text="${content.slug}">jlpt-max-entry</code>
+                    <form th:action="@{/review/{id}/publish(id=${content.id})}" method="post">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                        <button class="publish-button" type="submit">검토 완료 · 공개</button>
+                    </form>
+                </div>
+            </article>
+        </div>
+        <p class="empty-state" th:if="${#lists.isEmpty(contents)}">검토할 콘텐츠가 없습니다.</p>
+        <div class="pagination" th:if="${totalCount > 100}">
+            <a th:if="${hasPrevious}" th:href="@{/review(status=${status},type=${type},level=${level},page=${page - 1})}">이전</a>
+            <span th:text="${page + 1 + ' / ' + totalPages}">1 / 128</span>
+            <a th:if="${hasNext}" th:href="@{/review(status=${status},type=${type},level=${level},page=${page + 1})}">다음</a>
+        </div>
+    </section>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+<script th:src="@{/js/review.js}"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('학습 분야')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('search')}"></header>
+<main id="main-content" class="page-shell">
+    <header class="page-heading">
+        <p class="eyebrow">EXPLORE JAPANESE</p>
+        <h1>관심 있는 분야부터</h1>
+        <p class="subtle">시험 준비부터 일상과 업무까지, 필요한 일본어를 찾아보세요.</p>
+    </header>
+    <section class="surface detail-section" aria-labelledby="category-title">
+        <div class="section-heading">
+            <h2 id="category-title">학습 분야</h2>
+            <span class="subtle" th:text="${#lists.size(categories) + '개 분야'}">0개 분야</span>
+        </div>
+        <div class="content-list category-list" th:unless="${#lists.isEmpty(categories)}">
+            <a class="content-row category-row" th:each="category : ${categories}" th:href="@{/(category=${category.slug})} + '#library'">
+                <span class="type-pill">분야</span>
+                <div class="content-main"><h3 th:text="${category.name}">JLPT</h3></div>
+                <span class="subtle" th:text="${category.publicContentCount + '개 콘텐츠'}">0개 콘텐츠</span>
+                <span aria-hidden="true">→</span>
+            </a>
+        </div>
+        <div class="empty-state" th:if="${#lists.isEmpty(categories)}">
+            <p>등록된 학습 분야가 없습니다.</p>
+            <a class="button button-secondary" th:href="@{/(keyword='')}">전체 콘텐츠 보기</a>
+        </div>
+    </section>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

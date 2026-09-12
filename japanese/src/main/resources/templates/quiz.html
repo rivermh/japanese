@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('확인 문제')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('search')}"></header>
+<main id="main-content" class="page-shell quiz-shell">
+    <header class="page-heading">
+        <div>
+            <p class="eyebrow">JLPT QUIZ</p>
+            <h1>확인 문제</h1>
+            <p class="subtle">필요할 때 선택하는 보조 학습입니다. JLPT 문제 카드로 어휘를 확인하세요.</p>
+        </div>
+        <a class="api-link" href="/">홈</a>
+    </header>
+
+    <nav class="quiz-levels" aria-label="JLPT 레벨">
+        <a th:classappend="${level == '' ? ' active' : ''}" href="/quiz">전체</a>
+        <a th:each="code : ${ {'N5','N4','N3','N2','N1'} }"
+           th:classappend="${level == code ? ' active' : ''}"
+           th:href="@{/quiz(level=${code})}" th:text="${code}">N5</a>
+    </nav>
+
+    <section class="content-section">
+        <div class="section-heading">
+            <h2>문제 카드</h2>
+            <span class="count" th:text="${questions.totalElements} + '개'">0개</span>
+        </div>
+        <div class="quiz-list">
+            <article class="quiz-row" th:each="question : ${questions.questions}">
+                <div>
+                    <div class="card-meta">
+                        <span class="type-pill" th:text="${question.questionType}">어휘</span>
+                        <span class="level-pill" th:text="${question.level}">N5</span>
+                    </div>
+                    <h2 th:text="${question.label != '' ? question.label : question.promptJapanese}">문제</h2>
+                    <p class="description" th:text="${question.promptKorean}">문제를 풀어보세요.</p>
+                </div>
+                <a class="review-detail-link" th:href="@{/quiz/{id}(id=${question.id})}">풀기 →</a>
+            </article>
+        </div>
+        <div class="empty-state" th:if="${#lists.isEmpty(questions.questions)}"><h3>지금은 확인 문제가 없어요.</h3><p>단어와 문법 학습은 계속할 수 있어요.</p><a class="text-link" href="/today">오늘의 학습으로 →</a></div>
+        <div class="pagination" th:if="${questions.totalPages > 1}">
+            <a th:if="${questions.hasPrevious}" th:href="@{/quiz(level=${level},page=${questions.page - 1})}">이전</a>
+            <span th:text="${questions.page + 1 + ' / ' + questions.totalPages}">1 / 1</span>
+            <a th:if="${questions.hasNext}" th:href="@{/quiz(level=${level},page=${questions.page + 1})}">다음</a>
+        </div>
+    </section>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

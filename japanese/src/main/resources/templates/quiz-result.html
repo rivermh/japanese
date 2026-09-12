@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('확인 문제 결과')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('search')}"></header>
+<main id="main-content" class="page-shell detail-shell">
+    <a class="back-link" href="/quiz">← 문제 목록</a>
+    <article class="detail-card quiz-result-card">
+        <header class="page-heading">
+            <p class="eyebrow" th:text="${result.correct ? 'CORRECT' : 'REVIEW'}">CORRECT</p>
+            <h1 th:text="${result.correct ? '정답이에요' : '다시 확인해보세요'}">정답이에요</h1>
+            <p class="subtle">확인 문제 결과입니다. 다음 문제는 필요할 때 선택해서 풀어 보세요.</p>
+        </header>
+        <p class="quiz-prompt" th:text="${question.promptJapanese}">問題文</p>
+        <div class="quiz-answer-box">
+            <strong th:text="${'정답: ' + result.answerJapanese}">정답</strong>
+            <span th:if="${result.answerKorean != ''}" th:text="${result.answerKorean}">뜻</span>
+            <p th:if="${result.explanation != ''}" th:text="${result.explanation}">해설</p>
+        </div>
+        <p class="quiz-progress" th:text="${result.overview.character.stageName + ' · 레벨 ' + result.overview.character.level + ' · 현재 EXP ' + result.overview.character.experience + ' · +' + (result.correct ? 10 : 2) + ' EXP'}">새싹 · 레벨 1 · 현재 EXP 10 · +10 EXP</p>
+        <a class="quiz-next-link" href="/quiz">다음 문제 풀기 →</a>
+    </article>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

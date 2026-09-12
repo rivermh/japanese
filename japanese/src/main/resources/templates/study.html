@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('자유 학습')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('today')}"></header>
+<main id="main-content" class="page-shell study-shell">
+    <header class="page-heading">
+        <div>
+            <p class="eyebrow">STUDY SESSION</p>
+            <h1 th:text="${relearnTarget == null ? '짧게 학습하기' : (relearnTarget.name() == 'BOOKMARKS' ? '북마크 다시 학습' : '약점 다시 학습')}">짧게 학습하기</h1>
+            <p class="subtle" th:text="${relearnTarget == null ? '오늘의 콘텐츠를 확인하고 답변 결과를 기록하세요.' : '정규 오늘의 학습과 분리해 필요한 표현을 다시 확인하세요.'}">오늘의 콘텐츠를 확인하고 답변 결과를 기록하세요.</p>
+        </div>
+        <a class="api-link" href="/">홈</a>
+    </header>
+
+    <section class="character-card" aria-label="학습자 상태">
+        <div class="character-mark" th:text="${overview.character.stageName}">처음의 학습자</div>
+        <div class="character-info">
+            <strong th:text="${overview.displayName}">학습자</strong>
+            <span th:text="${overview.character.stageName + ' · 레벨 ' + overview.character.level + ' · ' + overview.character.experience + ' EXP'}">새싹 · 레벨 1 · 0 EXP</span>
+            <div class="exp-track" role="progressbar" aria-label="다음 성장까지 진행률" aria-valuemin="0" aria-valuemax="100" th:attr="aria-valuenow=${overview.character.stageProgressPercent}"><span th:style="${'width:' + overview.character.stageProgressPercent + '%'}"></span></div>
+        </div>
+        <div class="study-stats">
+            <strong th:text="${overview.correctAnswers + ' / ' + overview.totalAnswers}">0 / 0</strong>
+            <span>정답</span>
+        </div>
+        <div class="study-daily">
+            <strong th:text="${dailyProgress.completed + ' / ' + dailyProgress.goal}">0 / 10</strong>
+            <span>오늘 학습</span>
+        </div>
+        <div class="study-due" th:if="${overview.dueReviewCount > 0}">
+            <strong th:text="${overview.dueReviewCount + '개'}">0개</strong>
+            <span>복습 대기</span>
+        </div>
+    </section>
+
+    <nav class="study-filters" aria-label="학습 필터" th:if="${relearnTarget == null}">
+        <a th:classappend="${!reviewOnly ? ' active' : ''}" th:href="@{/study(level=${level},type=${type})}">학습 전체</a>
+        <a th:classappend="${reviewOnly ? ' active' : ''}" th:href="@{/study(level=${level},type=${type},reviewOnly=true)}" th:text="${'복습만 ' + overview.dueReviewCount + '개'}">복습만 0개</a>
+        <a th:each="code : ${ {'N5','N4','N3','N2','N1'} }"
+           th:classappend="${level == code ? ' active' : ''}"
+           th:href="@{/study(level=${code},type=${type},reviewOnly=${reviewOnly})}" th:text="${code}">N5</a>
+        <a th:classappend="${type == 'WORD' ? ' active' : ''}" th:href="@{/study(type='WORD',level=${level},reviewOnly=${reviewOnly})}">단어</a>
+        <a th:classappend="${type == 'GRAMMAR' ? ' active' : ''}" th:href="@{/study(type='GRAMMAR',level=${level},reviewOnly=${reviewOnly})}">문법</a>
+    </nav>
+    <nav class="study-filters" aria-label="다시 학습 메뉴" th:if="${relearnTarget != null}">
+        <a href="/study">자유 학습</a>
+        <a th:classappend="${relearnTarget.name() == 'BOOKMARKS' ? ' active' : ''}" href="/study/relearn/bookmarks">북마크</a>
+        <a th:classappend="${relearnTarget.name() == 'WEAKNESSES' ? ' active' : ''}" href="/study/relearn/weaknesses">약점 표현</a>
+    </nav>
+
+    <section class="content-section" aria-labelledby="study-title">
+        <div class="section-heading">
+            <h2 id="study-title">학습 카드</h2>
+            <span class="count" th:text="${#lists.size(cards)} + '개' + (relearnTarget == null ? ' · 복습 우선' : ' · 다시 학습')">0개 · 복습 우선</span>
+        </div>
+        <div class="study-list">
+            <article class="study-card" th:each="card : ${cards}">
+                <div class="card-meta">
+                    <span class="type-pill" th:text="${card.type == T(com.japanese.content.entity.ContentType).WORD ? '단어' : '문법'}">단어</span>
+                    <span th:each="level : ${card.levels}" class="level-pill" th:text="${level.system + ' ' + level.code}">JLPT N5</span>
+                </div>
+                <h2 th:text="${card.title}">食べる</h2>
+                <p class="reading" th:if="${card.reading != null}" th:text="${card.reading}">たべる</p>
+                <p class="description" th:text="${card.description}">먹다</p>
+                <div class="study-actions">
+                    <form th:if="${relearnTarget == null}" th:action="@{/study/{slug}/answer(slug=${card.slug},level=${level},type=${type},reviewOnly=${reviewOnly})}" method="post">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                        <input type="hidden" name="sessionKey" th:value="${studySessionKey}">
+                        <input type="hidden" name="result" value="CORRECT">
+                        <button class="correct-button" type="submit">알고 있어요 +10</button>
+                    </form>
+                    <form th:if="${relearnTarget == null}" th:action="@{/study/{slug}/answer(slug=${card.slug},level=${level},type=${type},reviewOnly=${reviewOnly})}" method="post">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                        <input type="hidden" name="sessionKey" th:value="${studySessionKey}">
+                        <input type="hidden" name="result" value="INCORRECT">
+                        <button class="incorrect-button" type="submit">다시 볼게요 +2</button>
+                    </form>
+                    <form th:if="${relearnTarget != null}" th:action="@{'/study/relearn/' + ${relearnTarget.name().toLowerCase()} + '/' + ${card.slug} + '/answer'}" method="post">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                        <input type="hidden" name="sessionKey" th:value="${studySessionKey}">
+                        <input type="hidden" name="result" value="CORRECT">
+                        <button class="correct-button" type="submit">확인했어요</button>
+                    </form>
+                    <form th:if="${relearnTarget != null}" th:action="@{'/study/relearn/' + ${relearnTarget.name().toLowerCase()} + '/' + ${card.slug} + '/answer'}" method="post">
+                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                        <input type="hidden" name="sessionKey" th:value="${studySessionKey}">
+                        <input type="hidden" name="result" value="INCORRECT">
+                        <button class="incorrect-button" type="submit">다시 볼게요</button>
+                    </form>
+                </div>
+            </article>
+        </div>
+        <p class="empty-state" th:if="${#lists.isEmpty(cards) and relearnTarget != null and relearnTarget.name() == 'BOOKMARKS'}">저장한 콘텐츠가 없습니다. 콘텐츠 상세에서 북마크를 추가해 보세요.</p>
+        <p class="empty-state" th:if="${#lists.isEmpty(cards) and relearnTarget != null and relearnTarget.name() == 'WEAKNESSES'}">최근 오답 콘텐츠가 없습니다. 카드 학습을 이어가면 다시 볼 표현이 모입니다.</p>
+        <p class="empty-state" th:if="${#lists.isEmpty(cards) and relearnTarget == null and reviewOnly}">지금은 복습할 카드가 없습니다. 새 학습 카드에서 학습한 뒤 다시 확인하세요.</p>
+        <p class="empty-state" th:if="${#lists.isEmpty(cards) and relearnTarget == null and !reviewOnly}">공개된 학습 콘텐츠가 없습니다. 검토 화면에서 콘텐츠를 먼저 공개하세요.</p>
+    </section>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head(${content.summary.title + ' · 콘텐츠 검토'})}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('search')}"></header>
+<main id="main-content" class="page-shell detail-shell review-detail-shell">
+    <a class="back-link" href="/review">← 검토 목록</a>
+    <article class="detail-card">
+        <header class="page-heading">
+            <div class="card-meta">
+                <span class="type-pill" th:text="${content.summary.type == T(com.japanese.content.entity.ContentType).WORD ? '단어' : '문법'}">단어</span>
+                <span class="level-pill" th:if="${content.summary.level != null and !content.summary.level.isBlank()}" th:text="${content.summary.level}">JLPT N5</span>
+                <span th:each="category : ${content.summary.categories}" class="level-pill" th:text="${category}">JLPT</span>
+                <span class="status-pill" th:text="${content.summary.reviewStatus == T(com.japanese.content.entity.ReviewStatus).REJECTED ? '반려됨' : '검토 대기'}">검토 대기</span>
+            </div>
+            <h1 th:text="${content.summary.title}">食べる</h1>
+            <p class="reading" th:if="${content.summary.reading != null}" th:text="${content.summary.reading}">たべる</p>
+        </header>
+
+        <section class="source-card" th:if="${content.source != null}">
+            <strong th:text="${content.source.displayName + (content.source.version != null ? ' ' + content.source.version : '')}">출처</strong>
+            <span th:text="${content.source.licenseSummary}">라이선스 안내</span>
+            <span th:text="${content.source.attribution}">귀속 정보</span>
+            <span th:text="${content.source.usageNote}">사용 안내</span>
+            <a th:if="${content.source.licenseUrl != null}" th:href="${content.source.licenseUrl}" target="_blank" rel="noreferrer">라이선스 원문</a>
+        </section>
+
+        <section class="review-facts" th:if="${content.partOfSpeech != null or content.pitchAccent != null or content.summary.sourceRef != null}">
+            <div th:if="${content.partOfSpeech != null}"><span class="fact-label">품사</span><span th:text="${content.partOfSpeech}">동사</span></div>
+            <div th:if="${content.pitchAccent != null}"><span class="fact-label">악센트</span><span th:text="${content.pitchAccent}">2</span></div>
+            <div th:if="${content.summary.sourceRef != null}"><span class="fact-label">출처</span><span th:text="${content.summary.sourceRef}">JLPT-MAX-Deck-2.1.1.apkg</span></div>
+        </section>
+
+        <p class="review-note review-note-detail" th:if="${content.summary.reviewNote != null and !content.summary.reviewNote.isBlank()}" th:text="${'이전 반려 사유: ' + content.summary.reviewNote}">이전 반려 사유</p>
+
+        <section class="detail-section" th:if="${!#lists.isEmpty(content.reviewHistory)}">
+            <h2>검토 이력</h2>
+            <ol class="review-history">
+                <li th:each="history : ${content.reviewHistory}">
+                    <strong th:text="${history.status == T(com.japanese.content.entity.ReviewStatus).APPROVED ? '공개 승인' : (history.status == T(com.japanese.content.entity.ReviewStatus).REJECTED ? '반려' : '재검토 요청')}">반려</strong>
+                    <span th:if="${history.note != null}" th:text="${history.note}">사유</span>
+                    <time th:datetime="${history.reviewedAt}" th:text="${history.reviewedAt}">2026-09-10T00:00:00Z</time>
+                </li>
+            </ol>
+        </section>
+
+        <section class="detail-section" th:if="${!#lists.isEmpty(content.meanings)}">
+            <h2>뜻</h2>
+            <ul class="meaning-list">
+                <li th:each="meaning : ${content.meanings}" th:text="${meaning.text}">먹다</li>
+            </ul>
+        </section>
+
+        <section class="detail-section" th:if="${content.grammar != null}">
+            <h2>문법 설명</h2>
+            <p th:text="${content.grammar.explanation}">허가를 나타냅니다.</p>
+            <p class="connection" th:text="${content.grammar.connection}">동사 て형 + もいい</p>
+        </section>
+
+        <section class="detail-section" th:if="${!#lists.isEmpty(content.examples)}">
+            <h2>예문</h2>
+            <div class="example-list">
+                <article class="example" th:each="example : ${content.examples}">
+                    <p class="example-japanese" th:text="${example.japaneseText}">毎朝、朝ご飯を食べます。</p>
+                    <p class="example-reading" th:if="${example.reading != null}" th:text="${example.reading}">まいあさ、あさごはんをたべます。</p>
+                    <p class="example-translation" th:if="${example.translation != null}" th:text="${example.translation}">매일 아침밥을 먹습니다.</p>
+                    <p class="example-audio" th:if="${example.audioFileName != null}" th:text="${'오디오 참조: ' + example.audioFileName}">오디오 참조</p>
+                </article>
+            </div>
+        </section>
+
+        <div class="review-actions">
+            <form class="review-action" th:action="@{/review/{id}/publish(id=${content.summary.id})}" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <button type="submit">검토 완료 · 공개</button>
+            </form>
+            <form class="reject-form" th:action="@{/review/{id}/reject(id=${content.summary.id})}" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <label class="sr-only" th:for="${'reject-reason-' + content.summary.id}">반려 사유</label>
+                <input th:id="${'reject-reason-' + content.summary.id}" name="reason" type="text" maxlength="1000" required placeholder="반려 사유 입력">
+                <button class="reject-button" type="submit">반려</button>
+            </form>
+            <form th:if="${content.summary.reviewStatus == T(com.japanese.content.entity.ReviewStatus).REJECTED}" th:action="@{/review/{id}/reset(id=${content.summary.id})}" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                <button class="reset-button" type="submit">재검토 상태로</button>
+            </form>
+        </div>
+    </article>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

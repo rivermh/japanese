@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('북마크')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('bookmarks')}"></header>
+<main id="main-content" class="page-shell">
+    <header class="page-heading">
+        <p class="eyebrow">MY COLLECTION</p>
+        <h1>다시 보고 싶은 일본어</h1>
+        <p class="subtle">저장한 단어와 문법을 모아 두고, 필요할 때 꺼내 보세요.</p>
+    </header>
+    <section class="surface detail-section" aria-labelledby="bookmarks-title">
+        <div class="section-heading">
+            <h2 id="bookmarks-title">북마크 <span class="subtle" th:text="${#lists.size(bookmarks) + '개'}">0개</span></h2>
+            <div class="toolbar"><a class="button button-secondary" href="/study/relearn/bookmarks">북마크 다시 학습</a><a class="button button-quiet" th:href="@{/(keyword='')}">콘텐츠 찾기</a></div>
+        </div>
+        <form class="toolbar filter-form" th:action="@{/bookmarks}" method="get" aria-label="북마크 필터">
+            <div class="field">
+                <label for="bookmark-type">유형</label>
+                <select id="bookmark-type" name="type">
+                    <option value="" th:selected="${type == ''}">전체 유형</option>
+                    <option value="WORD" th:selected="${type == 'WORD'}">단어</option>
+                    <option value="GRAMMAR" th:selected="${type == 'GRAMMAR'}">문법</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="bookmark-level">JLPT 레벨</label>
+                <select id="bookmark-level" name="level">
+                    <option value="" th:selected="${level == ''}">전체 레벨</option>
+                    <option th:each="code : ${ {'N5','N4','N3','N2','N1'} }" th:value="${code}" th:selected="${level == code}" th:text="${code}">N5</option>
+                </select>
+            </div>
+            <button class="button button-secondary" type="submit">적용</button>
+            <a class="button button-quiet" th:if="${type != '' or level != ''}" th:href="@{/bookmarks}">초기화</a>
+        </form>
+        <p class="form-message success" role="status" th:if="${bookmarkMessage != null}" th:text="${bookmarkMessage}"></p>
+        <div class="content-list" th:unless="${#lists.isEmpty(bookmarks)}">
+            <a class="content-row" th:each="content : ${bookmarks}" th:href="@{/contents/{slug}(slug=${content.slug})}">
+                <span class="type-pill" th:text="${content.type.name() == 'WORD' ? '단어' : '문법'}">단어</span>
+                <div class="content-main">
+                    <h3 lang="ja" th:text="${content.title}">食べる</h3>
+                    <p class="reading" lang="ja" th:if="${!#strings.isEmpty(content.reading)}" th:text="${content.reading}">たべる</p>
+                    <p class="description" th:text="${content.description}">먹다</p>
+                </div>
+                <div class="content-meta">
+                    <span class="level-pill" th:each="contentLevel : ${content.levels}" th:text="${contentLevel.code}">N5</span>
+                    <span class="subtle" th:each="category : ${content.categories}" th:text="${category.name}">일상생활</span>
+                </div>
+            </a>
+        </div>
+        <div class="empty-state" th:if="${#lists.isEmpty(bookmarks)}">
+            <p th:text="${type != '' or level != '' ? '선택한 조건에 맞는 북마크가 없습니다.' : '아직 저장한 콘텐츠가 없습니다.'}">아직 저장한 콘텐츠가 없습니다.</p>
+            <p class="subtle">콘텐츠 상세에서 북마크를 눌러 나만의 목록을 만들어 보세요.</p>
+            <a class="button button-secondary" th:if="${type != '' or level != ''}" th:href="@{/bookmarks}">전체 북마크 보기</a>
+        </div>
+    </section>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

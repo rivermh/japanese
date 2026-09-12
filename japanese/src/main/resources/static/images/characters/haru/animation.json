@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "stages": {
+    "young": {
+      "idle": "young.png",
+      "states": {
+        "study": {
+          "frames": [{ "asset": "apprentice.png", "durationMs": 2200 }],
+          "returnToIdle": true
+        },
+        "happy": {
+          "frames": [{ "asset": "reliable.png", "durationMs": 1800 }],
+          "returnToIdle": true
+        },
+        "goal-complete": {
+          "frames": [{ "asset": "reliable.png", "durationMs": 2400 }],
+          "returnToIdle": true
+        },
+        "growth": {
+          "frames": [{ "asset": "reliable.png", "durationMs": 2800 }],
+          "returnToIdle": true
+        }
+      },
+      "ambient": [
+        { "state": "study", "weight": 1 }
+      ],
+      "ambientDelayMs": { "min": 9000, "max": 17000 }
+    },
+    "apprentice": { "idle": "apprentice.png", "states": {}, "ambient": [] },
+    "confident": { "idle": "confident.png", "states": {}, "ambient": [] },
+    "reliable": { "idle": "reliable.png", "states": {}, "ambient": [] }
+  }
+}

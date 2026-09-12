@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('회원 가입')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('home')}"></header>
+<main id="main-content" class="page-shell auth-shell">
+    <header class="page-heading">
+        <p class="eyebrow">START LEARNING</p>
+        <h1>매일 조금씩, 나의 일본어</h1>
+        <p class="subtle">배운 내용을 기록하고 나에게 맞는 복습을 시작하세요.</p>
+    </header>
+    <section class="surface detail-section" aria-labelledby="signup-title">
+        <div class="section-heading"><h2 id="signup-title">회원 가입</h2></div>
+        <p class="form-message" role="alert" th:if="${registrationError != null}" th:text="${registrationError}">가입 정보를 확인하세요.</p>
+        <form class="auth-form" th:action="@{/signup}" th:object="${registrationRequest}" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <div class="field">
+                <label for="loginId">로그인 ID</label>
+                <input th:field="*{loginId}" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="80" aria-describedby="loginId-help loginId-error" th:attr="aria-invalid=${#fields.hasErrors('loginId')}" required>
+                <p id="loginId-help" class="subtle">영문, 숫자, 점(.), 밑줄(_), 하이픈(-)으로 3~80자</p>
+                <p id="loginId-error" class="field-error" th:errors="*{loginId}"></p>
+            </div>
+            <div class="field">
+                <label for="email">이메일 <span class="subtle">선택</span></label>
+                <input th:field="*{email}" type="email" autocomplete="email" maxlength="160" aria-describedby="email-error" th:attr="aria-invalid=${#fields.hasErrors('email')}">
+                <p id="email-error" class="field-error" th:errors="*{email}"></p>
+            </div>
+            <div class="field">
+                <label for="displayName">표시 이름</label>
+                <input th:field="*{displayName}" type="text" autocomplete="nickname" maxlength="80" aria-describedby="displayName-error" th:attr="aria-invalid=${#fields.hasErrors('displayName')}" required>
+                <p id="displayName-error" class="field-error" th:errors="*{displayName}"></p>
+            </div>
+            <div class="field">
+                <label for="password">비밀번호</label>
+                <input th:field="*{password}" type="password" autocomplete="new-password" minlength="8" maxlength="72" aria-describedby="password-help password-error" th:attr="aria-invalid=${#fields.hasErrors('password')}" required>
+                <p id="password-help" class="subtle">8~72자로 입력하세요.</p>
+                <p id="password-error" class="field-error" th:errors="*{password}"></p>
+            </div>
+            <button class="button" type="submit">가입하기</button>
+        </form>
+        <p class="auth-switch subtle">이미 계정이 있나요? <a th:href="@{/login}">로그인</a></p>
+    </section>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

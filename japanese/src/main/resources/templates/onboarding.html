@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('학습 시작 설정')}"></head>
+<body><header th:replace="~{fragments/layout :: header('onboarding')}"></header>
+<main id="main-content" class="page-shell onboarding-shell">
+    <header class="page-heading"><div><p class="eyebrow">SET UP YOUR PLAN</p><h1>어떤 일본어를 공부할까요?</h1><p class="subtle">나중에 설정에서 언제든 바꿀 수 있어요. 1분이면 충분합니다.</p></div></header>
+    <p class="form-message" role="alert" th:if="${onboardingError}" th:text="${onboardingError}"></p>
+    <form class="surface onboarding-form" action="/onboarding" method="post" data-onboarding-form>
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <section class="onboarding-step" data-step="1"><div class="section-heading"><h2>1. 시작할 범위</h2><span class="subtle">현재 수준은 추천을 위한 선택입니다.</span></div>
+            <fieldset><legend>현재 일본어 수준</legend><div class="choice-grid"><label class="choice-item"><input type="radio" name="currentLevel" value="UNKNOWN" checked><span>잘 모르겠음 · N5부터 시작</span></label><label th:each="level : ${options.jlptLevels}" class="choice-item"><input type="radio" name="currentLevel" th:value="${level.key}"><span th:text="${level.label + ' 정도'}">N5 정도</span></label></div></fieldset>
+            <fieldset><legend>공부하고 싶은 JLPT 목표</legend><div class="choice-grid"><label th:each="level, stat : ${options.jlptLevels}" class="choice-item"><input type="radio" name="targetLevel" th:value="${level.key}" th:checked="${stat.first}" required><span th:text="${level.label}">JLPT N5</span></label></div></fieldset>
+        </section>
+        <section class="onboarding-step" data-step="2"><div class="section-heading"><h2>2. 함께 공부할 분야</h2><span class="subtle">선택하지 않으면 모든 제공 분야를 봅니다.</span></div>
+            <div class="choice-grid" th:if="${!#lists.isEmpty(options.categories)}"><label th:each="category : ${options.categories}" class="choice-item"><input type="checkbox" name="categories" th:value="${category.key}"><span th:text="${category.label}">일상 일본어</span></label></div>
+            <p class="subtle" th:if="${#lists.isEmpty(options.categories)}">현재 공개된 분야 콘텐츠가 아직 없습니다. JLPT 범위부터 시작합니다.</p>
+        </section>
+        <section class="onboarding-step" data-step="3"><div class="section-heading"><h2>3. 하루 학습량</h2><span class="subtle">복습은 새 학습보다 먼저 보여 드립니다.</span></div>
+            <div class="preset-grid"><label th:each="preset, stat : ${options.presets}" class="preset-choice"><input type="radio" name="preset" th:value="${preset.key}" th:checked="${stat.first}"><span><strong th:text="${preset.label}">보통</strong><small th:text="${'새 단어 ' + preset.dailyNewWordLimit + ' · 새 문법 ' + preset.dailyNewGrammarLimit + ' · 목표 ' + preset.dailyGoal}">새 단어 5 · 새 문법 5 · 목표 10</small></span></label></div>
+            <details class="custom-plan"><summary>직접 정하기</summary><div class="field-row"><label>새 단어<input name="dailyNewWordLimit" type="number" min="0" max="50" placeholder="5"></label><label>새 문법<input name="dailyNewGrammarLimit" type="number" min="0" max="50" placeholder="5"></label><label>일일 목표<input name="dailyGoal" type="number" min="1" max="100" placeholder="10"></label></div><p class="subtle">직접 값을 모두 입력하면 프리셋 대신 적용됩니다.</p></details>
+        </section>
+        <div class="onboarding-actions"><button class="button" type="submit">내 학습 플랜 만들기 →</button><span class="subtle">학습 기록이나 EXP는 아직 생성되지 않습니다.</span></div>
+    </form>
+</main><footer th:replace="~{fragments/layout :: footer}"></footer></body></html>

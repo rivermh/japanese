@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('학습 통계')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('statistics')}"></header>
+<main id="main-content" class="page-shell">
+    <header class="page-heading">
+        <p class="eyebrow">YOUR LEARNING JOURNAL</p>
+        <h1>차곡차곡 쌓인 학습</h1>
+        <p class="subtle">최근의 학습 흐름을 살펴보고, 다시 볼 내용을 골라 보세요.</p>
+    </header>
+    <section class="surface detail-section" aria-labelledby="summary-title">
+        <div class="section-heading">
+            <h2 id="summary-title">학습 기록</h2>
+            <a class="button button-quiet" th:href="@{/today}">오늘의 학습</a>
+        </div>
+        <dl class="metric-strip">
+            <div><dt>총 학습</dt><dd th:text="${statistics.totalAnswers + '회'}">0회</dd></div>
+            <div><dt>정답률</dt><dd th:text="${statistics.totalAnswers == 0 ? '—' : statistics.accuracyPercent + '%'}">—</dd></div>
+            <div><dt>오늘 학습</dt><dd th:text="${statistics.todayCompleted + '회'}">0회</dd></div>
+            <div><dt>최근 7일</dt><dd th:text="${statistics.recentSevenDaysCompleted + '회'}">0회</dd></div>
+            <div><dt th:text="${'누적 EXP · 레벨 ' + statistics.level}">누적 EXP · 레벨 1</dt><dd th:text="${statistics.experience}">0</dd></div>
+        </dl>
+        <p class="subtle" th:if="${statistics.totalAnswers > 0}" th:text="${'정답 ' + statistics.correctAnswers + '회 · 오답 ' + statistics.incorrectAnswers + '회 · 카드 학습과 퀴즈 합계'}">카드 학습과 퀴즈 합계</p>
+        <p class="empty-state" th:if="${statistics.totalAnswers == 0}">첫 학습을 마치면 이곳에 나의 기록이 쌓입니다.</p>
+    </section>
+    <div class="stats-grid">
+        <section class="surface detail-section" aria-labelledby="activity-title">
+            <div class="section-heading"><h2 id="activity-title">최근 7일 활동</h2><span class="subtle">하루 학습 횟수</span></div>
+            <div class="week-activity">
+                <div th:each="day : ${weeklyActivity}" th:classappend="${day.count > 0 ? ' has-activity' : ''}">
+                    <strong th:text="${day.count + '회'}">0회</strong>
+                    <time th:datetime="${day.date}" th:text="${#temporals.format(day.date, 'MM.dd')}">09.10</time>
+                </div>
+            </div>
+            <p class="subtle">카드 학습과 퀴즈를 완료한 횟수입니다.</p>
+        </section>
+        <section class="surface detail-section" aria-labelledby="levels-title">
+            <div class="section-heading"><h2 id="levels-title">JLPT 레벨별 학습</h2></div>
+            <div class="level-progress-grid" th:unless="${#lists.isEmpty(levelProgress)}">
+                <div th:each="level : ${levelProgress}">
+                    <strong class="level-pill" th:text="${level.levelCode}">N5</strong>
+                    <span th:text="${'학습 ' + level.learnedContentCount + '개'}">학습 0개</span>
+                    <a th:if="${level.dueReviewCount > 0}" th:href="@{/study(level=${level.levelCode},reviewOnly=true)}" th:text="${'복습 대기 ' + level.dueReviewCount + '개'}">복습 대기 0개</a>
+                    <span class="subtle" th:if="${level.dueReviewCount == 0}">복습 대기 0개</span>
+                </div>
+            </div>
+            <p class="empty-state" th:if="${#lists.isEmpty(levelProgress)}">아직 레벨별 학습 기록이 없습니다.</p>
+        </section>
+    </div>
+    <section class="surface detail-section" aria-labelledby="weakness-title">
+        <div class="section-heading"><div><h2 id="weakness-title">한 번 더 살펴볼 표현</h2><span class="subtle">최근 200회 카드 학습 기준</span></div><a class="button button-quiet" href="/study/relearn/weaknesses">약점 다시 학습</a></div>
+        <div class="content-list" th:unless="${#lists.isEmpty(weaknesses)}">
+            <a class="content-row" th:each="weakness : ${weaknesses}" th:href="@{/contents/{slug}(slug=${weakness.slug})}">
+                <span class="type-pill" th:text="${weakness.type.name() == 'WORD' ? '단어' : '문법'}">단어</span>
+                <div class="content-main">
+                    <h3 lang="ja" th:text="${weakness.title}">食べる</h3>
+                    <p class="subtle" th:text="${'오답 ' + weakness.incorrectAnswers + '회 · 시도 ' + weakness.attempts + '회'}">오답 1회 · 시도 2회</p>
+                </div>
+                <span class="subtle">다시 읽기 <span aria-hidden="true">→</span></span>
+            </a>
+        </div>
+        <p class="empty-state" th:if="${#lists.isEmpty(weaknesses)}">최근 카드 학습에 다시 살펴볼 오답 콘텐츠가 없습니다.</p>
+    </section>
+    <section class="surface detail-section" aria-labelledby="errors-title">
+        <div class="section-heading"><h2 id="errors-title">최근 오답 기록</h2><span class="subtle">카드 학습 기준</span></div>
+        <div class="recent-history-list" th:unless="${#lists.isEmpty(recentErrors)}">
+            <a class="recent-history-row" th:each="entry : ${recentErrors}" th:href="@{/contents/{slug}(slug=${entry.slug})}">
+                <span class="type-pill" th:text="${entry.contentType.name() == 'WORD' ? '단어' : '문법'}">단어</span>
+                <strong lang="ja" th:text="${entry.title}">食べる</strong>
+                <span class="reading" lang="ja" th:if="${!#strings.isEmpty(entry.reading)}" th:text="${entry.reading}">たべる</span>
+                <time th:datetime="${entry.studiedAt}" th:text="${#temporals.format(entry.studiedAt, 'MM.dd HH:mm')}">09.10 12:00</time>
+            </a>
+        </div>
+        <p class="empty-state" th:if="${#lists.isEmpty(recentErrors)}">최근 카드 학습에서 기록된 오답이 없습니다.</p>
+    </section>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>
