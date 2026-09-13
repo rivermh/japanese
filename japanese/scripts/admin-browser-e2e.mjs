@@ -2,6 +2,7 @@ const endpoint = process.env.CDP_ENDPOINT ?? 'http://127.0.0.1:9223';
 const base = process.env.APP_BASE_URL ?? 'http://localhost:8080';
 const username = process.env.ADMIN_E2E_USERNAME;
 const password = process.env.ADMIN_E2E_PASSWORD;
+const mutating = process.env.ADMIN_E2E_MUTATING === 'true';
 if (!username || !password) throw new Error('ADMIN_E2E_USERNAME and ADMIN_E2E_PASSWORD are required');
 
 const target = await fetch(`${endpoint}/json/new?${encodeURIComponent('about:blank')}`, {method: 'PUT'}).then(r => r.json());
@@ -60,7 +61,7 @@ for (let i=0;i<80 && !(await evaluate(`location.pathname!=='/login' && document.
 if ((await evaluate('location.pathname'))==='/login') throw new Error('Browser login failed: '+await evaluate('location.href'));
 await new Promise(r=>setTimeout(r,500));
 const loginState = {url: await evaluate('location.href'), cookies: (await call('Network.getAllCookies')).cookies.map(c => ({name:c.name, domain:c.domain}))};
-if (process.env.ADMIN_E2E_READ_ONLY === 'true') {
+if (!mutating) {
   const desktop = [];
   await navigate('/admin'); desktop.push(await layout('dashboard'));
   await navigate('/admin/contents?status=PENDING'); desktop.push(await layout('content-list'));
