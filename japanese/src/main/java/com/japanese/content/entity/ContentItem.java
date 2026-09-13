@@ -152,10 +152,31 @@ public class ContentItem {
     }
 
     public void publish() {
+        validatePublishable();
         this.published = true;
         this.reviewStatus = ReviewStatus.APPROVED;
         this.reviewNote = null;
         this.reviewedAt = Instant.now();
+    }
+
+    private void validatePublishable() {
+        if (type == ContentType.WORD) {
+            if (word == null || blank(word.getExpression()) || blank(word.getReading())) {
+                throw new IllegalStateException("단어 표기와 읽기가 있어야 공개할 수 있습니다.");
+            }
+            if (word.getMeanings().isEmpty() || word.getMeanings().stream().anyMatch(meaning -> blank(meaning.getText()))) {
+                throw new IllegalStateException("빈 뜻이 없는 단어 의미가 하나 이상 있어야 공개할 수 있습니다.");
+            }
+            return;
+        }
+        if (type == ContentType.GRAMMAR
+                && (grammar == null || blank(grammar.getPattern()) || blank(grammar.getExplanation()))) {
+            throw new IllegalStateException("문법 패턴과 설명이 있어야 공개할 수 있습니다.");
+        }
+    }
+
+    private static boolean blank(String value) {
+        return value == null || value.trim().isEmpty();
     }
 
     public void reject(String note) {
