@@ -49,6 +49,7 @@ public class GrammarEnrichment {
     }
 
     public void approveForPublication() { reviewStatus = ReviewStatus.APPROVED; published = true; reviewedAt = Instant.now(); }
+    public void reject() { reviewStatus = ReviewStatus.REJECTED; published = false; reviewedAt = Instant.now(); }
     public void markPending() { reviewStatus = ReviewStatus.PENDING; published = false; reviewedAt = null; }
     public boolean isPubliclyVisible() { return published && reviewStatus == ReviewStatus.APPROVED; }
     public Long getId() { return id; }
@@ -60,4 +61,6 @@ public class GrammarEnrichment {
     public String getLearnerNote() { return learnerNote; }
     public String getSourceRef() { return sourceRef; }
     public ReviewStatus getReviewStatus() { return reviewStatus; }
+    public boolean isPublished() { return published; }
+    public Instant getReviewedAt() { return reviewedAt; }
 }

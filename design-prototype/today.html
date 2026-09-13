@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Japanese Design Prototype · Today Study</title>
+  <link rel="stylesheet" href="css/prototype.css"><script defer src="js/prototype.js"></script>
+</head>
+<body>
+<div class="prototype-note"><span>독립 UI 프로토타입 · 버튼은 화면 상태만 변경합니다</span><a href="mobile/today.html">Mobile Today 보기</a></div>
+<main class="study-frame">
+  <header class="study-header">
+    <a class="study-exit" href="index.html">← 오늘 학습 나가기</a>
+    <div class="study-progress">
+      <div class="study-progress-copy"><strong><span data-current>1</span> / 3</strong><span>세션 진행</span></div>
+      <div class="progress-track"><span class="progress-fill" data-progress-fill style="--value:33%"></span></div>
+    </div>
+    <div class="study-kinds">복습 1 · 새 단어 1 · 새 문법 1</div>
+  </header>
+  <div class="study-workspace">
+    <article class="learning-sheet" data-lesson>
+      <div class="card-meta"><span data-field="activity">복습</span><span data-field="kind">단어</span><span data-field="level">JLPT N5</span></div>
+      <h1 lang="ja" data-field="title">食べる</h1>
+      <p class="learning-reading" lang="ja" data-field="reading">たべる</p>
+      <div class="learning-rule"></div>
+      <section class="meaning-block">
+        <span class="meaning-number">01</span>
+        <div><h2><span data-field="meaning">먹다, 식사하다</span><span class="part-of-speech" data-field="pos">동사 · 2그룹</span></h2></div>
+      </section>
+      <div class="example">
+        <p class="example-jp" lang="ja" data-field="example">毎朝、家で朝ご飯を食べます。</p>
+        <p class="example-reading" lang="ja" data-field="exampleReading">まいあさ、いえで あさごはんを たべます。</p>
+        <p class="example-translation" data-field="translation">매일 아침 집에서 아침밥을 먹습니다.</p>
+      </div>
+      <dl class="grammar-note" data-grammar-only hidden>
+        <dt>접속</dt><dd data-field="connection"></dd>
+        <dt>핵심 설명</dt><dd data-field="explanation"></dd>
+      </dl>
+      <div style="margin-top:28px"><a class="quiet-link" href="#">사전 상세에서 더 보기</a></div>
+    </article>
+    <aside class="study-companion" data-study-companion aria-label="Haru 반응 영역">
+      <div class="study-companion-label"><span>함께 학습 중</span><strong>Haru</strong></div>
+      <div class="study-companion-figure"><img src="assets/haru-young.png" alt="학습을 지켜보는 Haru"></div>
+      <p class="study-companion-reaction" data-study-reaction>천천히 떠올려 봐요.</p>
+    </aside>
+    <section class="completion-sheet" data-completion>
+      <h1>오늘의 학습을 마쳤어요.</h1>
+      <p>퀴즈를 풀지 않아도 오늘 학습은 정상적으로 완료됩니다.</p>
+      <div class="completion-summary">
+        <div><strong>1</strong><span>복습</span></div><div><strong>1</strong><span>새 단어</span></div><div><strong>1</strong><span>새 문법</span></div><div><strong>+30</strong><span>EXP</span></div>
+      </div>
+      <div style="margin-top:24px;display:flex;gap:10px"><a class="button" href="index.html">홈으로 돌아가기</a><button class="button secondary">선택: 확인 문제</button></div>
+    </section>
+  </div>
+  <div class="study-actions" data-study-actions>
+    <button class="button secondary" data-study-answer="incorrect">다시 볼게요 <span class="shortcut">1</span></button>
+    <button class="button" data-study-answer="correct">기억했어요 <span class="shortcut">2</span></button>
+  </div>
+</main>
+</body>
+</html>

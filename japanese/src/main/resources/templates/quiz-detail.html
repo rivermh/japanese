@@ -29,12 +29,6 @@
             <button type="submit">정답 확인</button>
         </form>
 
-        <section class="quiz-answer-guide" th:if="${question.answerKorean != '' or question.explanation != ''}">
-            <h2>정답과 해설</h2>
-            <p th:if="${question.answerJapanese != ''}" th:text="${'정답: ' + question.answerJapanese}">정답</p>
-            <p th:if="${question.answerKorean != ''}" th:text="${question.answerKorean}">정답 뜻</p>
-            <p th:if="${question.explanation != ''}" th:text="${question.explanation}">해설</p>
-        </section>
     </article>
 </main>
 <footer th:replace="~{fragments/layout :: footer}"></footer>

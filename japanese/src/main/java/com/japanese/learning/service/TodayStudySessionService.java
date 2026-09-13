@@ -18,6 +18,8 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import java.util.Optional;
+import com.japanese.content.entity.ContentType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,6 +58,12 @@ public class TodayStudySessionService {
         return session.map(this::view).orElseGet(() -> startOrResume(account));
     }
 
+    @Transactional(readOnly = true)
+    public Optional<TodayStudySessionView> findCurrent(UserAccount account) {
+        LearnerProfile profile = profile(account);
+        return sessions.findByLearnerProfileIdAndSessionDate(profile.getId(), LocalDate.now(zone)).map(this::view);
+    }
+
     @Transactional
     public TodayStudySessionView complete(UserAccount account, String slug, StudyResult result) {
         LearnerProfile profile = profile(account);
@@ -91,13 +99,23 @@ public class TodayStudySessionService {
     }
 
     private TodayStudySessionView view(TodayStudySession session) {
-        List<TodayStudySessionItem> incomplete = items.findIncompleteItems(session.getId());
-        int completed = (int) items.countBySessionIdAndCompletedTrue(session.getId());
-        int total = completed + incomplete.size();
+        List<TodayStudySessionItem> all = items.findItems(session.getId());
+        List<TodayStudySessionItem> incomplete = all.stream().filter(item -> !item.isCompleted()).toList();
+        int completed = all.size() - incomplete.size();
+        int total = all.size();
         TodayStudySessionItem current = incomplete.isEmpty() ? null : incomplete.get(0);
+        int completedReview = (int) all.stream().filter(TodayStudySessionItem::isCompleted)
+                .filter(item -> item.getPlannedActivityType() == StudyActivityType.REVIEW).count();
+        int completedWords = (int) all.stream().filter(TodayStudySessionItem::isCompleted)
+                .filter(item -> item.getPlannedActivityType() == StudyActivityType.NEW)
+                .filter(item -> item.getContentItem().getType() == ContentType.WORD).count();
+        int completedGrammar = (int) all.stream().filter(TodayStudySessionItem::isCompleted)
+                .filter(item -> item.getPlannedActivityType() == StudyActivityType.NEW)
+                .filter(item -> item.getContentItem().getType() == ContentType.GRAMMAR).count();
         return new TodayStudySessionView(session.getSessionKey(), session.getState(), total, completed,
                 session.getPlannedReviewCount(), session.getPlannedNewWordCount(), session.getPlannedNewGrammarCount(),
-                current == null ? null : current.getContentItem().getSlug(), current == null ? null : current.getPlannedActivityType());
+                current == null ? null : current.getContentItem().getSlug(), current == null ? null : current.getPlannedActivityType(),
+                completedReview, completedWords, completedGrammar);
     }
 
     private LearnerProfile profile(UserAccount account) {

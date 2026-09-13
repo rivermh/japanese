@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="rows(items)">
+    <article class="weakness-row" th:each="item : ${items}">
+        <div class="weakness-main"><div class="tag-row"><span class="type-pill" th:text="${item.content.type.name() == 'WORD' ? '단어' : '문법'}">단어</span><span class="status-pill" th:classappend="${item.status.name() == 'IMPROVING' ? ' success' : ''}" th:text="${item.status.name() == 'IMPROVING' ? '개선 중' : '현재 약점'}">현재 약점</span></div><a class="content-link" th:href="@{/contents/{slug}(slug=${item.content.slug})}"><h3 lang="ja" th:text="${item.content.title}">食べる</h3></a><p class="reading" lang="ja" th:if="${item.content.reading != null}" th:text="${item.content.reading}">たべる</p><p class="subtle" th:text="${item.reason}">SRS 학습 오답 2회</p></div>
+        <div class="weakness-evidence"><span th:if="${item.regularIncorrectCount > 0}" th:text="${'SRS ' + item.regularIncorrectCount + '회'}">SRS 2회</span><span th:if="${item.confirmationIncorrectCount > 0}" th:text="${'문법 확인 ' + item.confirmationIncorrectCount + '회'}">문법 확인 1회</span><time th:if="${item.lastIncorrectAt != null}" th:datetime="${item.lastIncorrectAt}" th:text="${#temporals.format(item.lastIncorrectAt, 'M/d HH:mm')}">9/12 12:30</time></div>
+        <a class="text-link" th:href="@{/contents/{slug}(slug=${item.content.slug})}">보기</a>
+    </article>
+</div>
+</body></html>

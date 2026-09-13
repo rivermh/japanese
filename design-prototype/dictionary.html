@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Japanese Design Prototype · Dictionary</title>
+  <link rel="stylesheet" href="css/prototype.css"><script defer src="js/prototype.js"></script>
+</head>
+<body>
+<div class="prototype-note"><span>독립 UI 프로토타입 · 검색은 아래 데모 항목만 필터링합니다</span><a href="mobile/dictionary.html">Mobile Dictionary 보기</a></div>
+<div class="app-frame">
+  <aside class="side-rail">
+    <a class="brand" href="index.html"><span class="brand-mark" lang="ja">日</span><span>Japanese</span></a>
+    <nav class="rail-nav" aria-label="주요 메뉴">
+      <a class="rail-link" href="index.html">홈</a><a class="rail-link" href="today.html">오늘의 학습</a>
+      <a class="rail-link active" href="dictionary.html">사전</a><a class="rail-link" href="review.html">복습</a><a class="rail-link" href="my-learning.html">내 학습</a>
+    </nav>
+    <div class="rail-divider"></div><p class="rail-subhead">사전 보기</p>
+    <nav class="rail-nav"><a class="rail-link active" href="#">전체 검색</a><a class="rail-link" href="#">단어</a><a class="rail-link" href="#">문법</a><a class="rail-link" href="#">카테고리</a></nav>
+    <div class="rail-footer"><div class="rail-user"><span class="avatar">민</span><span><strong>민수</strong><small>N3 학습 중</small></span></div></div>
+  </aside>
+  <header class="topbar"><span class="topbar-title">사전</span><span style="margin-left:auto;color:var(--ink-soft);font-size:11px">검색 기록</span><a class="header-cta" href="today.html">오늘 학습</a></header>
+  <main class="page dictionary-page">
+    <div class="page-inner">
+      <header class="dictionary-head">
+        <div class="dictionary-title"><h1>일본어 사전</h1><p>표기·읽기·뜻·문법을 한 번에 찾습니다.</p></div>
+        <form class="dictionary-query" data-dictionary-form>
+          <label class="sr-only" for="dictionary-q">단어 또는 문법 검색</label>
+          <input id="dictionary-q" data-dictionary-input value="たべ" placeholder="食べる, たべる, 먹다, ～ように">
+          <button>검색</button>
+        </form>
+      </header>
+      <div class="dictionary-layout">
+        <aside class="filter-panel" aria-label="검색 필터">
+          <div class="filter-group"><h2>콘텐츠</h2><label class="check-row"><input type="checkbox" checked> 단어</label><label class="check-row"><input type="checkbox" checked> 문법</label></div>
+          <div class="filter-group"><h2>JLPT</h2><label class="check-row"><input type="checkbox"> N5</label><label class="check-row"><input type="checkbox" checked> N4</label><label class="check-row"><input type="checkbox"> N3</label><label class="check-row"><input type="checkbox"> N2</label><label class="check-row"><input type="checkbox"> N1</label></div>
+          <div class="filter-group"><h2>학습 분야</h2><label class="check-row"><input type="checkbox"> 일상</label><label class="check-row"><input type="checkbox"> 비즈니스</label><label class="check-row"><input type="checkbox"> IT 일본어</label></div>
+          <button class="button quiet" type="button">필터 초기화</button>
+        </aside>
+        <section>
+          <div class="result-toolbar"><strong data-result-count>6개 결과</strong><span>표기·읽기 정확 일치 우선</span></div>
+          <div class="result-list">
+            <a class="result-row exact-result" href="word-detail.html" data-result-row data-kind="word" data-search="食べる たべる 먹다 식사하다">
+              <span class="result-type">단어</span><div class="result-term"><strong lang="ja">食べる</strong><span lang="ja">たべる</span></div>
+              <div class="result-meaning">먹다, 식사하다</div><div class="result-meta"><span class="meta-tag">N5</span><span class="meta-tag">일상</span></div><span class="result-state">복습 중 · 다음 복습 오늘</span>
+            </a>
+            <a class="result-row" href="word-detail.html" data-result-row data-kind="word" data-search="食べ物 たべもの 음식 먹을 것">
+              <span class="result-type">단어</span><div class="result-term"><strong lang="ja">食べ物</strong><span lang="ja">たべもの</span></div>
+              <div class="result-meaning">음식, 먹을 것</div><div class="result-meta"><span class="meta-tag">N5</span></div>
+            </a>
+            <a class="result-row" href="word-detail.html" data-result-row data-kind="word" data-search="食べ方 たべかた 먹는 방법">
+              <span class="result-type">단어</span><div class="result-term"><strong lang="ja">食べ方</strong><span lang="ja">たべかた</span></div>
+              <div class="result-meaning">먹는 방법; 먹는 방식</div><div class="result-meta"><span class="meta-tag">N4</span></div>
+            </a>
+            <a class="result-row" href="grammar-detail.html" data-result-row data-kind="grammar" data-search="～たべきれない 食べきれない 끝까지 다 먹을 수 없다">
+              <span class="result-type">문법</span><div class="result-term"><strong lang="ja">～きれない</strong><span>동사 ます형 + きれない</span></div>
+              <div class="result-meaning">끝까지 완전히 할 수 없음을 나타내는 표현</div><div class="result-meta"><span class="meta-tag">N3</span></div>
+            </a>
+            <a class="result-row" href="word-detail.html" data-result-row data-kind="word" data-search="食べ放題 たべほうだい 무제한 뷔페">
+              <span class="result-type">단어</span><div class="result-term"><strong lang="ja">食べ放題</strong><span lang="ja">たべほうだい</span></div>
+              <div class="result-meaning">마음껏 먹기, 무제한 식사</div><div class="result-meta"><span class="meta-tag">N3</span><span class="meta-tag">외식</span></div>
+            </a>
+            <a class="result-row" href="grammar-detail.html" data-result-row data-kind="grammar" data-search="～ながら 먹으면서 동시에">
+              <span class="result-type">문법</span><div class="result-term"><strong lang="ja">～ながら</strong><span>동사 ます형 + ながら</span></div>
+              <div class="result-meaning">두 동작을 동시에 함: 음악을 들으면서 식사하다</div><div class="result-meta"><span class="meta-tag">N4</span></div>
+            </a>
+            <div class="empty-results" data-empty-results hidden>일치하는 데모 항목이 없습니다. 검색어를 바꿔보세요.</div>
+          </div>
+          <nav class="pagination" aria-label="페이지 이동"><span>← 이전</span><strong>1 / 24</strong><a href="#">다음 →</a></nav>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

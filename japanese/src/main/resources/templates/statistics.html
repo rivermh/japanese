@@ -49,7 +49,7 @@
         </section>
     </div>
     <section class="surface detail-section" aria-labelledby="weakness-title">
-        <div class="section-heading"><div><h2 id="weakness-title">한 번 더 살펴볼 표현</h2><span class="subtle">최근 200회 카드 학습 기준</span></div><a class="button button-quiet" href="/study/relearn/weaknesses">약점 다시 학습</a></div>
+        <div class="section-heading"><div><h2 id="weakness-title">한 번 더 살펴볼 표현</h2><span class="subtle">최근 30일 실제 학습 기록 기준</span></div><div class="toolbar"><a class="button button-quiet" href="/report/weekly">주간 리포트</a><a class="button button-quiet" href="/study/relearn/weaknesses">약점 다시 학습</a></div></div>
         <div class="content-list" th:unless="${#lists.isEmpty(weaknesses)}">
             <a class="content-row" th:each="weakness : ${weaknesses}" th:href="@{/contents/{slug}(slug=${weakness.slug})}">
                 <span class="type-pill" th:text="${weakness.type.name() == 'WORD' ? '단어' : '문법'}">단어</span>

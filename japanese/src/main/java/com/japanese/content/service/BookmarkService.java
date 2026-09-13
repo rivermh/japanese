@@ -30,6 +30,10 @@ public class BookmarkService {
         return bookmarkRepository.findByUserAccountLoginIdAndContentItemSlug(account.getLoginId(), slug).isPresent();
     }
     @Transactional(readOnly = true)
+    public long count(UserAccount account) {
+        return bookmarkRepository.countByUserAccountLoginId(account.getLoginId());
+    }
+    @Transactional(readOnly = true)
     public List<ContentSummary> list(UserAccount account, ContentType type, String level) {
         return bookmarkRepository.findByUserAccountLoginIdOrderByCreatedAtDesc(account.getLoginId()).stream()
                 .map(Bookmark::getContentItem).filter(item -> (type == null || item.getType() == type)

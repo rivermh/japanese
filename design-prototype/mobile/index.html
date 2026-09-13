@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Japanese Mobile Prototype · Home</title>
+  <link rel="stylesheet" href="../css/prototype.css"><script defer src="../js/prototype.js"></script>
+</head>
+<body class="mobile-body">
+<div class="prototype-note mobile-note"><span>Mobile prototype · 저장 없음</span><a href="../index.html">Desktop</a></div>
+<header class="mobile-header">
+  <a class="brand" href="index.html"><span class="brand-mark" lang="ja">日</span><span>Japanese</span></a>
+  <button class="mobile-header-action" aria-label="사전 검색" onclick="location.href='dictionary.html'">⌕</button>
+</header>
+<main class="mobile-main">
+  <div class="mobile-home-intro"><h1>오늘도 한 걸음씩.</h1><span>N3 학습 중</span></div>
+  <section class="mobile-home-scene" aria-label="Haru와 오늘의 학습">
+    <div class="mobile-haru" data-haru-room data-state="idle">
+      <div class="mobile-haru-identity"><span>Haru · Young 2단계</span><strong data-haru-title>쉬는 중</strong><p data-haru-message>오늘도 옆에서 기다리고 있어요.</p></div>
+      <img src="../assets/haru-young.png" alt="책을 들고 공부를 기다리는 Haru">
+      <span class="shared-desk" aria-hidden="true"><i></i></span>
+      <div class="mobile-growth"><span>다음 성장</span><div class="progress-track"><span class="progress-fill" style="--value:62%"></span></div><strong>420 / 600</strong></div>
+    </div>
+    <div class="mobile-today">
+      <div class="mobile-today-head"><h2>오늘 13개</h2><strong>4 / 13</strong></div>
+      <div class="progress-track"><span class="progress-fill" style="--value:31%"></span></div>
+      <div class="mobile-session-counts">
+        <div><span>복습</span><strong>6</strong></div><div><span>새 단어</span><strong>5</strong></div><div><span>새 문법</span><strong>2</strong></div>
+      </div>
+      <a class="button" href="today.html">4번째 카드부터 이어하기</a>
+      <p style="margin:9px 0 0;text-align:center;color:var(--ink-soft);font-size:9px">오늘 이후 복습 18개 · 오래 기다린 카드 우선</p>
+    </div>
+  </section>
+
+  <div class="mobile-streak"><span><strong>5일 연속 학습</strong><small style="display:block;margin-top:3px;color:var(--ink-soft);font-size:9px">최고 12일</small></span><span class="mobile-streak-days" aria-label="최근 7일"><i class="done"></i><i class="done"></i><i></i><i class="done"></i><i class="done"></i><i class="done"></i><i></i></span></div>
+
+  <section class="mobile-shortcuts">
+    <div class="section-title"><h2>다음에 볼 곳</h2><a class="quiet-link" href="../my-learning.html">전체</a></div>
+    <div class="learning-links">
+      <a class="learning-link" href="../weaknesses.html"><span><strong>약점 문법 다시 보기</strong><small>～ように 외 7개</small></span><span class="arrow">→</span></a>
+      <a class="learning-link" href="../weekly-report.html"><span><strong>이번 주 기록</strong><small>5일 · 42개 학습</small></span><span class="arrow">→</span></a>
+      <a class="learning-link" href="../progress.html"><span><strong>N3 진도</strong><small>단어 18% · 문법 12%</small></span><span class="arrow">→</span></a>
+    </div>
+  </section>
+</main>
+<nav class="mobile-bottom-nav" aria-label="주요 메뉴">
+  <a class="active" href="index.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20h-6v-6h-4v6H4Z"/></svg><span>홈</span></a>
+  <a href="today.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 2v4m8-4v4M5 9h14"/></svg><span>오늘</span></a>
+  <a href="dictionary.html"><svg class="nav-icon" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg><span>사전</span></a>
+  <a href="../review.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h13"/></svg><span>복습</span></a>
+  <a href="../my-learning.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M5 20V10m7 10V4m7 16v-7"/></svg><span>내 학습</span></a>
+</nav>
+</body>
+</html>

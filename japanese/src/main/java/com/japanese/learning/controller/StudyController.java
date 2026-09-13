@@ -17,15 +17,17 @@ import java.time.ZoneId;
 import java.util.Locale;
 import java.util.UUID;
 import com.japanese.learning.entity.RelearningTarget;
+import com.japanese.learning.service.WeaknessNoteService;
 
 @Controller
 public class StudyController {
 
     private final LearningService learningService;
     private final CurrentUserService currentUserService;
+    private final WeaknessNoteService weaknessNotes;
 
-    public StudyController(LearningService learningService, CurrentUserService currentUserService) {
-        this.learningService = learningService; this.currentUserService = currentUserService;
+    public StudyController(LearningService learningService, CurrentUserService currentUserService, WeaknessNoteService weaknessNotes) {
+        this.learningService = learningService; this.currentUserService = currentUserService; this.weaknessNotes=weaknessNotes;
     }
 
     @GetMapping("/study")
@@ -54,7 +56,9 @@ public class StudyController {
         var account = currentUserService.currentAccount();
         model.addAttribute("overview", learningService.overview(account));
         model.addAttribute("dailyProgress", learningService.todayProgress(account));
-        model.addAttribute("cards", learningService.relearningCards(account, relearnTarget));
+        model.addAttribute("cards", relearnTarget == RelearningTarget.WEAKNESSES
+                ? weaknessNotes.focusedReviewCandidates(account, 20)
+                : learningService.relearningCards(account, relearnTarget));
         model.addAttribute("level", "");
         model.addAttribute("type", "");
         model.addAttribute("reviewOnly", false);

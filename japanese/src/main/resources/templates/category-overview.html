@@ -15,7 +15,7 @@
             <span class="subtle" th:text="${#lists.size(categories) + '개 분야'}">0개 분야</span>
         </div>
         <div class="content-list category-list" th:unless="${#lists.isEmpty(categories)}">
-            <a class="content-row category-row" th:each="category : ${categories}" th:href="@{/(category=${category.slug})} + '#library'">
+            <a class="content-row category-row" th:each="category : ${categories}" th:href="@{/dictionary(category=${category.slug})}">
                 <span class="type-pill">분야</span>
                 <div class="content-main"><h3 th:text="${category.name}">JLPT</h3></div>
                 <span class="subtle" th:text="${category.publicContentCount + '개 콘텐츠'}">0개 콘텐츠</span>
@@ -24,7 +24,7 @@
         </div>
         <div class="empty-state" th:if="${#lists.isEmpty(categories)}">
             <p>등록된 학습 분야가 없습니다.</p>
-            <a class="button button-secondary" th:href="@{/(keyword='')}">전체 콘텐츠 보기</a>
+            <a class="button button-secondary" href="/dictionary">전체 콘텐츠 보기</a>
         </div>
     </section>
 </main>

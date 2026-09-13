@@ -1,6 +1,8 @@
 package com.japanese.content.controller;
 
 import com.japanese.content.service.ContentReviewService;
+import com.japanese.content.service.AdminContentReviewService;
+import com.japanese.account.service.CurrentUserService;
 import com.japanese.content.entity.ReviewStatus;
 import com.japanese.content.entity.ContentType;
 import java.util.List;
@@ -21,9 +23,14 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 public class ContentReviewController {
 
     private final ContentReviewService contentReviewService;
+    private final AdminContentReviewService adminReviewService;
+    private final CurrentUserService currentUserService;
 
-    public ContentReviewController(ContentReviewService contentReviewService) {
+    public ContentReviewController(ContentReviewService contentReviewService,
+            AdminContentReviewService adminReviewService, CurrentUserService currentUserService) {
         this.contentReviewService = contentReviewService;
+        this.adminReviewService = adminReviewService;
+        this.currentUserService = currentUserService;
     }
 
     @GetMapping("/review")
@@ -61,7 +68,7 @@ public class ContentReviewController {
 
     @PostMapping("/review/{id}/publish")
     public String publish(@PathVariable("id") Long contentId) {
-        contentReviewService.publish(contentId);
+        adminReviewService.approveContent(contentId, currentUserService.currentAccount(), null);
         return "redirect:/review";
     }
 
@@ -73,7 +80,7 @@ public class ContentReviewController {
             @RequestParam(required = false) String level,
             RedirectAttributes redirectAttributes
     ) {
-        int publishedCount = contentReviewService.publishSelected(contentIds);
+        int publishedCount = adminReviewService.approveContents(contentIds, currentUserService.currentAccount());
         redirectAttributes.addFlashAttribute("reviewMessage", publishedCount + "개 콘텐츠를 공개했습니다.");
         addReviewFilters(redirectAttributes, status, type, level);
         return "redirect:/review";
@@ -84,7 +91,7 @@ public class ContentReviewController {
             @PathVariable("id") Long contentId,
             @RequestParam("reason") String reason
     ) {
-        contentReviewService.reject(contentId, reason);
+        adminReviewService.rejectContent(contentId, currentUserService.currentAccount(), reason);
         return "redirect:/review";
     }
 

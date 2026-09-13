@@ -87,6 +87,7 @@ public class ImportedSourceRecord {
     public String getLevelCode() {
         return levelCode;
     }
+    public String getTags() { return tags; }
 
     public void setLevelCode(String levelCode) {
         this.levelCode = levelCode;

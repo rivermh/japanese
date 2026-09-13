@@ -21,8 +21,9 @@
                 <p id="loginId-error" class="field-error" th:errors="*{loginId}"></p>
             </div>
             <div class="field">
-                <label for="email">이메일 <span class="subtle">선택</span></label>
-                <input th:field="*{email}" type="email" autocomplete="email" maxlength="160" aria-describedby="email-error" th:attr="aria-invalid=${#fields.hasErrors('email')}">
+                <label for="email">이메일</label>
+                <input th:field="*{email}" type="email" autocomplete="email" maxlength="160" aria-describedby="email-help email-error" th:attr="aria-invalid=${#fields.hasErrors('email')}" required>
+                <p id="email-help" class="subtle">가입 후 인증 안내를 보내며 비밀번호 재설정에 사용합니다.</p>
                 <p id="email-error" class="field-error" th:errors="*{email}"></p>
             </div>
             <div class="field">

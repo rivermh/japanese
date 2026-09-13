@@ -56,8 +56,8 @@ public class LearningService {
 
     private static final int MAX_CARDS = 20;
     private static final int MAX_HISTORY_ITEMS = 20;
-    private static final int CORRECT_EXP = 10;
-    private static final int INCORRECT_EXP = 2;
+    static final int CORRECT_EXP = 10;
+    static final int INCORRECT_EXP = 2;
     private static final int MAX_NEW_CONTENT_LIMIT = 50;
 
     private final ContentItemRepository contentItemRepository;
@@ -71,6 +71,7 @@ public class LearningService {
     private final BookmarkRepository bookmarkRepository;
     private final StudyQueueRepository studyQueueRepository;
     private final CharacterCatalog characterCatalog;
+    private final com.japanese.learning.character.HaruPresentationService haruPresentation;
     private final StreakService streakService;
     private final int dailyGoal;
     private final ZoneId learningZone;
@@ -87,6 +88,7 @@ public class LearningService {
             BookmarkRepository bookmarkRepository,
             StudyQueueRepository studyQueueRepository,
             CharacterCatalog characterCatalog,
+            com.japanese.learning.character.HaruPresentationService haruPresentation,
             StreakService streakService,
             @Value("${japanese.learning.daily-goal:10}") int dailyGoal,
             @Value("${japanese.learning.time-zone:Asia/Seoul}") String learningTimeZone
@@ -102,6 +104,7 @@ public class LearningService {
         this.bookmarkRepository = bookmarkRepository;
         this.studyQueueRepository = studyQueueRepository;
         this.characterCatalog = characterCatalog;
+        this.haruPresentation = haruPresentation;
         this.streakService = streakService;
         this.dailyGoal = Math.max(dailyGoal, 1);
         this.learningZone = ZoneId.of(learningTimeZone);
@@ -154,7 +157,7 @@ public class LearningService {
     @Transactional(readOnly = true)
     public TodayLearningPlan todayPlan(UserAccount account) {
         LearnerProfile profile = profile(account);
-        LearnerStudyPreference preference = preference(profile);
+        LearnerStudyPreference preference = preferenceOrDefault(profile);
         Set<Long> levelIds = new LinkedHashSet<>(preference.getLevelIds());
         Set<Long> categoryIds = new LinkedHashSet<>(preference.getCategoryIds());
         int totalDueReviewCount = (int) Math.min(Integer.MAX_VALUE, learningProgressRepository.countDueForLearner(
@@ -222,7 +225,7 @@ public class LearningService {
 
     @Transactional(readOnly = true)
     public LearningScope learningScope(UserAccount account) {
-        LearnerStudyPreference preference = preference(profile(account));
+        LearnerStudyPreference preference = preferenceOrDefault(profile(account));
         Set<Long> selectedLevelIds = preference.getLevelIds();
         Set<Long> selectedCategoryIds = preference.getCategoryIds();
         List<String> levelCodes = levelRepository.findAllById(selectedLevelIds).stream()
@@ -261,7 +264,7 @@ public class LearningService {
 
     @Transactional(readOnly = true)
     public StudyPreferences studyPreferences(UserAccount account) {
-        LearnerStudyPreference preference = preference(profile(account));
+        LearnerStudyPreference preference = preferenceOrDefault(profile(account));
         return new StudyPreferences(learningScope(account), preference.getDailyNewWordLimit(), preference.getDailyNewGrammarLimit());
     }
 
@@ -327,13 +330,24 @@ public class LearningService {
 
     @Transactional
     public StudyOverview recordQuizAnswer(UserAccount account, Long questionSourceRecordId, boolean correct) {
-        LearnerProfile profile = profile(account);
+        return recordQuizAward(account, questionSourceRecordId, correct, true).overview();
+    }
+
+    @Transactional
+    public com.japanese.learning.dto.QuizAward recordQuizSessionAnswer(
+            UserAccount account, Long questionSourceRecordId, boolean correct) {
+        return recordQuizAward(account, questionSourceRecordId, correct, false);
+    }
+
+    private com.japanese.learning.dto.QuizAward recordQuizAward(
+            UserAccount account, Long questionSourceRecordId, boolean correct, boolean recordStreak) {
+        LearnerProfile profile = profileForUpdate(account);
         StudyResult result = correct ? StudyResult.CORRECT : StudyResult.INCORRECT;
         int earnedExperience = correct ? CORRECT_EXP : INCORRECT_EXP;
         earnExperience(profile, earnedExperience);
-        quizAttemptRepository.save(new QuizAttempt(profile, questionSourceRecordId, result, earnedExperience));
-        streakService.recordActivity(profile);
-        return toOverview(profile);
+        quizAttemptRepository.save(new QuizAttempt(profile, questionSourceRecordId, result, earnedExperience, recordStreak));
+        if (recordStreak) streakService.recordActivity(profile);
+        return new com.japanese.learning.dto.QuizAward(toOverview(profile), earnedExperience);
     }
 
     @Transactional(readOnly = true)
@@ -392,9 +406,20 @@ public class LearningService {
 
     @Transactional
     public void acknowledgeGrowth(UserAccount account) {
-        profile(account).acknowledgeGrowth();
+        profileForUpdate(account).acknowledgeGrowth();
     }
 
+    @Transactional
+    public boolean claimGrowthPresentation(UserAccount account, String stageKey) {
+        return profileForUpdate(account).claimGrowthPresentation(stageKey);
+    }
+
+    @Transactional
+    public void acknowledgeGrowth(UserAccount account, String stageKey) {
+        profileForUpdate(account).acknowledgeGrowth(stageKey);
+    }
+
+    public String guestHaruPoster() { return haruPresentation.guestPoster(); }
     private LearnerProfile profile(UserAccount account) {
         return learnerProfileRepository.findByUserAccountLoginId(account.getLoginId())
                 .orElseGet(() -> learnerProfileRepository.save(new LearnerProfile(account, dailyGoal, characterCatalog.defaultCharacter().key())));
@@ -408,6 +433,12 @@ public class LearningService {
     private LearnerStudyPreference preference(LearnerProfile profile) {
         return preferenceRepository.findByLearnerProfileId(profile.getId())
                 .orElseGet(() -> preferenceRepository.save(new LearnerStudyPreference(profile)));
+    }
+
+    /** Read paths must support accounts created before preference rows existed. */
+    private LearnerStudyPreference preferenceOrDefault(LearnerProfile profile) {
+        return preferenceRepository.findByLearnerProfileId(profile.getId())
+                .orElseGet(() -> new LearnerStudyPreference(profile));
     }
 
     private Set<Long> levelIds(String levelCode) {
@@ -460,30 +491,9 @@ public class LearningService {
         long dueReviewCount = learningProgressRepository
                 .countByLearnerProfileLearnerKeyAndNextReviewAtLessThanEqual(profile.getLearnerKey(), Instant.now());
         CharacterDefinition character = characterCatalog.resolve(profile.getCharacterKey());
-        CharacterGrowthStage stage = CharacterGrowthStage.forExperience(profile.getExperience());
-        CharacterGrowthStage nextStage = stage.next();
-        int nextStageExperience = nextStage == null ? stage.getRequiredExperience() : nextStage.getRequiredExperience();
-        int experienceToNextStage = nextStage == null ? 0 : Math.max(nextStageExperience - profile.getExperience(), 0);
-        int stageProgressPercent = nextStage == null ? 100 : (int) Math.min(100,
-                (long) (profile.getExperience() - stage.getRequiredExperience()) * 100
-                        / (nextStageExperience - stage.getRequiredExperience()));
         return new StudyOverview(
                 profile.getDisplayName(),
-                new CharacterStatus(
-                        character.key(),
-                        character.displayName(),
-                        character.description(),
-                        character.assetDirectory(),
-                        character.illustrationsAvailable() ? character.assetDirectory() + "/" + stage.getKey() + ".png" : null,
-                        stage.getKey(),
-                        stage.getDisplayName(),
-                        stage.getDescription(),
-                        profile.getLevel(),
-                        profile.getExperience(),
-                        nextStageExperience,
-                        experienceToNextStage,
-                        stageProgressPercent,
-                        profile.getPendingGrowthStageKey() != null),
+                haruPresentation.status(profile, character),
                 correctAnswers + incorrectAnswers,
                 correctAnswers,
                 dueReviewCount);

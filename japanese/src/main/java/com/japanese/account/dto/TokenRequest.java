@@ -1,0 +1,10 @@
+package com.japanese.account.dto;
+
+import jakarta.validation.constraints.NotBlank;
+
+public class TokenRequest {
+    @NotBlank private String token;
+    public String getToken() { return token; }
+    public void setToken(String token) { this.token = token; }
+    @Override public String toString() { return "TokenRequest[REDACTED]"; }
+}

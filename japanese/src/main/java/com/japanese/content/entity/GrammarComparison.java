@@ -29,7 +29,8 @@ public class GrammarComparison {
     public GrammarComparison(GrammarRelation relation, String sourceRef) { this.relation = relation; this.sourceRef = sourceRef; }
     public void revise(String summary, String keyDifference, String usageDifference, String commonConfusion) { this.summary=summary; this.keyDifference=keyDifference; this.usageDifference=usageDifference; this.commonConfusion=commonConfusion; }
     public void approveForPublication() { reviewStatus=ReviewStatus.APPROVED; published=true; reviewedAt=Instant.now(); }
+    public void reject(){reviewStatus=ReviewStatus.REJECTED;published=false;reviewedAt=Instant.now();}
     public void markPending() { reviewStatus=ReviewStatus.PENDING; published=false; reviewedAt=null; }
     public boolean isPubliclyVisible() { return published && reviewStatus==ReviewStatus.APPROVED && relation.isPubliclyVisible(); }
-    public Long getId(){return id;} public GrammarRelation getRelation(){return relation;} public String getSummary(){return summary;} public String getKeyDifference(){return keyDifference;} public String getUsageDifference(){return usageDifference;} public String getCommonConfusion(){return commonConfusion;} public String getSourceRef(){return sourceRef;}
+    public Long getId(){return id;} public GrammarRelation getRelation(){return relation;} public String getSummary(){return summary;} public String getKeyDifference(){return keyDifference;} public String getUsageDifference(){return usageDifference;} public String getCommonConfusion(){return commonConfusion;} public String getSourceRef(){return sourceRef;} public ReviewStatus getReviewStatus(){return reviewStatus;} public boolean isPublished(){return published;} public Instant getReviewedAt(){return reviewedAt;}
 }

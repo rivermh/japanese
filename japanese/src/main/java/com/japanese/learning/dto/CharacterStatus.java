@@ -14,6 +14,15 @@ public record CharacterStatus(
         int nextStageExperience,
         int experienceToNextStage,
         int stageProgressPercent,
-        boolean growthNoticePending
+        boolean growthNoticePending,
+        int stageNumber,
+        String animationStageKey,
+        Integer assetStage,
+        boolean fallbackUsed,
+        boolean supportsBlink,
+        String animationManifestPath,
+        boolean finalStage,
+        boolean growthPresentationPending,
+        String pendingGrowthStageKey
 ) {
 }

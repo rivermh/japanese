@@ -43,6 +43,10 @@ public class LearnerProfile {
     @Column(name = "pending_growth_stage_key", length = 40)
     private String pendingGrowthStageKey;
 
+    // Existing null profiles have no historical animation to replay. Pending notices remain readable.
+    @Column(name = "presented_growth_stage_key", length = 40)
+    private String presentedGrowthStageKey;
+
     @Column(nullable = false)
     private int experience;
 
@@ -96,6 +100,11 @@ public class LearnerProfile {
         return displayName;
     }
 
+    public void changeDisplayName(String displayName) {
+        this.displayName = displayName;
+        this.updatedAt = Instant.now();
+    }
+
     public String getCharacterKey() {
         return characterKey;
     }
@@ -120,7 +129,22 @@ public class LearnerProfile {
     }
 
     public void updateCharacterKey(String characterKey) { this.characterKey = characterKey; this.updatedAt = Instant.now(); }
-    public void markGrowthPending(String stageKey) { this.pendingGrowthStageKey = stageKey; this.updatedAt = Instant.now(); }
+    public void markGrowthPending(String stageKey) {
+        if (!stageKey.equals(pendingGrowthStageKey)) this.presentedGrowthStageKey = null;
+        this.pendingGrowthStageKey = stageKey; this.updatedAt = Instant.now();
+    }
+    public boolean isGrowthPresentationPending() {
+        return pendingGrowthStageKey != null && !pendingGrowthStageKey.equals(presentedGrowthStageKey);
+    }
+    public boolean claimGrowthPresentation(String stageKey) {
+        if (!isGrowthPresentationPending() || !pendingGrowthStageKey.equals(stageKey)) return false;
+        presentedGrowthStageKey = stageKey;
+        updatedAt = Instant.now();
+        return true;
+    }
+    public void acknowledgeGrowth(String stageKey) {
+        if (stageKey != null && stageKey.equals(pendingGrowthStageKey)) acknowledgeGrowth();
+    }
     public void acknowledgeGrowth() { this.pendingGrowthStageKey = null; this.updatedAt = Instant.now(); }
     public String getPendingGrowthStageKey() { return pendingGrowthStageKey; }
     public boolean requiresOnboarding() { return Boolean.FALSE.equals(onboardingCompleted); }

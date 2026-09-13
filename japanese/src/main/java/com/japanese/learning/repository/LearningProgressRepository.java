@@ -10,9 +10,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface LearningProgressRepository extends JpaRepository<LearningProgress, Long> {
+    @Query("select min(progress.nextReviewAt) from LearningProgress progress where progress.learnerProfile.learnerKey=:learnerKey")
+    java.time.Instant findNextReviewAt(@Param("learnerKey") String learnerKey);
 
     Optional<LearningProgress> findByLearnerProfileLearnerKeyAndContentItemId(
             String learnerKey, Long contentItemId);
+
+    List<LearningProgress> findByLearnerProfileLearnerKeyAndContentItemIdIn(
+            String learnerKey, java.util.Collection<Long> contentItemIds);
 
     long countByLearnerProfileLearnerKey(String learnerKey);
 

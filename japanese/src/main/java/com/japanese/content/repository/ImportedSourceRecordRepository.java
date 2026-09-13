@@ -17,4 +17,5 @@ public interface ImportedSourceRecordRepository extends JpaRepository<ImportedSo
             String noteType, String levelCode, Pageable pageable);
 
     Optional<ImportedSourceRecord> findByIdAndNoteType(Long id, String noteType);
+    java.util.List<ImportedSourceRecord> findByContentItemIdOrderById(Long contentItemId);
 }

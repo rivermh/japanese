@@ -30,6 +30,10 @@ public class UserAccount {
     @Column(name = "display_name", nullable = false, length = 80)
     private String displayName;
 
+    /** Null belongs to accounts created before email verification and is treated as verified. */
+    @Column(name = "email_verified")
+    private Boolean emailVerified;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private UserRole role;
@@ -45,6 +49,7 @@ public class UserAccount {
         this.email = email;
         this.passwordHash = passwordHash;
         this.displayName = displayName;
+        this.emailVerified = email == null ? Boolean.TRUE : Boolean.FALSE;
         this.role = role;
         this.joinedAt = Instant.now();
     }
@@ -54,6 +59,10 @@ public class UserAccount {
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }
     public String getDisplayName() { return displayName; }
+    public boolean isEmailVerified() { return emailVerified == null || Boolean.TRUE.equals(emailVerified); }
     public UserRole getRole() { return role; }
     public Instant getJoinedAt() { return joinedAt; }
+    public void verifyEmail() { this.emailVerified = Boolean.TRUE; }
+    public void changePasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+    public void changeDisplayName(String displayName) { this.displayName = displayName; }
 }

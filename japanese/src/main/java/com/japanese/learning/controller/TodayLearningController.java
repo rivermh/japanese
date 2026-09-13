@@ -7,6 +7,7 @@ import com.japanese.learning.service.StreakService;
 import com.japanese.learning.service.LearningHistoryService;
 import com.japanese.learning.service.OnboardingService;
 import com.japanese.learning.service.TodayStudySessionService;
+import com.japanese.learning.service.DailyMissionService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,15 +27,18 @@ public class TodayLearningController {
     private final com.japanese.content.service.ContentQueryService contentQueryService;
     private final OnboardingService onboardingService;
     private final TodayStudySessionService todaySessionService;
+    private final DailyMissionService dailyMissionService;
 
     public TodayLearningController(LearningService learningService, CurrentUserService currentUserService, StreakService streakService,
                                    LearningHistoryService historyService, com.japanese.content.service.ContentQueryService contentQueryService,
-                                   OnboardingService onboardingService, TodayStudySessionService todaySessionService) {
+                                   OnboardingService onboardingService, TodayStudySessionService todaySessionService,
+                                   DailyMissionService dailyMissionService) {
         this.learningService = learningService; this.currentUserService = currentUserService; this.streakService = streakService;
         this.historyService = historyService;
         this.contentQueryService = contentQueryService;
         this.onboardingService = onboardingService;
         this.todaySessionService = todaySessionService;
+        this.dailyMissionService = dailyMissionService;
     }
 
     @GetMapping("/today")
@@ -43,11 +47,14 @@ public class TodayLearningController {
         if (onboardingService.status(account).required()) return "redirect:/onboarding";
         var todaySession = todaySessionService.startOrResume(account);
         model.addAttribute("todaySession", todaySession);
+        model.addAttribute("dailyMission", dailyMissionService.today(account));
         if (todaySession.currentSlug() != null) {
             model.addAttribute("lesson", contentQueryService.findBySlug(todaySession.currentSlug()).orElseThrow());
         }
         model.addAttribute("dailyProgress", learningService.todayProgress(account));
-        model.addAttribute("overview", learningService.overview(account));
+        var overview = learningService.overview(account);
+        model.addAttribute("overview", overview);
+        if (overview.character().growthPresentationPending()) model.addAttribute("characterReaction", "growth");
         model.addAttribute("streak", streakService.status(account));
         model.addAttribute("todayReport", historyService.day(account, LocalDate.now(ZoneId.of("Asia/Seoul"))));
         return todaySession.completed() ? "today-session-complete" : "today-learning";
@@ -59,6 +66,9 @@ public class TodayLearningController {
         var account = currentUserService.currentAccount();
         if (onboardingService.status(account).required()) return "redirect:/onboarding";
         var todaySession = todaySessionService.complete(account, slug, result);
+        redirectAttributes.addFlashAttribute("characterReaction",
+                todaySession.completed() ? "goal-complete"
+                        : result == StudyResult.CORRECT ? "happy" : "study");
         if (result == StudyResult.CORRECT && !todaySession.completed()) session.setAttribute("characterReaction", "happy");
         if (todaySession.completed()) redirectAttributes.addFlashAttribute("todaySessionCompleted", true);
         return "redirect:/today";

@@ -70,6 +70,11 @@ public class StudyQueueService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public long count(UserAccount account) {
+        return queueRepository.countByUserAccountLoginId(account.getLoginId());
+    }
+
     private boolean hasProgress(UserAccount account, String slug) {
         return profileRepository.findByUserAccountLoginId(account.getLoginId())
                 .flatMap(profile -> contentItemRepository.findBySlugAndPublishedTrue(slug)

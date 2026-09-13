@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('콘텐츠 검수 목록')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('admin')}"></header>
+<main id="main-content" class="page-shell admin-shell">
+  <header class="page-heading"><div><p class="eyebrow">CONTENT REVIEW</p><h1>일반 콘텐츠</h1><p class="subtle">DB 필터와 25건 페이지네이션으로 검토 대상을 조회합니다.</p></div><a href="/admin">관리자 홈</a></header>
+  <form class="admin-filter" method="get">
+    <label>상태<select name="status"><option value="">전체</option><option th:each="v:${T(com.japanese.content.entity.ReviewStatus).values()}" th:value="${v}" th:text="${v}" th:selected="${v==status}"></option></select></label>
+    <label>공개<select name="published"><option value="">전체</option><option value="false" th:selected="${published==false}">미공개</option><option value="true" th:selected="${published==true}">공개</option></select></label>
+    <label>유형<select name="type"><option value="">전체</option><option value="WORD" th:selected="${type?.name()=='WORD'}">WORD</option><option value="GRAMMAR" th:selected="${type?.name()=='GRAMMAR'}">GRAMMAR</option></select></label>
+    <label>JLPT<select name="level"><option value="">전체</option><option value="N5" th:selected="${level=='N5'}">N5</option><option value="N4" th:selected="${level=='N4'}">N4</option><option value="N3" th:selected="${level=='N3'}">N3</option><option value="N2" th:selected="${level=='N2'}">N2</option><option value="N1" th:selected="${level=='N1'}">N1</option></select></label>
+    <label>검색<input name="keyword" th:value="${keyword}" placeholder="표기·읽기·설명"></label>
+    <label>출처<input name="source" th:value="${source}" placeholder="sourceRef"></label>
+    <label>품질<select name="qualityIssue"><option value="">전체</option><option value="true" th:selected="${qualityIssue==true}">문제 있음</option></select></label>
+    <label>심각도<select name="qualitySeverity"><option value="">전체</option><option th:each="v:${T(com.japanese.content.entity.QualitySeverity).values()}" th:value="${v}" th:text="${v}" th:selected="${v==qualitySeverity}"></option></select></label>
+    <label>항목<select name="qualityIssueType"><option value="">전체</option><option th:each="v:${T(com.japanese.content.entity.QualityIssueType).values()}" th:value="${v}" th:text="${v}" th:selected="${v==qualityIssueType}"></option></select></label>
+    <label class="admin-check"><input type="checkbox" name="oldest" value="true" th:checked="${oldest}"> 오래된 순</label><button>조회</button>
+  </form>
+  <p class="admin-result-count" th:text="${result.totalElements+'개 · '+(result.number+1)+' / '+(result.totalPages==0?1:result.totalPages)+' 페이지'}"></p>
+  <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>상태</th><th>유형</th><th>콘텐츠</th><th>품질</th><th>JLPT</th><th>출처</th><th>공개</th><th></th></tr></thead><tbody>
+    <tr th:each="row:${result.content}"><td><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(row.reviewStatus.name())}" th:text="${row.reviewStatus}"></span></td><td th:text="${row.type}"></td><td><strong th:text="${row.title}"></strong><small th:if="${row.reading}" th:text="${row.reading}"></small><small th:text="${row.summary}"></small></td><td><span th:if="${row.qualityIssueCount>0}" class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(row.qualitySeverity.name())}" th:text="${row.qualitySeverity+' '+row.qualityIssueCount}"></span><span th:unless="${row.qualityIssueCount>0}" class="subtle">clean</span></td><td th:text="${row.jlpt}"></td><td><code th:text="${row.sourceRef}"></code></td><td th:text="${row.published?'공개':'미공개'}"></td><td><a th:href="@{/admin/contents/{id}(id=${row.id})}">검토</a></td></tr>
+  </tbody></table></div>
+  <p class="empty-state" th:if="${result.empty}">조건에 맞는 콘텐츠가 없습니다.</p>
+  <nav class="pagination"><a th:if="${result.hasPrevious()}" th:href="@{/admin/contents(status=${status},published=${published},type=${type},level=${level},keyword=${keyword},source=${source},qualityIssue=${qualityIssue},qualitySeverity=${qualitySeverity},qualityIssueType=${qualityIssueType},oldest=${oldest},page=${result.number-1})}">이전</a><a th:if="${result.hasNext()}" th:href="@{/admin/contents(status=${status},published=${published},type=${type},level=${level},keyword=${keyword},source=${source},qualityIssue=${qualityIssue},qualitySeverity=${qualitySeverity},qualityIssueType=${qualityIssueType},oldest=${oldest},page=${result.number+1})}">다음</a></nav>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

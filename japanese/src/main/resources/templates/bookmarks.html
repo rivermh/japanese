@@ -5,14 +5,14 @@
 <header th:replace="~{fragments/layout :: header('bookmarks')}"></header>
 <main id="main-content" class="page-shell">
     <header class="page-heading">
-        <p class="eyebrow">MY COLLECTION</p>
-        <h1>다시 보고 싶은 일본어</h1>
-        <p class="subtle">저장한 단어와 문법을 모아 두고, 필요할 때 꺼내 보세요.</p>
+        <div><h1>저장함</h1>
+        <p class="subtle">다시 볼 콘텐츠, 정규 학습에 넣을 콘텐츠, 목적별 모음을 구분해 관리합니다.</p></div>
     </header>
+    <nav class="saved-subnav" aria-label="저장함 메뉴"><a class="active" href="/bookmarks">북마크 <span th:text="${#lists.size(bookmarks)}"></span></a><a href="/study-queue">학습 목록</a><a href="/collections">나만의 단어장</a></nav>
     <section class="surface detail-section" aria-labelledby="bookmarks-title">
         <div class="section-heading">
             <h2 id="bookmarks-title">북마크 <span class="subtle" th:text="${#lists.size(bookmarks) + '개'}">0개</span></h2>
-            <div class="toolbar"><a class="button button-secondary" href="/study/relearn/bookmarks">북마크 다시 학습</a><a class="button button-quiet" th:href="@{/(keyword='')}">콘텐츠 찾기</a></div>
+            <div class="toolbar"><a class="button button-secondary" href="/study/relearn/bookmarks">북마크 다시 학습</a><a class="button button-quiet" href="/dictionary">콘텐츠 찾기</a></div>
         </div>
         <form class="toolbar filter-form" th:action="@{/bookmarks}" method="get" aria-label="북마크 필터">
             <div class="field">

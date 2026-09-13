@@ -35,7 +35,7 @@ public class StreakService {
         LearnerProfile profile=profileRepository.findByUserAccountLoginId(account.getLoginId()).orElseThrow(); LocalDate today=LocalDate.now(learningZone); LocalDate startDate=today.minusDays(6); Instant startAt=startDate.atStartOfDay(learningZone).toInstant();
         Set<LocalDate> studiedDays=new LinkedHashSet<>();
         studyRecordRepository.findByLearnerProfileLearnerKeyAndStudiedAtGreaterThanEqualOrderByStudiedAtAsc(profile.getLearnerKey(), startAt).forEach(record -> studiedDays.add(record.getStudiedAt().atZone(learningZone).toLocalDate()));
-        quizAttemptRepository.findByLearnerProfileLearnerKeyAndAnsweredAtGreaterThanEqualOrderByAnsweredAtAsc(profile.getLearnerKey(), startAt).forEach(attempt -> studiedDays.add(attempt.getAnsweredAt().atZone(learningZone).toLocalDate()));
+        quizAttemptRepository.findStreakEligibleSince(profile.getLearnerKey(), startAt).forEach(attempt -> studiedDays.add(attempt.getAnsweredAt().atZone(learningZone).toLocalDate()));
         LearningStreak streak=streakRepository.findByLearnerProfileId(profile.getId()).orElse(null);
         return new StreakStatus(streak==null?0:streak.getCurrentStreak(), streak==null?0:streak.getLongestStreak(), studiedDays.contains(today), recentDays(startDate, studiedDays));
     }

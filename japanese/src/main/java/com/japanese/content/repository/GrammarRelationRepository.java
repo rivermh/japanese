@@ -6,10 +6,13 @@ import com.japanese.content.entity.ReviewStatus;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface GrammarRelationRepository extends JpaRepository<GrammarRelation, Long> {
+public interface GrammarRelationRepository extends JpaRepository<GrammarRelation, Long>, JpaSpecificationExecutor<GrammarRelation> {
     Optional<GrammarRelation> findByLeftGrammarIdAndRightGrammarIdAndRelationType(Long leftId, Long rightId, GrammarRelationType type);
 
     @Query("""
@@ -27,4 +30,6 @@ public interface GrammarRelationRepository extends JpaRepository<GrammarRelation
               and relation.published = true and relation.reviewStatus = :status
             """)
     List<GrammarRelation> findPublicPair(@Param("leftId") Long leftId, @Param("rightId") Long rightId, @Param("status") ReviewStatus status);
+    @Lock(LockModeType.PESSIMISTIC_WRITE) @Query("select r from GrammarRelation r where r.id=:id")
+    Optional<GrammarRelation> findByIdForReview(@Param("id") Long id);
 }

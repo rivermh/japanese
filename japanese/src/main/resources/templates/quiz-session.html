@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('빠른 퀴즈')}"></head>
+<body class="quiz-focus-mode">
+<header th:replace="~{fragments/layout :: header('quiz')}"></header>
+<main id="main-content" class="page-shell quiz-session-shell">
+    <header class="quiz-session-header">
+        <a class="study-exit" href="/quiz">← 퀴즈 나가기</a>
+        <div class="study-progress">
+            <div class="study-progress-copy"><strong th:text="${quizSession.answeredCount + ' / ' + quizSession.totalQuestions}">0 / 5</strong><span th:text="${quizSession.remainingCount + '문제 남음'}">5문제 남음</span></div>
+            <div class="progress-track" role="progressbar" aria-label="빠른 퀴즈 진행" aria-valuemin="0" aria-valuemax="100" th:attr="aria-valuenow=${quizSession.progressPercent}"><span class="progress-fill" th:style="${'--value:' + quizSession.progressPercent + '%'}"></span></div>
+        </div>
+        <span class="quiz-exp" th:text="${'Quiz EXP +' + quizSession.earnedExperience}">Quiz EXP +0</span>
+    </header>
+
+    <article class="quiz-question-panel" th:if="${feedback == null and quizSession.currentQuestion != null}">
+        <div class="card-meta"><span th:text="${quizSession.currentQuestion.contentType.name() == 'WORD' ? '단어' : '문법'}">단어</span><span th:text="${quizSession.currentQuestion.number + '번'}">1번</span></div>
+        <p class="quiz-instruction" th:text="${quizSession.currentQuestion.instruction}">알맞은 답을 고르세요.</p>
+        <h1 class="quiz-session-prompt" th:text="${quizSession.currentQuestion.prompt}">問題</h1>
+        <form class="quiz-session-form" th:action="@{/quiz/session/{id}/answer(id=${quizSession.sessionId})}" method="post">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <input type="hidden" name="itemId" th:value="${quizSession.currentQuestion.itemId}">
+            <fieldset th:if="${!quizSession.currentQuestion.input}">
+                <legend class="sr-only">정답 선택</legend>
+                <div class="quiz-session-choices">
+                    <label class="quiz-session-choice" th:each="choice, stat : ${quizSession.currentQuestion.choices}">
+                        <input type="radio" name="answer" th:value="${choice}" required>
+                        <span><i th:text="${stat.index + 1}">1</i><strong th:text="${choice}">선택지</strong></span>
+                    </label>
+                </div>
+            </fieldset>
+            <div class="field quiz-input-field" th:if="${quizSession.currentQuestion.input}">
+                <label for="quiz-answer">읽기</label>
+                <input id="quiz-answer" name="answer" type="text" lang="ja" autocomplete="off" autocapitalize="none" enterkeyhint="send" autofocus required placeholder="히라가나 또는 가타카나">
+                <p class="subtle">앞뒤 공백과 가타카나·히라가나 표기는 정규화해 판정합니다.</p>
+            </div>
+            <button class="button quiz-submit" type="submit">정답 확인</button>
+        </form>
+    </article>
+
+    <article class="quiz-question-panel quiz-feedback" th:if="${feedback != null}" aria-live="polite" th:classappend="${feedback.correct ? ' is-correct' : ' is-incorrect'}">
+        <p class="eyebrow" th:text="${feedback.correct ? '정답' : '다시 확인'}">정답</p>
+        <h1 th:text="${feedback.correct ? '좋아요, 정확히 기억했어요.' : '정답을 확인하고 다음으로 가요.'}">결과</h1>
+        <dl class="quiz-feedback-grid">
+            <div><dt>내 답</dt><dd th:text="${feedback.submittedAnswer}">답</dd></div>
+            <div><dt>정답</dt><dd th:text="${feedback.correctAnswer}">정답</dd></div>
+        </dl>
+        <p class="quiz-explanation" th:if="${feedback.explanation != null and !#strings.isEmpty(feedback.explanation)}" th:text="${feedback.explanation}">설명</p>
+        <div class="toolbar quiz-feedback-actions">
+            <a class="button" th:if="${!quizSession.completed}" th:href="@{/quiz/session/{id}(id=${quizSession.sessionId})}">다음 문제 →</a>
+            <a class="button" th:if="${quizSession.completed}" th:href="@{/quiz/session/{id}/result(id=${quizSession.sessionId})}">결과 보기 →</a>
+            <a class="text-link" th:href="@{/contents/{slug}(slug=${feedback.contentSlug})}">상세에서 다시 보기</a>
+        </div>
+    </article>
+</main>
+</body>
+</html>

@@ -9,17 +9,56 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 
-public interface ContentItemRepository extends JpaRepository<ContentItem, Long> {
+public interface ContentItemRepository extends JpaRepository<ContentItem, Long>, JpaSpecificationExecutor<ContentItem> {
 
     Optional<ContentItem> findBySlug(String slug);
 
     Optional<ContentItem> findBySlugAndPublishedTrue(String slug);
 
+    @Query("""
+            select distinct item from ContentItem item
+            left join fetch item.word word
+            left join fetch word.meanings
+            left join fetch item.grammar
+            left join fetch item.levels
+            left join fetch item.categories
+            where item.published = true and item.id in :ids
+            """)
+    List<ContentItem> findPublishedForSummaryByIdIn(@Param("ids") java.util.Collection<Long> ids);
+
     Optional<ContentItem> findByIdAndPublishedFalse(Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from ContentItem c where c.id=:id")
+    Optional<ContentItem> findByIdForReview(@Param("id") Long id);
+
+    @Query("""
+            select word.contentItem.id from Word word
+            where word.contentItem.id in :ids
+              and word.expressionSearch is not null and word.readingSearch is not null
+              and exists (select peer.id from Word peer
+                  where peer.id <> word.id
+                    and peer.expressionSearch = word.expressionSearch
+                    and peer.readingSearch = word.readingSearch)
+            """)
+    List<Long> findDuplicateWordContentIds(@Param("ids") java.util.Collection<Long> ids);
+
+    @Query("""
+            select grammar.contentItem.id from Grammar grammar
+            where grammar.contentItem.id in :ids
+              and grammar.patternSearch is not null
+              and exists (select peer.id from Grammar peer
+                  where peer.id <> grammar.id
+                    and peer.patternSearch = grammar.patternSearch)
+            """)
+    List<Long> findDuplicateGrammarContentIds(@Param("ids") java.util.Collection<Long> ids);
 
     List<ContentItem> findByPublishedFalseOrderById(Pageable pageable);
 

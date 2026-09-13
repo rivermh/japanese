@@ -19,6 +19,7 @@ import com.japanese.content.repository.ContentItemRepository;
 import com.japanese.learning.repository.LearnerProfileRepository;
 import com.japanese.learning.repository.LearningProgressRepository;
 import com.japanese.learning.repository.StudyRecordRepository;
+import com.japanese.learning.repository.LearnerStudyPreferenceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +48,7 @@ class LearningServiceTest {
     @Autowired private LearningProgressRepository learningProgressRepository;
     @Autowired private ContentItemRepository contentItemRepository;
     @Autowired private StudyRecordRepository studyRecordRepository;
+    @Autowired private LearnerStudyPreferenceRepository learnerStudyPreferenceRepository;
     @Autowired private BookmarkService bookmarkService;
     private UserAccount account;
 
@@ -218,6 +220,21 @@ class LearningServiceTest {
         assertThat(learningService.todayPlan(account).items())
                 .extracting(value -> value.slug())
                 .containsExactly("taberu");
+    }
+
+    @Test
+    void readsDefaultPreferencesForLegacyProfileWithoutWritingInReadOnlyFlow() {
+        var legacy = userAccountRepository.saveAndFlush(new UserAccount("legacy-preferences-" + UUID.randomUUID(), null,
+                "hash", "기존 사용자", UserRole.USER));
+        learningService.overview(legacy);
+        var profile = learnerProfileRepository.findByUserAccountLoginId(legacy.getLoginId()).orElseThrow();
+        assertThat(learnerStudyPreferenceRepository.findByLearnerProfileId(profile.getId())).isEmpty();
+
+        var values = learningService.studyPreferences(legacy);
+
+        assertThat(values.dailyNewWordLimit()).isEqualTo(5);
+        assertThat(values.dailyNewGrammarLimit()).isEqualTo(5);
+        assertThat(learnerStudyPreferenceRepository.findByLearnerProfileId(profile.getId())).isEmpty();
     }
 
     @Test

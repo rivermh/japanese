@@ -17,7 +17,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class CharacterApiController {
     private final CharacterCatalog characterCatalog; private final LearningService learningService; private final CurrentUserService currentUserService;
     public CharacterApiController(CharacterCatalog characterCatalog, LearningService learningService, CurrentUserService currentUserService) { this.characterCatalog=characterCatalog; this.learningService=learningService; this.currentUserService=currentUserService; }
+    @GetMapping("/current") public com.japanese.learning.dto.CharacterStatus current() {
+        return learningService.overview(currentUserService.currentAccount()).character();
+    }
+    @PostMapping("/growth/present") public java.util.Map<String, Boolean> present(
+            @org.springframework.web.bind.annotation.RequestParam("stageKey") String stageKey) {
+        return java.util.Map.of("claimed", learningService.claimGrowthPresentation(currentUserService.currentAccount(), stageKey));
+    }
     @GetMapping public List<CharacterDefinition> characters() { return characterCatalog.all(); }
     @PostMapping("/{key}/select") public StudyOverview select(@PathVariable String key) { var account=currentUserService.currentAccount(); learningService.updateCharacter(account, key); return learningService.overview(account); }
-    @PostMapping("/growth/acknowledge") public StudyOverview acknowledgeGrowth() { var account=currentUserService.currentAccount(); learningService.acknowledgeGrowth(account); return learningService.overview(account); }
+    @PostMapping("/growth/acknowledge") public StudyOverview acknowledgeGrowth(@org.springframework.web.bind.annotation.RequestParam(value="stageKey", required=false) String stageKey) { var account=currentUserService.currentAccount(); if (stageKey == null) learningService.acknowledgeGrowth(account); else learningService.acknowledgeGrowth(account, stageKey); return learningService.overview(account); }
 }

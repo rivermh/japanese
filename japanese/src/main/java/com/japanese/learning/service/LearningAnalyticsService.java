@@ -26,7 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class LearningAnalyticsService {
     private final LearnerProfileRepository profileRepository; private final StudyRecordRepository studyRepository;
     private final QuizAttemptRepository quizRepository; private final LearningProgressRepository progressRepository; private final LearningService learningService; private final ZoneId learningZone;
-    public LearningAnalyticsService(LearnerProfileRepository p, StudyRecordRepository s, QuizAttemptRepository q, LearningProgressRepository progressRepository, LearningService l, @org.springframework.beans.factory.annotation.Value("${japanese.learning.time-zone:Asia/Seoul}") String learningTimeZone) { profileRepository=p; studyRepository=s; quizRepository=q; this.progressRepository=progressRepository; learningService=l; learningZone=ZoneId.of(learningTimeZone); }
+    private final WeaknessNoteService weaknessNotes;
+    public LearningAnalyticsService(LearnerProfileRepository p, StudyRecordRepository s, QuizAttemptRepository q, LearningProgressRepository progressRepository, LearningService l, WeaknessNoteService weaknessNotes, @org.springframework.beans.factory.annotation.Value("${japanese.learning.time-zone:Asia/Seoul}") String learningTimeZone) { profileRepository=p; studyRepository=s; quizRepository=q; this.progressRepository=progressRepository; learningService=l; this.weaknessNotes=weaknessNotes; learningZone=ZoneId.of(learningTimeZone); }
     @Transactional(readOnly = true) public LearningStatistics statistics(UserAccount account) {
         var profile = profileRepository.findByUserAccountLoginId(account.getLoginId()).orElseThrow(); String key=profile.getLearnerKey();
         long correct=studyRepository.countByLearnerProfileLearnerKeyAndResult(key, StudyResult.CORRECT)+quizRepository.countByLearnerProfileLearnerKeyAndResult(key, StudyResult.CORRECT);
@@ -36,12 +37,10 @@ public class LearningAnalyticsService {
         return new LearningStatistics(total,correct,incorrect,total==0?0:(int)(correct*100/total),profile.getExperience(),profile.getLevel(),today,recent);
     }
     @Transactional(readOnly = true) public List<WeakContent> weaknesses(UserAccount account) {
-        String key=profileRepository.findByUserAccountLoginId(account.getLoginId()).orElseThrow().getLearnerKey();
-        Map<String, long[]> counts=new LinkedHashMap<>(); Map<String, ContentItem> items=new LinkedHashMap<>();
-        for (StudyRecord record: studyRepository.findByLearnerProfileLearnerKeyOrderByStudiedAtDesc(key, PageRequest.of(0,200))) {
-            ContentItem item=record.getContentItem(); long[] c=counts.computeIfAbsent(item.getSlug(), ignored->new long[2]); c[0]++; if(record.getResult()==StudyResult.INCORRECT)c[1]++; items.putIfAbsent(item.getSlug(),item);
-        }
-        return counts.entrySet().stream().filter(e->e.getValue()[1]>0).sorted((a,b)->Long.compare(b.getValue()[1],a.getValue()[1])).limit(10).map(e->{ContentItem i=items.get(e.getKey()); String title=i.getWord()==null?i.getGrammar().getPattern():i.getWord().getExpression(); return new WeakContent(i.getSlug(),i.getType(),title,e.getValue()[0],e.getValue()[1]);}).toList();
+        return weaknessNotes.notebook(account, 10).recent().stream().map(item -> new WeakContent(
+                item.content().slug(), item.content().type(), item.content().title(),
+                item.regularAttemptCount()+item.confirmationAttemptCount(),
+                item.regularIncorrectCount()+item.confirmationIncorrectCount())).toList();
     }
     @Transactional(readOnly = true) public List<LevelStudyProgress> levelProgress(UserAccount account) {
         String key=profileRepository.findByUserAccountLoginId(account.getLoginId()).orElseThrow().getLearnerKey();

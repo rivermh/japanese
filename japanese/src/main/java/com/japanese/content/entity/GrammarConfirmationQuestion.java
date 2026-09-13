@@ -44,9 +44,10 @@ public class GrammarConfirmationQuestion {
         choices.clear();
     }
     public void approveForPublication() { if (choices.stream().filter(GrammarConfirmationChoice::isCorrect).count()!=1) throw new IllegalStateException("A confirmation question must have exactly one correct choice"); reviewStatus=ReviewStatus.APPROVED; published=true; reviewedAt=Instant.now(); }
+    public void reject(){reviewStatus=ReviewStatus.REJECTED;published=false;reviewedAt=Instant.now();}
     public void markPending(){reviewStatus=ReviewStatus.PENDING;published=false;reviewedAt=null;}
     public boolean isPubliclyVisible(){return published && reviewStatus==ReviewStatus.APPROVED && grammar.getContentItem().isPublished();}
-    public Long getId(){return id;} public Grammar getGrammar(){return grammar;} public GrammarConfirmationType getQuestionType(){return questionType;} public String getPrompt(){return prompt;} public String getContext(){return context;} public String getExplanation(){return explanation;} public String getSourceRef(){return sourceRef;} public List<GrammarConfirmationChoice> getChoices(){return choices;}
+    public Long getId(){return id;} public Grammar getGrammar(){return grammar;} public GrammarConfirmationType getQuestionType(){return questionType;} public String getPrompt(){return prompt;} public String getContext(){return context;} public String getExplanation(){return explanation;} public String getSourceRef(){return sourceRef;} public List<GrammarConfirmationChoice> getChoices(){return choices;} public ReviewStatus getReviewStatus(){return reviewStatus;} public boolean isPublished(){return published;} public Instant getReviewedAt(){return reviewedAt;}
     public boolean isCorrectChoice(Long choiceId) { return choices.stream().anyMatch(choice -> choice.getId().equals(choiceId) && choice.isCorrect()); }
     public GrammarConfirmationChoice correctChoice() { return choices.stream().filter(GrammarConfirmationChoice::isCorrect).findFirst().orElseThrow(); }
 }

@@ -50,21 +50,37 @@ class RedesignedViewsTest {
 
     @Test
     void rendersPublicPagesAndSharedNavigation() throws Exception {
-        for (String path : new String[]{"/", "/?keyword=食べる", "/contents/taberu", "/contents/temo-ii", "/categories", "/login", "/signup", "/quiz"}) {
+        for (String path : new String[]{"/", "/?keyword=食べる", "/dictionary?keyword=食べる", "/contents/taberu", "/contents/temo-ii", "/categories", "/login", "/signup", "/quiz"}) {
             mvc.perform(get(path)).andExpect(status().isOk())
                     .andExpect(content().string(containsString("id=\"main-content\"")))
-                    .andExpect(content().string(containsString("class=\"app-header\"")));
+                    .andExpect(content().string(containsString("class=\"app-header")));
         }
         mvc.perform(get("/images/characters/haru/animation.json"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("\"ambientDelayMs\"")))
-                .andExpect(content().string(containsString("\"goal-complete\"")));
+                .andExpect(content().string(containsString("\"goal-complete\"")))
+                .andExpect(content().string(containsString("celebrate")))
+                .andExpect(jsonPath("$.stages['stage-1'].states.study.assetStatus").value("motion-only"))
+                .andExpect(jsonPath("$.stages['stage-1'].states.blink.assetStatus").value("required"));
+    }
+
+    @Test
+    void servesInstalledStageAssetsAndOmitsUnavailableBlinkFrames() throws Exception {
+        mvc.perform(get("/images/characters/haru/animation.json"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(2))
+                .andExpect(jsonPath("$.stages['stage-1'].states.blink.frames").doesNotExist())
+                .andExpect(jsonPath("$.stages['stage-4'].idle.asset").value("haru-stage-3.png"));
+        for (int n = 1; n <= 3; n++) {
+            mvc.perform(get("/images/characters/haru/haru-stage-" + n + ".png"))
+                    .andExpect(status().isOk()).andExpect(content().contentType("image/png"));
+        }
     }
 
     @Test
     void rendersPersonalScreensAndFullLessonBodyWithoutAwardingExperience() throws Exception {
         var account = register();
-        for (String path : new String[]{"/", "/today", "/study", "/study/relearn/bookmarks", "/study/relearn/weaknesses", "/bookmarks", "/study-queue", "/collections", "/history", "/statistics", "/progress", "/settings"}) {
+        for (String path : new String[]{"/", "/today", "/study", "/study/relearn/bookmarks", "/study/relearn/weaknesses", "/weaknesses", "/report/weekly", "/my-learning", "/bookmarks", "/study-queue", "/collections", "/history", "/statistics", "/progress", "/settings"}) {
             mvc.perform(get(path).with(user(account.getLoginId())))
                     .andExpect(status().isOk()).andExpect(content().string(containsString("id=\"main-content\"")));
         }
@@ -80,6 +96,12 @@ class RedesignedViewsTest {
                 .andExpect(content().string(containsString("\"dailyNewWordLimit\":2")));
         mvc.perform(get("/api/v1/study/relearn/BOOKMARKS").with(user(account.getLoginId())))
                 .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/weaknesses").with(user(account.getLoginId())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("availableForFocusedReview")));
+        mvc.perform(get("/api/v1/reports/weekly").with(user(account.getLoginId())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("currentStudy")));
         mvc.perform(get("/api/v1/progress/jlpt").with(user(account.getLoginId())))
                 .andExpect(status().isOk()).andExpect(content().string(containsString("levels")));
         mvc.perform(get("/today").with(user(account.getLoginId())))
@@ -115,11 +137,38 @@ class RedesignedViewsTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("data-state=\"goal-complete\"")))
                 .andExpect(content().string(containsString("data-animation-manifest=\"/images/characters/haru/animation.json\"")))
-                .andExpect(content().string(containsString("data-character-action=\"study\"")));
+                .andExpect(content().string(containsString("Daily Mission")))
+                .andExpect(content().string(containsString("오늘 학습 완료")));
         mvc.perform(get("/statistics").with(user(account.getLoginId()))).andExpect(status().isOk());
         assertThat(learning.overview(account).character().experience()).isEqualTo(10);
         assertThat(streak.status(account).currentStreak()).isEqualTo(1);
         assertThat(learning.recentQuizHistory(account, 10)).isEmpty();
+    }
+
+    @Test
+    void resumesFocusedWeaknessSessionWithoutAddingExperienceOrRegularGoal() throws Exception {
+        var account = register();
+        learning.answer(account, "taberu", com.japanese.learning.entity.StudyResult.INCORRECT, "weakness-web-origin", false);
+        int experienceBefore = learning.overview(account).character().experience();
+        long goalBefore = learning.todayProgress(account).completed();
+
+        mvc.perform(post("/weaknesses/session/start").with(user(account.getLoginId())).with(csrf()))
+                .andExpect(redirectedUrl("/weaknesses/session"));
+        MvcResult page = mvc.perform(get("/weaknesses/session").with(user(account.getLoginId())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("FOCUSED RETRAIN"))).andReturn();
+        Matcher matcher = Pattern.compile("/weaknesses/session/([^/]+)/complete").matcher(page.getResponse().getContentAsString());
+        assertThat(matcher.find()).isTrue();
+        String slug = matcher.group(1);
+        mvc.perform(post("/weaknesses/session/" + slug + "/complete").with(user(account.getLoginId())).with(csrf()).param("result", "CORRECT"))
+                .andExpect(redirectedUrl("/weaknesses/session"));
+        mvc.perform(post("/weaknesses/session/" + slug + "/complete").with(user(account.getLoginId())).with(csrf()).param("result", "INCORRECT"))
+                .andExpect(redirectedUrl("/weaknesses/session"));
+        mvc.perform(get("/weaknesses/session").with(user(account.getLoginId())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("FOCUSED RETRAIN COMPLETE")));
+        assertThat(learning.overview(account).character().experience()).isEqualTo(experienceBefore);
+        assertThat(learning.todayProgress(account).completed()).isEqualTo(goalBefore);
     }
 
     private String currentTodaySlug(UserAccount account, MockHttpSession session) throws Exception {

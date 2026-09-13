@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Japanese Design Prototype · Home</title>
+  <link rel="stylesheet" href="css/prototype.css">
+  <script defer src="js/prototype.js"></script>
+</head>
+<body>
+<div class="prototype-note"><span>독립 UI 프로토타입 · 실제 데이터 저장 없음</span><a href="mobile/index.html">Mobile Home 보기</a></div>
+<div class="app-frame">
+  <aside class="side-rail">
+    <a class="brand" href="index.html"><span class="brand-mark" lang="ja">日</span><span>Japanese</span></a>
+    <nav class="rail-nav" aria-label="주요 메뉴">
+      <a class="rail-link active" href="index.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20h-6v-6h-4v6H4Z"/></svg>홈</a>
+      <a class="rail-link" href="today.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 2v4m8-4v4M5 9h14"/></svg>오늘의 학습</a>
+      <a class="rail-link" href="dictionary.html"><svg class="nav-icon" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>사전</a>
+      <a class="rail-link" href="review.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h13"/><path d="m17 11 3 3-3 3"/></svg>복습</a>
+      <a class="rail-link" href="my-learning.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M5 20V10m7 10V4m7 16v-7"/></svg>내 학습</a>
+    </nav>
+    <div class="rail-divider"></div>
+    <p class="rail-subhead">바로가기</p>
+    <nav class="rail-nav" aria-label="학습 바로가기">
+      <a class="rail-link" href="weaknesses.html">약점노트 <span style="margin-left:auto;font-size:10px">8</span></a>
+      <a class="rail-link" href="saved.html">저장함</a>
+      <a class="rail-link" href="weekly-report.html">주간 리포트</a>
+    </nav>
+    <div class="rail-footer"><div class="rail-user"><span class="avatar">민</span><span><strong>민수</strong><small>N3 학습 중</small></span></div></div>
+  </aside>
+
+  <header class="topbar">
+    <span class="topbar-title">홈</span>
+    <form class="global-search" action="dictionary.html"><label class="sr-only" for="global-q">사전 검색</label><input id="global-q" name="q" placeholder="단어, 읽기, 한국어 뜻, 문법 검색"><button aria-label="검색">⌕</button></form>
+    <a class="header-link" href="onboarding.html">학습 계획</a>
+    <a class="header-cta" href="today.html">오늘 학습</a>
+  </header>
+
+  <main class="page">
+    <div class="page-inner">
+      <header class="page-heading">
+        <div><h1>오늘도 한 걸음씩, 민수님.</h1><p>N3 단어와 문법을 중심으로 공부하고 있어요.</p></div>
+        <a class="quiet-link" href="onboarding.html">학습 계획 수정</a>
+      </header>
+
+      <section class="home-desk" aria-label="오늘의 학습과 Haru">
+        <div class="today-panel">
+          <p class="date-line">9월 12일 토요일 · 진행 중인 세션</p>
+          <h2>오늘은 13개를<br>함께 정리해요.</h2>
+          <p class="lead">밀린 복습을 먼저 끝내고, 새 단어와 문법으로 이어집니다.</p>
+          <div class="session-breakdown">
+            <div class="session-row"><span class="session-index">01</span><span><strong>복습</strong><small>오래 기다린 카드부터</small></span><span class="session-count">6</span></div>
+            <div class="session-row"><span class="session-index">02</span><span><strong>새 단어</strong><small>학습 큐 2개 포함</small></span><span class="session-count">5</span></div>
+            <div class="session-row"><span class="session-index">03</span><span><strong>새 문법</strong><small>예문과 접속까지 읽기</small></span><span class="session-count">2</span></div>
+          </div>
+          <div class="goal-line">
+            <div class="goal-copy"><span>오늘 목표</span><strong>4 / 13</strong></div>
+            <div class="progress-track"><span class="progress-fill" style="--value:31%"></span></div>
+            <div class="today-actions"><a class="button" href="today.html">4번째 카드부터 이어하기 <span aria-hidden="true">→</span></a><span class="backlog-note">오늘 이후 복습 18개</span></div>
+          </div>
+        </div>
+
+        <aside class="haru-room" data-haru-room data-state="idle" aria-label="Haru 캐릭터 장면">
+          <div class="haru-stage">
+            <div class="haru-context"><span>함께 공부하는 자리</span><strong>오늘 남은 카드 9개</strong></div>
+            <img class="haru-figure" src="assets/haru-young.png" alt="책을 들고 공부를 기다리는 Haru">
+            <span class="shared-desk" aria-hidden="true"><i></i></span>
+            <div class="haru-state-tools" aria-label="캐릭터 상태 데모">
+              <button class="state-dot active" data-haru-state="idle" title="idle">쉼</button>
+              <button class="state-dot" data-haru-state="study" title="study">공부</button>
+              <button class="state-dot" data-haru-state="happy" title="happy">기쁨</button>
+              <button class="state-dot" data-haru-state="goal" title="goal complete">완료</button>
+              <button class="state-dot" data-haru-state="growth" title="growth">성장</button>
+            </div>
+          </div>
+          <div class="haru-presence" aria-live="polite">
+            <div class="haru-presence-top"><strong>Haru · <span data-haru-title>쉬는 중</span></strong><span class="stage-label">Young 2단계</span></div>
+            <p data-haru-message>오늘도 옆에서 기다리고 있어요.</p>
+            <div class="exp-line"><span>Lv. 7</span><div class="progress-track"><span class="progress-fill" style="--value:62%"></span></div><span>420 / 600 EXP</span></div>
+          </div>
+        </aside>
+      </section>
+
+      <div class="home-lower">
+        <section>
+          <div class="section-title"><h2>이번 주 학습 리듬</h2><a class="quiet-link" href="weekly-report.html">주간 리포트</a></div>
+          <div class="rhythm-strip" aria-label="최근 7일 학습">
+            <div class="rhythm-day done"><span>일</span><i></i><small>12</small></div>
+            <div class="rhythm-day done"><span>월</span><i></i><small>10</small></div>
+            <div class="rhythm-day"><span>화</span><i></i><small>0</small></div>
+            <div class="rhythm-day done"><span>수</span><i></i><small>17</small></div>
+            <div class="rhythm-day done"><span>목</span><i></i><small>9</small></div>
+            <div class="rhythm-day done"><span>금</span><i></i><small>14</small></div>
+            <div class="rhythm-day today"><span>오늘</span><i></i><small>4</small></div>
+          </div>
+          <p style="margin:9px 0 0;color:var(--ink-soft);font-size:11px"><strong style="color:var(--ink)">5일 연속 학습</strong> · 최고 12일</p>
+        </section>
+        <section>
+          <div class="section-title"><h2>다음에 볼 곳</h2></div>
+          <div class="learning-links">
+            <a class="learning-link" href="weaknesses.html"><span><strong>약점 문법 다시 보기</strong><small>～ように 외 7개</small></span><span class="arrow">→</span></a>
+            <a class="learning-link" href="progress.html"><span><strong>N3 진도</strong><small>단어 18% · 문법 12%</small></span><span class="arrow">→</span></a>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

@@ -4,33 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f5f3ee">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23263248'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-size='40' fill='%23fffefa'%3E%E6%97%A5%3C/text%3E%3C/svg%3E">
     <title th:text="${title + ' · Japanese'}">Japanese</title>
     <link rel="stylesheet" th:href="@{/css/app.css}">
+    <link rel="stylesheet" th:href="@{/css/app-v2.css}">
     <script defer th:src="@{/js/character-animator.js}"></script>
     <script defer th:src="@{/js/app.js}"></script>
 </head>
 <body>
-<header th:fragment="header(active)" class="app-header" th:with="signedIn=${@currentUserService.isAuthenticated()}">
+<header th:fragment="header(active)" class="app-header" th:classappend="${@currentUserService.isAuthenticated() ? ' is-authenticated' : ' is-guest'}" th:with="signedIn=${@currentUserService.isAuthenticated()},account=${signedIn ? @currentUserService.currentAccount() : null}">
     <a class="skip-link" href="#main-content">본문으로 건너뛰기</a>
-    <div class="nav-shell">
-        <a class="brand" href="/" aria-label="Japanese 홈"><span class="brand-mark" aria-hidden="true">日</span><span>Japanese<small>하루를 쌓는 일본어</small></span></a>
-        <nav class="primary-nav" aria-label="주 메뉴">
-            <a href="/" th:attr="aria-current=${active == 'home' ? 'page' : null}">홈</a>
-            <a href="/today" th:if="${signedIn}" th:attr="aria-current=${active == 'today' ? 'page' : null}">오늘의 학습</a>
-            <a href="/#library" th:attr="aria-current=${active == 'search' ? 'page' : null}">단어·문법</a>
-            <a href="/bookmarks" th:if="${signedIn}" th:attr="aria-current=${active == 'bookmarks' ? 'page' : null}">북마크</a>
-            <a href="/study-queue" th:if="${signedIn}" th:attr="aria-current=${active == 'queue' ? 'page' : null}">학습 목록</a>
-            <a href="/collections" th:if="${signedIn}" th:attr="aria-current=${active == 'collections' ? 'page' : null}">단어장</a>
-            <a href="/history" th:if="${signedIn}" th:attr="aria-current=${active == 'history' ? 'page' : null}">기록</a>
-            <a href="/progress" th:if="${signedIn}" th:attr="aria-current=${active == 'progress' ? 'page' : null}">진도</a>
-            <a href="/statistics" th:if="${signedIn}" th:attr="aria-current=${active == 'statistics' ? 'page' : null}">통계</a>
+    <aside class="app-rail" th:if="${signedIn}">
+        <a class="brand" href="/" aria-label="Japanese 홈"><span class="brand-mark" aria-hidden="true">日</span><span>Japanese</span></a>
+        <nav class="rail-nav" aria-label="주 메뉴">
+            <a class="rail-link" href="/" th:classappend="${active == 'home' ? ' active' : ''}"><span aria-hidden="true">⌂</span>홈</a>
+            <a class="rail-link" href="/today" th:classappend="${active == 'today' ? ' active' : ''}"><span aria-hidden="true">▣</span>오늘의 학습</a>
+            <a class="rail-link" href="/dictionary" th:classappend="${active == 'search' ? ' active' : ''}"><span aria-hidden="true">⌕</span>사전</a>
+            <a class="rail-link" href="/study?reviewOnly=true" th:classappend="${active == 'review' or active == 'weaknesses' ? ' active' : ''}"><span aria-hidden="true">↻</span>복습</a>
+            <a class="rail-link" href="/my-learning" th:classappend="${active == 'my' or active == 'bookmarks' or active == 'queue' or active == 'collections' or active == 'history' or active == 'progress' or active == 'statistics' or active == 'settings' ? ' active' : ''}"><span aria-hidden="true">▥</span>내 학습</a>
         </nav>
-        <div class="account-nav" th:if="${signedIn}">
-            <a href="/settings" th:attr="aria-current=${active == 'settings' ? 'page' : null}">설정</a>
-            <form th:action="@{/logout}" method="post"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button class="button-quiet" type="submit">로그아웃</button></form>
-        </div>
-        <div class="account-nav" th:unless="${signedIn}"><a href="/login">로그인</a><a class="button button-small" href="/signup">시작하기</a></div>
+        <div class="rail-divider"></div><p class="rail-subhead">바로가기</p>
+        <nav class="rail-nav" aria-label="학습 바로가기"><a class="rail-link" href="/weaknesses">약점노트</a><a class="rail-link" href="/bookmarks">저장함</a><a class="rail-link" href="/report/weekly">주간 리포트</a><a class="rail-link" href="/progress">JLPT 진도</a></nav>
+        <div class="rail-footer"><a class="rail-user" href="/settings"><span class="avatar" th:text="${#strings.substring(account.displayName,0,1)}">나</span><span><strong th:text="${account.displayName}">학습자</strong><small>학습 설정</small></span></a><form action="/logout" method="post"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button type="submit">로그아웃</button></form></div>
+    </aside>
+    <div class="app-topbar">
+        <a class="mobile-brand brand" href="/"><span class="brand-mark" aria-hidden="true">日</span><span>Japanese</span></a>
+        <strong class="topbar-title" th:text="${active == 'home' ? '홈' : active == 'today' ? '오늘의 학습' : active == 'search' ? '사전' : (active == 'review' or active == 'weaknesses') ? '복습' : (active == 'my' or active == 'bookmarks' or active == 'queue' or active == 'collections' or active == 'history' or active == 'progress' or active == 'statistics' or active == 'settings') ? '내 학습' : 'Japanese'}">Japanese</strong>
+        <form class="global-search" action="/dictionary" method="get" role="search"><label class="sr-only" for="global-search">사전 검색</label><input id="global-search" name="keyword" placeholder="단어, 읽기, 뜻, 문법 검색"><button type="submit" aria-label="검색">⌕</button></form>
+        <a class="header-link" th:if="${signedIn}" href="/settings">학습 계획</a><a class="header-cta" th:if="${signedIn}" href="/today">오늘 학습</a>
+        <div class="guest-actions" th:unless="${signedIn}"><a href="/dictionary">사전</a><a href="/login">로그인</a><a class="header-cta" href="/signup">시작하기</a></div>
     </div>
+    <nav class="mobile-tabbar" th:if="${signedIn}" aria-label="모바일 주 메뉴"><a href="/" th:classappend="${active == 'home' ? ' active' : ''}"><span>⌂</span>홈</a><a href="/today" th:classappend="${active == 'today' ? ' active' : ''}"><span>▣</span>오늘</a><a href="/dictionary" th:classappend="${active == 'search' ? ' active' : ''}"><span>⌕</span>사전</a><a href="/study?reviewOnly=true" th:classappend="${active == 'review' or active == 'weaknesses' ? ' active' : ''}"><span>↻</span>복습</a><a href="/my-learning" th:classappend="${active == 'my' or active == 'bookmarks' or active == 'queue' or active == 'collections' or active == 'history' or active == 'progress' or active == 'statistics' or active == 'settings' ? ' active' : ''}"><span>▥</span>내 학습</a></nav>
 </header>
 <footer th:fragment="footer" class="app-footer"><span>Japanese <span aria-hidden="true">/</span> 매일, 조금씩 더 가까이.</span><nav aria-label="추가 메뉴"><a href="/categories">학습 분야</a><a href="/study">자유 학습</a><a href="/quiz">확인 문제</a></nav></footer>
 </body>

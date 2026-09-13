@@ -3,7 +3,8 @@
 <head th:replace="~{fragments/layout :: head('나만의 단어장')}"></head>
 <body><header th:replace="~{fragments/layout :: header('collections')}"></header>
 <main id="main-content" class="page-shell">
-    <header class="page-heading"><div><p class="eyebrow">MY COLLECTIONS</p><h1>나만의 단어장</h1><p class="subtle">단어와 문법을 목적별로 함께 정리하고, 필요할 때 자유 학습으로 다시 볼 수 있어요.</p></div></header>
+    <header class="page-heading"><div><h1>저장함</h1><p class="subtle">단어와 문법을 목적별로 함께 정리하고 자유 학습으로 다시 볼 수 있습니다.</p></div></header>
+    <nav class="saved-subnav" aria-label="저장함 메뉴"><a href="/bookmarks">북마크</a><a href="/study-queue">학습 목록</a><a class="active" href="/collections">나만의 단어장 <span th:text="${#lists.size(collections)}"></span></a></nav>
     <section class="surface detail-section"><form class="compact-add-form" action="/collections" method="post"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><label for="collection-name">새 단어장</label><input id="collection-name" name="name" maxlength="80" required placeholder="예: 면접 일본어"><button class="button" type="submit">만들기</button></form><p class="form-message success" th:if="${collectionMessage != null}" th:text="${collectionMessage}"></p>
         <div class="content-list" th:unless="${#lists.isEmpty(collections)}"><a class="content-row" th:each="collection : ${collections}" th:href="@{/collections/{id}(id=${collection.id})}"><span class="type-pill">단어장</span><div class="content-main"><h3 th:text="${collection.name}"></h3><p class="description" th:text="${collection.contentCount + '개 콘텐츠'}"></p></div><span class="row-arrow" aria-hidden="true">→</span></a></div>
         <div class="empty-state" th:if="${#lists.isEmpty(collections)}"><p>아직 만든 단어장이 없어요.</p><p class="subtle">여행, 회사 표현, 헷갈리는 문법처럼 필요한 목적부터 만들어 보세요.</p></div>

@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
-<head th:replace="~{fragments/layout :: head('자유 학습')}"></head>
+<head th:replace="~{fragments/layout :: head(${reviewOnly ? '복습' : (relearnTarget != null ? '다시 학습' : '자유 학습')})}"></head>
 <body>
-<header th:replace="~{fragments/layout :: header('today')}"></header>
+<header th:replace="~{fragments/layout :: header('review')}"></header>
 <main id="main-content" class="page-shell study-shell">
     <header class="page-heading">
         <div>
-            <p class="eyebrow">STUDY SESSION</p>
-            <h1 th:text="${relearnTarget == null ? '짧게 학습하기' : (relearnTarget.name() == 'BOOKMARKS' ? '북마크 다시 학습' : '약점 다시 학습')}">짧게 학습하기</h1>
-            <p class="subtle" th:text="${relearnTarget == null ? '오늘의 콘텐츠를 확인하고 답변 결과를 기록하세요.' : '정규 오늘의 학습과 분리해 필요한 표현을 다시 확인하세요.'}">오늘의 콘텐츠를 확인하고 답변 결과를 기록하세요.</p>
+            <p class="eyebrow">REVIEW</p>
+            <h1 th:text="${relearnTarget == null ? (reviewOnly ? '기억이 흐려지기 전에 복습해요.' : '자유 카드 학습') : (relearnTarget.name() == 'BOOKMARKS' ? '북마크 다시 학습' : '약점 다시 학습')}">복습</h1>
+            <p class="subtle" th:text="${relearnTarget == null ? (reviewOnly ? '오래 기다린 카드부터 현재 복습 일정을 처리합니다.' : '레벨과 유형을 골라 필요한 표현을 자유롭게 학습합니다.') : '정규 오늘의 학습과 분리해 필요한 표현을 다시 확인하세요.'}">복습할 표현을 확인합니다.</p>
         </div>
         <a class="api-link" href="/">홈</a>
     </header>

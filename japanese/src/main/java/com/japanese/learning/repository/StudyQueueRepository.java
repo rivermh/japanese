@@ -15,6 +15,8 @@ public interface StudyQueueRepository extends JpaRepository<StudyQueueEntry, Lon
 
     Optional<StudyQueueEntry> findByUserAccountLoginIdAndContentItemSlug(String loginId, String slug);
 
+    long countByUserAccountLoginId(String loginId);
+
     @EntityGraph(attributePaths = {"contentItem", "contentItem.word", "contentItem.word.meanings", "contentItem.grammar", "contentItem.levels", "contentItem.categories"})
     List<StudyQueueEntry> findByUserAccountLoginIdOrderByCreatedAtAsc(String loginId);
 

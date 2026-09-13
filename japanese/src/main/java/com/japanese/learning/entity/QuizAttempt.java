@@ -38,19 +38,30 @@ public class QuizAttempt {
     @Column(name = "answered_at", nullable = false)
     private Instant answeredAt;
 
+    /** Null keeps attempts created before Quiz 2.0 eligible for the legacy streak policy. */
+    @Column(name = "streak_eligible")
+    private Boolean streakEligible = true;
+
     protected QuizAttempt() {
     }
 
     public QuizAttempt(LearnerProfile learnerProfile, Long questionSourceRecordId,
                        StudyResult result, int earnedExperience) {
+        this(learnerProfile, questionSourceRecordId, result, earnedExperience, true);
+    }
+
+    public QuizAttempt(LearnerProfile learnerProfile, Long questionSourceRecordId,
+                       StudyResult result, int earnedExperience, boolean streakEligible) {
         this.learnerProfile = learnerProfile;
         this.questionSourceRecordId = questionSourceRecordId;
         this.result = result;
         this.earnedExperience = earnedExperience;
         this.answeredAt = Instant.now();
+        this.streakEligible = streakEligible;
     }
     public Long getQuestionSourceRecordId() { return questionSourceRecordId; }
     public StudyResult getResult() { return result; }
     public int getEarnedExperience() { return earnedExperience; }
     public Instant getAnsweredAt() { return answeredAt; }
+    public boolean isStreakEligible() { return streakEligible == null || streakEligible; }
 }

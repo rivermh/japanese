@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ContentReviewService {
 
     private static final int MAX_REVIEW_ITEMS = 100;
+    private static final int MAX_BULK_REVIEW_ITEMS = 20;
 
     private final ContentItemRepository contentItemRepository;
     private final ContentReviewHistoryRepository contentReviewHistoryRepository;
@@ -109,7 +110,7 @@ public class ContentReviewService {
             return 0;
         }
         int publishedCount = 0;
-        for (Long contentId : contentIds.stream().distinct().limit(MAX_REVIEW_ITEMS).toList()) {
+        for (Long contentId : contentIds.stream().distinct().limit(MAX_BULK_REVIEW_ITEMS).toList()) {
             Optional<ContentItem> item = contentItemRepository.findByIdAndPublishedFalse(contentId);
             if (item.isEmpty()) {
                 continue;

@@ -39,6 +39,11 @@ public class StudyCollectionService {
     }
 
     @Transactional(readOnly = true)
+    public long count(UserAccount account) {
+        return collectionRepository.countByUserAccountLoginId(account.getLoginId());
+    }
+
+    @Transactional(readOnly = true)
     public StudyCollectionDetails details(UserAccount account, Long id) {
         StudyCollection collection = owned(account, id);
         return new StudyCollectionDetails(collection.getId(), collection.getName(),

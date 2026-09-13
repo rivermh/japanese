@@ -10,6 +10,7 @@ import com.japanese.learning.service.StreakService;
 import com.japanese.learning.service.StudyQueueService;
 import com.japanese.learning.service.StudyCollectionService;
 import com.japanese.learning.service.OnboardingService;
+import com.japanese.learning.service.LearningGuidanceService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -32,6 +33,7 @@ public class ContentController {
     private final StudyQueueService studyQueueService;
     private final StudyCollectionService studyCollectionService;
     private final OnboardingService onboardingService;
+    private final LearningGuidanceService learningGuidanceService;
     private final String activeProfiles;
 
     public ContentController(
@@ -44,6 +46,7 @@ public class ContentController {
             StudyQueueService studyQueueService,
             StudyCollectionService studyCollectionService,
             OnboardingService onboardingService,
+            LearningGuidanceService learningGuidanceService,
             @Value("${spring.profiles.active:}") String activeProfiles
     ) {
         this.contentQueryService = contentQueryService;
@@ -55,6 +58,7 @@ public class ContentController {
         this.studyQueueService = studyQueueService;
         this.studyCollectionService = studyCollectionService;
         this.onboardingService = onboardingService;
+        this.learningGuidanceService = learningGuidanceService;
         this.activeProfiles = activeProfiles;
     }
 
@@ -69,32 +73,31 @@ public class ContentController {
             Model model,
             HttpSession session
     ) {
-        model.addAttribute("keyword", keyword == null ? "" : keyword);
-        model.addAttribute("type", type == null ? "" : type.name());
-        model.addAttribute("level", level == null ? "" : level);
-        model.addAttribute("category", category == null ? "" : category);
-        var contentPage = contentQueryService.searchPage(keyword, type, level, category, page, size);
-        model.addAttribute("contentPage", contentPage);
-        model.addAttribute("contents", contentPage.contents());
-        model.addAttribute("filterOptions", contentQueryService.filterOptions());
+        boolean dictionaryRequest = (keyword != null && !keyword.isBlank()) || type != null
+                || (level != null && !level.isBlank()) || (category != null && !category.isBlank()) || page > 0;
+        if (dictionaryRequest) {
+            return dictionary(keyword, type, level, category, page, size, model);
+        }
         boolean authenticated = currentUserService.isAuthenticated();
         model.addAttribute("authenticated", authenticated);
+        model.addAttribute("guestHaruPoster", learningService.guestHaruPoster());
         if (authenticated) {
             var account = currentUserService.currentAccount();
             if (onboardingService.status(account).required()) return "redirect:/onboarding";
             var learner = learningService.overview(account);
             var dailyProgress = learningService.todayProgress(account);
+            var learningStatus = learningGuidanceService.status(account);
             String reaction = (String) session.getAttribute("characterReaction");
             session.removeAttribute("characterReaction");
-            String characterState = learner.character().growthNoticePending()
+            String characterState = learner.character().growthPresentationPending()
                     ? "growth"
-                    : dailyProgress.remaining() == 0
+                    : learningStatus.mission().completed()
                     ? "goal-complete"
                     : "happy".equals(reaction) ? "happy" : "idle";
             model.addAttribute("learner", learner);
             model.addAttribute("dailyProgress", dailyProgress);
+            model.addAttribute("learningStatus", learningStatus);
             model.addAttribute("characterState", characterState);
-            model.addAttribute("todayPlan", learningService.todayPlan(account));
             model.addAttribute("studyPreferences", learningService.studyPreferences(account));
             model.addAttribute("recentHistory", learningService.recentHistory(account, 5));
             model.addAttribute("recentQuizHistory", learningService.recentQuizHistory(account, 5));
@@ -120,6 +123,27 @@ public class ContentController {
                 ? learningService.contentLearningStatus(currentUserService.currentAccount(), slug)
                 : null);
         return "content-detail";
+    }
+
+    @GetMapping("/dictionary")
+    public String dictionary(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) ContentType type,
+            @RequestParam(required = false) String level,
+            @RequestParam(required = false) String category,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            Model model
+    ) {
+        model.addAttribute("keyword", keyword == null ? "" : keyword);
+        model.addAttribute("type", type == null ? "" : type.name());
+        model.addAttribute("level", level == null ? "" : level);
+        model.addAttribute("category", category == null ? "" : category);
+        var contentPage = contentQueryService.searchPage(keyword, type, level, category, page, size);
+        model.addAttribute("contentPage", contentPage);
+        model.addAttribute("contents", contentPage.contents());
+        model.addAttribute("filterOptions", contentQueryService.filterOptions());
+        return "dictionary";
     }
 
     @GetMapping("/categories")

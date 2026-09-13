@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Japanese Mobile Prototype · Dictionary</title>
+  <link rel="stylesheet" href="../css/prototype.css"><script defer src="../js/prototype.js"></script>
+</head>
+<body class="mobile-body">
+<div class="prototype-note mobile-note"><span>Mobile dictionary prototype</span><a href="../dictionary.html">Desktop</a></div>
+<header class="mobile-header"><a class="brand" href="index.html"><span class="brand-mark" lang="ja">日</span><span>Japanese</span></a><button class="mobile-header-action" aria-label="검색 기록">⋯</button></header>
+<main class="mobile-dictionary-main">
+  <header class="mobile-dictionary-head">
+    <h1>사전</h1>
+    <form class="dictionary-query" data-dictionary-form><label class="sr-only" for="mobile-q">검색</label><input id="mobile-q" data-dictionary-input value="たべ" placeholder="단어, 읽기, 뜻, 문법"><button>검색</button></form>
+    <div class="mobile-filter-row">
+      <button class="segment-button active" data-kind-filter="all">전체</button>
+      <button class="segment-button" data-kind-filter="word">단어</button>
+      <button class="segment-button" data-kind-filter="grammar">문법</button>
+      <button class="mobile-filter-button" data-open-filter>필터 1</button>
+    </div>
+  </header>
+  <div class="mobile-result-toolbar"><strong data-result-count>6개 결과</strong><span>정확 일치 우선</span></div>
+  <section class="mobile-results">
+    <a class="mobile-result exact-result" href="../word-detail.html" data-result-row data-kind="word" data-search="食べる たべる 먹다 식사하다"><span class="result-type">단어</span><div class="result-term"><strong lang="ja">食べる</strong><span lang="ja">たべる</span></div><div class="result-meaning">먹다, 식사하다</div><div class="result-meta"><span class="meta-tag">N5</span><span class="meta-tag learning-state">복습 중</span></div></a>
+    <a class="mobile-result" href="../word-detail.html" data-result-row data-kind="word" data-search="食べ物 たべもの 음식 먹을 것"><span class="result-type">단어</span><div class="result-term"><strong lang="ja">食べ物</strong><span lang="ja">たべもの</span></div><div class="result-meaning">음식, 먹을 것</div><div class="result-meta"><span class="meta-tag">N5</span></div></a>
+    <a class="mobile-result" href="../word-detail.html" data-result-row data-kind="word" data-search="食べ方 たべかた 먹는 방법"><span class="result-type">단어</span><div class="result-term"><strong lang="ja">食べ方</strong><span lang="ja">たべかた</span></div><div class="result-meaning">먹는 방법; 먹는 방식</div><div class="result-meta"><span class="meta-tag">N4</span></div></a>
+    <a class="mobile-result" href="../grammar-detail.html" data-result-row data-kind="grammar" data-search="～きれない 食べきれない 끝까지 다 먹을 수 없다"><span class="result-type">문법</span><div class="result-term"><strong lang="ja">～きれない</strong><span>동사 ます형 + きれない</span></div><div class="result-meaning">끝까지 완전히 할 수 없음을 나타내는 표현</div><div class="result-meta"><span class="meta-tag">N3</span></div></a>
+    <a class="mobile-result" href="../word-detail.html" data-result-row data-kind="word" data-search="食べ放題 たべほうだい 무제한 뷔페"><span class="result-type">단어</span><div class="result-term"><strong lang="ja">食べ放題</strong><span lang="ja">たべほうだい</span></div><div class="result-meaning">마음껏 먹기, 무제한 식사</div><div class="result-meta"><span class="meta-tag">N3</span><span class="meta-tag">외식</span></div></a>
+    <a class="mobile-result" href="../grammar-detail.html" data-result-row data-kind="grammar" data-search="～ながら 먹으면서 동시에"><span class="result-type">문법</span><div class="result-term"><strong lang="ja">～ながら</strong><span>동사 ます형 + ながら</span></div><div class="result-meaning">두 동작을 동시에 함: 음악을 들으면서 식사하다</div><div class="result-meta"><span class="meta-tag">N4</span></div></a>
+    <div class="empty-results" data-empty-results hidden>일치하는 데모 항목이 없습니다.</div>
+  </section>
+</main>
+<div class="filter-sheet" data-filter-sheet role="dialog" aria-modal="true" aria-label="검색 필터">
+  <div class="filter-sheet-panel">
+    <div class="filter-sheet-head"><h2>검색 필터</h2><button class="button quiet" data-close-filter>닫기</button></div>
+    <div class="filter-group"><h2>JLPT</h2><label class="check-row"><input type="checkbox"> N5</label><label class="check-row"><input type="checkbox" checked> N4</label><label class="check-row"><input type="checkbox"> N3</label></div>
+    <div class="filter-group"><h2>학습 분야</h2><label class="check-row"><input type="checkbox"> 일상</label><label class="check-row"><input type="checkbox"> 비즈니스</label><label class="check-row"><input type="checkbox"> IT 일본어</label></div>
+    <div class="filter-sheet-actions"><button class="button secondary">초기화</button><button class="button" data-close-filter>결과 보기</button></div>
+  </div>
+</div>
+<nav class="mobile-bottom-nav" aria-label="주요 메뉴">
+  <a href="index.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 10.5 12 4l8 6.5V20h-6v-6h-4v6H4Z"/></svg><span>홈</span></a>
+  <a href="today.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 2v4m8-4v4M5 9h14"/></svg><span>오늘</span></a>
+  <a class="active" href="dictionary.html"><svg class="nav-icon" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg><span>사전</span></a>
+  <a href="../review.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h13"/></svg><span>복습</span></a>
+  <a href="../my-learning.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M5 20V10m7 10V4m7 16v-7"/></svg><span>내 학습</span></a>
+</nav>
+</body>
+</html>

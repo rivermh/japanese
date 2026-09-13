@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/layout :: head(${comparison.left.pattern + ' · ' + comparison.right.pattern})}"></head>
 <body><header th:replace="~{fragments/layout :: header('search')}"></header>
 <main id="main-content" class="page-shell detail-shell">
-  <div class="breadcrumb"><a href="/#library">문법</a><span aria-hidden="true">/</span><span>비교</span></div>
+  <div class="breadcrumb"><a href="/dictionary?type=GRAMMAR">문법</a><span aria-hidden="true">/</span><span>비교</span></div>
   <article class="surface lesson-paper comparison-paper">
     <header class="lesson-heading"><div><p class="eyebrow" th:text="${comparison.relationType}"></p><h1><span lang="ja" th:text="${comparison.left.pattern}"></span><span aria-hidden="true"> · </span><span lang="ja" th:text="${comparison.right.pattern}"></span></h1></div></header>
     <p class="prose" th:if="${comparison.summary != null and !comparison.summary.isBlank()}" th:text="${comparison.summary}"></p>

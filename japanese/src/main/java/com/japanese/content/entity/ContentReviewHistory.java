@@ -1,5 +1,7 @@
 package com.japanese.content.entity;
 
+import com.japanese.account.entity.UserAccount;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -29,6 +31,14 @@ public class ContentReviewHistory {
     @Column(nullable = false, length = 20)
     private ReviewStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "previous_status", length = 20)
+    private ReviewStatus previousStatus;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reviewer_id")
+    private UserAccount reviewer;
+
     @Column(length = 1000)
     private String note;
 
@@ -39,8 +49,15 @@ public class ContentReviewHistory {
     }
 
     public ContentReviewHistory(ContentItem contentItem, ReviewStatus status, String note) {
+        this(contentItem, null, status, null, note);
+    }
+
+    public ContentReviewHistory(ContentItem contentItem, ReviewStatus previousStatus, ReviewStatus status,
+                                UserAccount reviewer, String note) {
         this.contentItem = contentItem;
+        this.previousStatus = previousStatus;
         this.status = status;
+        this.reviewer = reviewer;
         this.note = note;
         this.reviewedAt = Instant.now();
     }
@@ -48,6 +65,8 @@ public class ContentReviewHistory {
     public ReviewStatus getStatus() {
         return status;
     }
+    public ReviewStatus getPreviousStatus() { return previousStatus; }
+    public UserAccount getReviewer() { return reviewer; }
 
     public String getNote() {
         return note;

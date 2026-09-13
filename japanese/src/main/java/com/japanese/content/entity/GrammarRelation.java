@@ -33,6 +33,7 @@ public class GrammarRelation {
         this.leftGrammar = leftGrammar; this.rightGrammar = rightGrammar; this.relationType = relationType; this.sourceRef = sourceRef;
     }
     public void approveForPublication() { reviewStatus = ReviewStatus.APPROVED; published = true; reviewedAt = Instant.now(); }
+    public void reject() { reviewStatus = ReviewStatus.REJECTED; published = false; reviewedAt = Instant.now(); }
     public void markPending() { reviewStatus = ReviewStatus.PENDING; published = false; reviewedAt = null; }
     public boolean isPubliclyVisible() { return published && reviewStatus == ReviewStatus.APPROVED; }
     public Long getId() { return id; }
@@ -41,4 +42,6 @@ public class GrammarRelation {
     public GrammarRelationType getRelationType() { return relationType; }
     public String getSourceRef() { return sourceRef; }
     public ReviewStatus getReviewStatus() { return reviewStatus; }
+    public boolean isPublished() { return published; }
+    public Instant getReviewedAt() { return reviewedAt; }
 }

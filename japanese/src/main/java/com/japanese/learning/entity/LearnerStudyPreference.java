@@ -14,6 +14,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.time.LocalTime;
 
 /**
  * A learner's content scope. An empty collection means "all" so adding a new
@@ -49,6 +50,13 @@ public class LearnerStudyPreference {
     @Column(name = "daily_new_grammar_limit")
     private Integer dailyNewGrammarLimit = 5;
 
+    /** Null keeps reminders enabled for preferences created before this setting existed. */
+    @Column(name = "reminder_enabled")
+    private Boolean reminderEnabled = true;
+
+    @Column(name = "reminder_time")
+    private LocalTime reminderTime = LocalTime.of(19, 0);
+
     protected LearnerStudyPreference() {
     }
 
@@ -72,6 +80,9 @@ public class LearnerStudyPreference {
         return dailyNewGrammarLimit == null ? 5 : dailyNewGrammarLimit;
     }
 
+    public boolean isReminderEnabled() { return reminderEnabled == null || reminderEnabled; }
+    public LocalTime getReminderTime() { return reminderTime == null ? LocalTime.of(19, 0) : reminderTime; }
+
     public void replace(Set<Long> levelIds, Set<Long> categoryIds) {
         this.levelIds.clear();
         this.levelIds.addAll(levelIds);
@@ -82,5 +93,10 @@ public class LearnerStudyPreference {
     public void updateDailyNewLimits(int wordLimit, int grammarLimit) {
         this.dailyNewWordLimit = wordLimit;
         this.dailyNewGrammarLimit = grammarLimit;
+    }
+
+    public void updateReminder(boolean enabled, LocalTime time) {
+        this.reminderEnabled = enabled;
+        this.reminderTime = time;
     }
 }

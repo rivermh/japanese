@@ -104,4 +104,12 @@ public class LearningProgress {
     public int getLapseCount() {
         return lapseCount;
     }
+
+    public StudyResult getLastResult() {
+        return lastResult;
+    }
+
+    public Instant getLastStudiedAt() {
+        return lastStudiedAt;
+    }
 }

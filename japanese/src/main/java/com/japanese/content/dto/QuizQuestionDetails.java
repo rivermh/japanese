@@ -12,8 +12,8 @@ public record QuizQuestionDetails(
         String promptJapanese,
         String promptKorean,
         List<String> choices,
-        String answerJapanese,
-        String answerKorean,
-        String explanation
+        @com.fasterxml.jackson.annotation.JsonIgnore String answerJapanese,
+        @com.fasterxml.jackson.annotation.JsonIgnore String answerKorean,
+        @com.fasterxml.jackson.annotation.JsonIgnore String explanation
 ) {
 }

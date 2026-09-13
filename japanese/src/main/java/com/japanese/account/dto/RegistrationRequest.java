@@ -12,6 +12,7 @@ public class RegistrationRequest {
     private String loginId;
 
     @Email(message = "이메일 형식을 확인하세요.")
+    @NotBlank(message = "이메일을 입력하세요.")
     @Size(max = 160, message = "이메일은 160자 이하여야 합니다.")
     private String email;
 
