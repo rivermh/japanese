@@ -47,7 +47,9 @@ class ContentQualityAuditServiceTest {
         var page=reviews.contents(ReviewStatus.PENDING,false,ContentType.WORD,"N5","",ref,true,QualitySeverity.ERROR,null,false,0);
         assertThat(page.getSize()).isEqualTo(25);
         assertThat(page.getContent()).extracting(r->r.id()).contains(bad.getId()).doesNotContain(clean.getId());
-        var typed=reviews.contents(ReviewStatus.PENDING,false,ContentType.WORD,"N5","",ref,true,null,QualityIssueType.WORD_READING_BLANK,false,0);
+        var severityOnly=reviews.contents(ReviewStatus.PENDING,false,ContentType.WORD,"N5","",ref,null,QualitySeverity.ERROR,null,false,0);
+        assertThat(severityOnly.getContent()).extracting(r->r.id()).contains(bad.getId()).doesNotContain(clean.getId());
+        var typed=reviews.contents(ReviewStatus.PENDING,false,ContentType.WORD,"N5","",ref,null,null,QualityIssueType.WORD_READING_BLANK,false,0);
         assertThat(typed.getContent()).extracting(r->r.id()).contains(bad.getId()).doesNotContain(clean.getId());
         assertThat(reviews.content(bad.getId()).qualityAudit().highestSeverity()).isEqualTo(QualitySeverity.ERROR);
     }

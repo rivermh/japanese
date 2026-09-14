@@ -49,7 +49,8 @@ public class AdminContentReviewService {
       Boolean qualityIssue,QualitySeverity qualitySeverity,QualityIssueType qualityIssueType,boolean oldest,int page){
       Pageable pageable=PageRequest.of(Math.max(0,page),PAGE_SIZE,Sort.by(oldest?Sort.Direction.ASC:Sort.Direction.DESC,"id"));
       Specification<ContentItem> spec=contentSpec(status,published,type,clean(level),normalize(keyword),clean(source));
-      if(Boolean.TRUE.equals(qualityIssue))spec=spec.and(qualityAudit.issueFilter(qualitySeverity,qualityIssueType));
+      boolean filterQuality=Boolean.TRUE.equals(qualityIssue)||qualitySeverity!=null||qualityIssueType!=null;
+      if(filterQuality)spec=spec.and(qualityAudit.issueFilter(qualitySeverity,qualityIssueType));
       Page<ContentItem> result=contents.findAll(spec,pageable);
       Map<Long,ContentQualityAuditService.Audit> audits=qualityAudit.audits(result.getContent());
       return result.map(item->row(item,audits.get(item.getId())));
