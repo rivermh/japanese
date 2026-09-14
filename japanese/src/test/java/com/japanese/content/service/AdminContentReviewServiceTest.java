@@ -24,6 +24,7 @@ class AdminContentReviewServiceTest {
  @Autowired GrammarRelationRepository relations; @Autowired GrammarComparisonRepository comparisons;
  @Autowired GrammarConfirmationQuestionRepository questions; @Autowired CurationReviewHistoryRepository curationHistory;
  @Autowired StudyRecordRepository studyRecords; @Autowired LearningProgressRepository progress;
+ @Autowired ContentReviewService legacyReviews;
  UserAccount admin;
  @BeforeEach void setup() throws Exception {sample.run();admin=accounts.save(new UserAccount("admin-"+UUID.randomUUID(),null,"hash","검수자",UserRole.ADMIN));}
  private ContentItem word(String suffix,String expression,String level){var item=new ContentItem("admin-word-"+suffix,ContentType.WORD,"admin-source",false);var w=new Word(expression,"よみ","명사",null);w.addMeaning(new Meaning("ko",expression+" 뜻",0));item.attachWord(w);levels.findBySystemAndCode("JLPT",level).ifPresent(item::addLevel);return contents.save(item);}
@@ -53,5 +54,30 @@ class AdminContentReviewServiceTest {
    }
    assertThat(reviews.curation(CurationRecordType.CONFIRMATION,q.getId()).choices()).anyMatch(AdminContentReviewModels.Choice::correct);
     var pending=curation.saveEnrichment(other.getSlug(),"admin:reject","x",null,null,null,null);reviews.reviewCuration(CurationRecordType.ENRICHMENT,pending.getId(),ReviewStatus.REJECTED,admin,"부족");assertThat(enrichments.findById(pending.getId()).orElseThrow().isPublished()).isFalse();
+ }
+
+ @Test void qualityErrorsBlockSingleAndBatchApprovalButWarningsRemainApprovable(){
+   var missingMeaning=word("quality-missing-meaning","quality-missing","N5");missingMeaning.getWord().getMeanings().clear();contents.save(missingMeaning);
+   var blankMeaning=word("quality-blank-meaning","quality-blank","N5");blankMeaning.getWord().getMeanings().clear();blankMeaning.getWord().addMeaning(new Meaning("ko"," ",0));contents.save(blankMeaning);
+   var blankGrammar=new ContentItem("admin-grammar-quality-blank",ContentType.GRAMMAR,"admin-source",false);blankGrammar.attachGrammar(new Grammar("~quality-blank"," ","connection"));levels.findBySystemAndCode("JLPT","N5").ifPresent(blankGrammar::addLevel);contents.save(blankGrammar);
+   var warning=word("quality-warning","quality-warning","N5");
+   contents.flush();
+
+   assertThatThrownBy(()->reviews.approveContent(missingMeaning.getId(),admin,null)).isInstanceOf(IllegalStateException.class).hasMessageContaining("MEANING_MISSING");
+   assertThatThrownBy(()->reviews.approveContent(blankMeaning.getId(),admin,null)).isInstanceOf(IllegalStateException.class).hasMessageContaining("MEANING_BLANK");
+   assertThatThrownBy(()->reviews.approveContent(blankGrammar.getId(),admin,null)).isInstanceOf(IllegalStateException.class).hasMessageContaining("GRAMMAR_DESCRIPTION_BLANK");
+   assertThat(reviews.approveContent(warning.getId(),admin,null).changed()).isTrue();
+
+   assertThat(missingMeaning.isPublished()).isFalse();assertThat(missingMeaning.getReviewStatus()).isEqualTo(ReviewStatus.PENDING);assertThat(histories.findByContentItemIdOrderByReviewedAtDesc(missingMeaning.getId())).isEmpty();
+   assertThat(blankMeaning.isPublished()).isFalse();assertThat(blankMeaning.getReviewStatus()).isEqualTo(ReviewStatus.PENDING);assertThat(histories.findByContentItemIdOrderByReviewedAtDesc(blankMeaning.getId())).isEmpty();
+   assertThat(blankGrammar.isPublished()).isFalse();assertThat(blankGrammar.getReviewStatus()).isEqualTo(ReviewStatus.PENDING);assertThat(histories.findByContentItemIdOrderByReviewedAtDesc(blankGrammar.getId())).isEmpty();
+ }
+
+ @Test void legacyPublishAndBatchPublishAlsoUseQualityApprovalGate(){
+   var invalid=word("quality-legacy-invalid","quality-legacy","N5");invalid.getWord().getMeanings().clear();contents.save(invalid);
+   var valid=word("quality-legacy-valid","quality-legacy-valid","N5");contents.flush();
+   assertThatThrownBy(()->legacyReviews.publish(invalid.getId())).isInstanceOf(IllegalStateException.class).hasMessageContaining("MEANING_MISSING");
+   assertThatThrownBy(()->legacyReviews.publishSelected(List.of(invalid.getId(),valid.getId()))).isInstanceOf(IllegalStateException.class).hasMessageContaining("MEANING_MISSING");
+   assertThat(invalid.isPublished()).isFalse();assertThat(valid.isPublished()).isFalse();
  }
 }

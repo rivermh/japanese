@@ -1,5 +1,6 @@
 package com.japanese.content.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -47,5 +48,15 @@ class AdminContentReviewControllerTest {
         mvc.perform(get("/api/v1/admin/contents?qualityIssue=true&qualitySeverity=WARNING").with(a)).andExpect(status().isOk()).andExpect(jsonPath("$.content").isArray());
         mvc.perform(post("/api/v1/admin/contents/"+pending.getId()+"/approve").with(a).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"note\":\"ok\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.changed").value(true));
         mvc.perform(post("/api/v1/admin/contents/"+pending.getId()+"/approve").with(a).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isOk()).andExpect(jsonPath("$.changed").value(false));
+    }
+
+    @Test void returnsValidationErrorWhenApiApprovalHasQualityError() throws Exception {
+        ContentItem invalid=new ContentItem("web-quality-error-"+UUID.randomUUID(),ContentType.WORD,"web-source",false);
+        invalid.attachWord(new Word("quality-error","クオリティ","명사",null));
+        invalid=contents.save(invalid);
+        mvc.perform(post("/api/v1/admin/contents/"+invalid.getId()+"/approve").with(user(admin.getLoginId()).roles("ADMIN")).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error",containsString("MEANING_MISSING")));
+        assertThat(contents.findById(invalid.getId()).orElseThrow().isPublished()).isFalse();
+        assertThat(contents.findById(invalid.getId()).orElseThrow().getReviewStatus()).isEqualTo(ReviewStatus.PENDING);
     }
 }

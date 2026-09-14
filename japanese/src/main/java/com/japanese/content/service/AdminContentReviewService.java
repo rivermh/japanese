@@ -70,7 +70,7 @@ public class AdminContentReviewService {
     @Transactional
     public ActionResult approveContent(Long id,UserAccount reviewer,String note){ContentItem item=contents.findByIdForReview(id).orElseThrow();
       if(item.getReviewStatus()==ReviewStatus.APPROVED)return result(false,item,"이미 승인된 콘텐츠입니다.");
-      requirePending(item.getReviewStatus()); validate(item);ReviewStatus before=item.getReviewStatus();item.publish();
+      requirePending(item.getReviewStatus()); validateQualityForApproval(item); validate(item);ReviewStatus before=item.getReviewStatus();item.publish();
       histories.save(new ContentReviewHistory(item,before,ReviewStatus.APPROVED,reviewer,clean(note)));return result(true,item,"승인하고 공개했습니다.");}
     @Transactional
     public ActionResult rejectContent(Long id,UserAccount reviewer,String note){String reason=clean(note);if(reason==null)throw new IllegalArgumentException("반려 사유를 입력해주세요.");
@@ -83,6 +83,7 @@ public class AdminContentReviewService {
       return changed;}
     private void validate(ContentItem item){if(item.getType()==ContentType.WORD&&(item.getWord()==null||blank(item.getWord().getExpression())||blank(item.getWord().getReading())))throw new IllegalStateException("단어 표기와 읽기가 필요합니다.");
       if(item.getType()==ContentType.GRAMMAR&&(item.getGrammar()==null||blank(item.getGrammar().getPattern())||blank(item.getGrammar().getExplanation())))throw new IllegalStateException("문법 패턴과 설명이 필요합니다.");}
+    private void validateQualityForApproval(ContentItem item){List<QualityIssueType> errors=qualityAudit.audit(item).issues().stream().filter(issue->issue.severity()==QualitySeverity.ERROR).map(ContentQualityAuditService.Issue::type).toList();if(!errors.isEmpty())throw new IllegalStateException("품질 오류가 있어 승인할 수 없습니다: "+String.join(", ",errors.stream().map(Enum::name).toList()));}
     private ActionResult result(boolean changed,ContentItem item,String message){return new ActionResult(changed,item.getReviewStatus(),item.isPublished(),message);}
     private void requirePending(ReviewStatus status){if(status!=ReviewStatus.PENDING)throw new IllegalStateException("PENDING 콘텐츠만 검수할 수 있습니다.");}
 

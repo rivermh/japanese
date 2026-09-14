@@ -9,6 +9,8 @@ import com.japanese.content.entity.ContentItem;
 import com.japanese.content.entity.ContentType;
 import com.japanese.content.entity.ContentReviewHistory;
 import com.japanese.content.entity.ReviewStatus;
+import com.japanese.content.entity.QualityIssueType;
+import com.japanese.content.entity.QualitySeverity;
 import com.japanese.content.repository.ContentItemRepository;
 import com.japanese.content.repository.ContentReviewHistoryRepository;
 import com.japanese.content.repository.ContentSourceRepository;
@@ -29,15 +31,18 @@ public class ContentReviewService {
     private final ContentItemRepository contentItemRepository;
     private final ContentReviewHistoryRepository contentReviewHistoryRepository;
     private final ContentSourceRepository contentSourceRepository;
+    private final ContentQualityAuditService qualityAudit;
 
     public ContentReviewService(
             ContentItemRepository contentItemRepository,
             ContentReviewHistoryRepository contentReviewHistoryRepository,
-            ContentSourceRepository contentSourceRepository
+            ContentSourceRepository contentSourceRepository,
+            ContentQualityAuditService qualityAudit
     ) {
         this.contentItemRepository = contentItemRepository;
         this.contentReviewHistoryRepository = contentReviewHistoryRepository;
         this.contentSourceRepository = contentSourceRepository;
+        this.qualityAudit = qualityAudit;
     }
 
     @Transactional(readOnly = true)
@@ -100,6 +105,7 @@ public class ContentReviewService {
     public void publish(Long contentId) {
         ContentItem item = contentItemRepository.findByIdAndPublishedFalse(contentId)
                 .orElseThrow(() -> new NoSuchElementException("Content not found: " + contentId));
+        validateQualityForApproval(item);
         item.publish();
         contentReviewHistoryRepository.save(new ContentReviewHistory(item, ReviewStatus.APPROVED, "검토 완료 · 공개"));
     }
@@ -115,6 +121,7 @@ public class ContentReviewService {
             if (item.isEmpty()) {
                 continue;
             }
+            validateQualityForApproval(item.get());
             item.get().publish();
             contentReviewHistoryRepository.save(
                     new ContentReviewHistory(item.get(), ReviewStatus.APPROVED, "검토 완료 · 선택 공개"));
@@ -206,6 +213,17 @@ public class ContentReviewService {
                         .map(history -> new ReviewHistoryEntry(
                                 history.getStatus(), history.getNote(), history.getReviewedAt()))
                         .toList());
+    }
+
+    private void validateQualityForApproval(ContentItem item) {
+        List<QualityIssueType> errors = qualityAudit.audit(item).issues().stream()
+                .filter(issue -> issue.severity() == QualitySeverity.ERROR)
+                .map(ContentQualityAuditService.Issue::type)
+                .toList();
+        if (!errors.isEmpty()) {
+            throw new IllegalStateException("품질 오류가 있어 승인할 수 없습니다: "
+                    + String.join(", ", errors.stream().map(Enum::name).toList()));
+        }
     }
 
     private SourceDetails toSourceDetails(String sourceRef) {
