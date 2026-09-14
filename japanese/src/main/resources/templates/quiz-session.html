@@ -2,7 +2,6 @@
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('빠른 퀴즈')}"></head>
 <body class="quiz-focus-mode">
-<header th:replace="~{fragments/layout :: header('quiz')}"></header>
 <main id="main-content" class="page-shell quiz-session-shell">
     <header class="quiz-session-header">
         <a class="study-exit" href="/quiz">← 퀴즈 나가기</a>
@@ -10,7 +9,7 @@
             <div class="study-progress-copy"><strong th:text="${quizSession.answeredCount + ' / ' + quizSession.totalQuestions}">0 / 5</strong><span th:text="${quizSession.remainingCount + '문제 남음'}">5문제 남음</span></div>
             <div class="progress-track" role="progressbar" aria-label="빠른 퀴즈 진행" aria-valuemin="0" aria-valuemax="100" th:attr="aria-valuenow=${quizSession.progressPercent}"><span class="progress-fill" th:style="${'--value:' + quizSession.progressPercent + '%'}"></span></div>
         </div>
-        <span class="quiz-exp" th:text="${'Quiz EXP +' + quizSession.earnedExperience}">Quiz EXP +0</span>
+        <span class="quiz-session-label">빠른 퀴즈</span>
     </header>
 
     <article class="quiz-question-panel" th:if="${feedback == null and quizSession.currentQuestion != null}">

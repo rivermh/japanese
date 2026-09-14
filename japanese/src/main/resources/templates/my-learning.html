@@ -1,5 +1,28 @@
-<!DOCTYPE html><html lang="ko" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{fragments/layout :: head('내 학습')}"></head><body><header th:replace="~{fragments/layout :: header('my')}"></header>
-<main id="main-content" class="page-shell"><header class="page-heading"><div><h1>내 학습</h1><p>진도, 기록, 저장한 콘텐츠와 현재 학습 플랜을 한곳에서 확인합니다.</p></div></header>
-<div class="my-learning-grid"><section class="my-learning-links"><a href="/progress"><span class="section-index">01</span><span><strong>JLPT 진도</strong><small>공개 콘텐츠 기준 상태 분포 확인</small></span><b>→</b></a><a href="/report/weekly"><span class="section-index">02</span><span><strong>주간 학습 리포트</strong><small th:text="${streak.currentStreak + '일 연속 학습 · 실제 기록 비교'}"></small></span><b>→</b></a><a href="/history"><span class="section-index">03</span><span><strong>학습 기록</strong><small>월별 활동과 날짜별 학습 내용</small></span><b>→</b></a><a href="/bookmarks"><span class="section-index">04</span><span><strong>저장함</strong><small th:text="${'북마크 ' + bookmarkCount + ' · 학습 목록 ' + queueCount + ' · 단어장 ' + collectionCount}"></small></span><b>→</b></a><a href="/weaknesses"><span class="section-index">05</span><span><strong>오답·약점 노트</strong><small>최근 오답과 개선된 약점 확인</small></span><b>→</b></a><a href="/statistics"><span class="section-index">06</span><span><strong>전체 학습 통계</strong><small>누적 학습량과 레벨별 기록</small></span><b>→</b></a></section>
-<aside class="study-plan-sheet"><div class="section-heading"><h2>내 학습 플랜</h2><a class="quiet-link" href="/settings">수정</a></div><dl><div><dt>JLPT 범위</dt><dd th:text="${#lists.isEmpty(studyPreferences.scope.levelCodes) ? '전체' : #strings.listJoin(studyPreferences.scope.levelCodes, ', ')}"></dd></div><div><dt>학습 분야</dt><dd th:text="${#lists.isEmpty(studyPreferences.scope.categorySlugs) ? '전체' : #strings.listJoin(studyPreferences.scope.categorySlugs, ', ')}"></dd></div><div><dt>새 단어</dt><dd th:text="${'하루 ' + studyPreferences.dailyNewWordLimit + '개'}"></dd></div><div><dt>새 문법</dt><dd th:text="${'하루 ' + studyPreferences.dailyNewGrammarLimit + '개'}"></dd></div><div><dt>일일 목표</dt><dd th:text="${dailyProgress.goal + '개'}"></dd></div><div><dt>오늘 남음</dt><dd th:text="${dailyProgress.remaining + '개'}"></dd></div></dl><a class="button" href="/today">오늘 학습 이어가기</a><form class="mobile-account-action" action="/logout" method="post"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button class="button-quiet" type="submit">로그아웃</button></form></aside></div>
-</main><footer th:replace="~{fragments/layout :: footer}"></footer></body></html>
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('내 학습')}"></head>
+<body class="editorial-page my-learning-page">
+<header th:replace="~{fragments/layout :: header('my')}"></header>
+<main id="main-content" class="page-shell my-learning-shell">
+    <header class="page-heading"><div><p class="eyebrow">MY LEARNING</p><h1>내 학습</h1><p class="subtle">쌓인 기록과 다시 볼 표현을 한곳에서 찾습니다.</p></div></header>
+    <div class="my-learning-grid">
+        <section class="my-learning-links" aria-label="내 학습 메뉴">
+            <a href="/history"><span class="section-index">01</span><span><strong>학습 기록</strong><small>월별 활동과 날짜별 학습 내용</small></span><b aria-hidden="true">→</b></a>
+            <a href="/weaknesses"><span class="section-index">02</span><span><strong>오답·약점 노트</strong><small>헷갈린 표현과 반복 오답 다시 보기</small></span><b aria-hidden="true">→</b></a>
+            <a href="/bookmarks"><span class="section-index">03</span><span><strong>저장함</strong><small th:text="${'북마크 ' + bookmarkCount + ' · 학습 목록 ' + queueCount + ' · 단어장 ' + collectionCount}">저장한 표현</small></span><b aria-hidden="true">→</b></a>
+            <a href="/progress"><span class="section-index">04</span><span><strong>JLPT 진도</strong><small>레벨별 학습 상태와 다음 복습</small></span><b aria-hidden="true">→</b></a>
+            <a href="/report/weekly"><span class="section-index">05</span><span><strong>주간 학습 리포트</strong><small th:text="${streak.currentStreak + '일 연속 학습 · 이번 주 흐름'}">이번 주 흐름</small></span><b aria-hidden="true">→</b></a>
+            <a href="/haru"><span class="section-index">06</span><span><strong>Haru</strong><small>학습과 함께 쌓인 성장 기록</small></span><b aria-hidden="true">→</b></a>
+            <a href="/settings"><span class="section-index">07</span><span><strong>학습 설정</strong><small>목표, 범위와 리마인더 조정</small></span><b aria-hidden="true">→</b></a>
+        </section>
+        <aside class="study-plan-sheet" aria-labelledby="plan-title">
+            <div class="section-heading"><h2 id="plan-title">현재 학습 플랜</h2><a class="quiet-link" href="/settings">수정</a></div>
+            <dl><div><dt>JLPT 범위</dt><dd th:text="${#lists.isEmpty(studyPreferences.scope.levelCodes) ? '전체' : #strings.listJoin(studyPreferences.scope.levelCodes, ', ')}">전체</dd></div><div><dt>학습 분야</dt><dd th:text="${#lists.isEmpty(studyPreferences.scope.categorySlugs) ? '전체' : #strings.listJoin(studyPreferences.scope.categorySlugs, ', ')}">전체</dd></div><div><dt>새 단어</dt><dd th:text="${'하루 ' + studyPreferences.dailyNewWordLimit + '개'}">하루 5개</dd></div><div><dt>새 문법</dt><dd th:text="${'하루 ' + studyPreferences.dailyNewGrammarLimit + '개'}">하루 2개</dd></div><div><dt>오늘 남음</dt><dd th:text="${dailyProgress.remaining + '개'}">0개</dd></div></dl>
+            <a class="button" href="/today">오늘 학습 이어가기</a>
+            <form class="mobile-account-action" action="/logout" method="post"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button class="button-quiet" type="submit">로그아웃</button></form>
+        </aside>
+    </div>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

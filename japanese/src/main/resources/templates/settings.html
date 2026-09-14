@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('학습 설정')}"></head>
-<body>
+<body class="editorial-page settings-page">
 <header th:replace="~{fragments/layout :: header('settings')}"></header>
 <main id="main-content" class="page-shell">
     <header class="page-heading">
         <p class="eyebrow">YOUR LEARNING PACE</p>
         <h1>나에게 맞는 학습</h1>
-        <p class="subtle">꾸준히 이어 갈 수 있는 목표와 함께할 파트너를 정하세요.</p>
+        <p class="subtle">꾸준히 이어 갈 수 있는 목표와 학습 범위를 정하세요.</p>
     </header>
     <p class="form-message success" role="status" th:if="${settingsMessage != null}" th:text="${settingsMessage}"></p>
     <p class="form-message" role="alert" th:if="${settingsError != null}" th:text="${settingsError}"></p>
@@ -85,20 +85,6 @@
                 <label class="choice-item reminder-toggle"><input type="checkbox" name="reminderEnabled" value="true" th:checked="${reminderPreference.enabled}"><span>학습 리마인더 사용</span></label>
                 <div class="field"><label for="reminderTime">선호 시간</label><input id="reminderTime" name="reminderTime" type="time" step="60" th:value="${reminderPreference.preferredTime}" aria-describedby="reminder-help" required></div>
                 <button class="button button-secondary" type="submit">리마인더 저장</button>
-            </form>
-        </section>
-        <section class="settings-section" aria-labelledby="character-title">
-            <div class="section-heading"><h2 id="character-title">함께 공부할 파트너</h2></div>
-            <p id="character-help" class="subtle">홈에서 학습을 함께할 파트너를 선택하세요. 학습으로 쌓은 EXP에 따라 성장합니다.</p>
-            <form class="auth-form" th:action="@{/settings/character}" method="post">
-                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-                <div class="field">
-                    <label for="characterKey">학습 파트너</label>
-                    <select id="characterKey" name="characterKey" aria-describedby="character-help" required>
-                        <option th:each="character : ${characterOptions}" th:value="${character.key}" th:selected="${learner.character.characterKey == character.key}" th:text="${character.displayName + ' · ' + character.description}">하루</option>
-                    </select>
-                </div>
-                <button class="button button-secondary" type="submit">파트너 저장</button>
             </form>
         </section>
     </div>

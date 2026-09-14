@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import jakarta.servlet.http.HttpSession;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
@@ -54,7 +53,6 @@ public class TodayLearningController {
         model.addAttribute("dailyProgress", learningService.todayProgress(account));
         var overview = learningService.overview(account);
         model.addAttribute("overview", overview);
-        if (overview.character().growthPresentationPending()) model.addAttribute("characterReaction", "growth");
         model.addAttribute("streak", streakService.status(account));
         model.addAttribute("todayReport", historyService.day(account, LocalDate.now(ZoneId.of("Asia/Seoul"))));
         return todaySession.completed() ? "today-session-complete" : "today-learning";
@@ -62,14 +60,10 @@ public class TodayLearningController {
 
     @PostMapping("/today/{slug}/complete")
     public String complete(@PathVariable String slug, @RequestParam StudyResult result,
-                           org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes, HttpSession session) {
+                           org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes) {
         var account = currentUserService.currentAccount();
         if (onboardingService.status(account).required()) return "redirect:/onboarding";
         var todaySession = todaySessionService.complete(account, slug, result);
-        redirectAttributes.addFlashAttribute("characterReaction",
-                todaySession.completed() ? "goal-complete"
-                        : result == StudyResult.CORRECT ? "happy" : "study");
-        if (result == StudyResult.CORRECT && !todaySession.completed()) session.setAttribute("characterReaction", "happy");
         if (todaySession.completed()) redirectAttributes.addFlashAttribute("todaySessionCompleted", true);
         return "redirect:/today";
     }

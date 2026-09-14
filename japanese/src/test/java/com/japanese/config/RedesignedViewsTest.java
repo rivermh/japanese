@@ -7,6 +7,15 @@ import com.japanese.learning.service.LearningService;
 import com.japanese.learning.service.StreakService;
 import com.japanese.learning.service.OnboardingService;
 import com.japanese.learning.dto.OnboardingRequest;
+import com.japanese.learning.entity.StudyActivityType;
+import com.japanese.learning.entity.TodayStudySession;
+import com.japanese.learning.entity.TodayStudySessionItem;
+import com.japanese.learning.repository.LearnerProfileRepository;
+import com.japanese.learning.repository.TodayStudySessionItemRepository;
+import com.japanese.learning.repository.TodayStudySessionRepository;
+import com.japanese.content.repository.ContentItemRepository;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,6 +46,10 @@ class RedesignedViewsTest {
     @Autowired LearningService learning;
     @Autowired StreakService streak;
     @Autowired OnboardingService onboarding;
+    @Autowired LearnerProfileRepository profiles;
+    @Autowired TodayStudySessionRepository todaySessions;
+    @Autowired TodayStudySessionItemRepository todaySessionItems;
+    @Autowired ContentItemRepository contents;
 
     private UserAccount register() {
         var request = new RegistrationRequest();
@@ -80,7 +93,7 @@ class RedesignedViewsTest {
     @Test
     void rendersPersonalScreensAndFullLessonBodyWithoutAwardingExperience() throws Exception {
         var account = register();
-        for (String path : new String[]{"/", "/today", "/study", "/study/relearn/bookmarks", "/study/relearn/weaknesses", "/weaknesses", "/report/weekly", "/my-learning", "/bookmarks", "/study-queue", "/collections", "/history", "/statistics", "/progress", "/settings"}) {
+        for (String path : new String[]{"/", "/today", "/study", "/study/relearn/bookmarks", "/study/relearn/weaknesses", "/weaknesses", "/report/weekly", "/my-learning", "/haru", "/bookmarks", "/study-queue", "/collections", "/history", "/statistics", "/progress", "/settings"}) {
             mvc.perform(get(path).with(user(account.getLoginId())))
                     .andExpect(status().isOk()).andExpect(content().string(containsString("id=\"main-content\"")));
         }
@@ -106,8 +119,28 @@ class RedesignedViewsTest {
                 .andExpect(status().isOk()).andExpect(content().string(containsString("levels")));
         mvc.perform(get("/today").with(user(account.getLoginId())))
                 .andExpect(content().string(containsString("毎朝、朝ご飯を食べます。")))
-                .andExpect(content().string(containsString("TODAY'S SESSION")));
+                .andExpect(content().string(containsString("today-focus-card")))
+                .andExpect(content().string(containsString("이해했어요 · 다음")));
         assertThat(learning.overview(account).character().experience()).isZero();
+    }
+
+    @Test
+    void rendersReviewAsAClosedRecallPromptUntilTheLearnerChoosesToRevealIt() throws Exception {
+        var account = register();
+        var profile = profiles.findByUserAccountLoginId(account.getLoginId()).orElseThrow();
+        var session = todaySessions.saveAndFlush(new TodayStudySession(profile, LocalDate.now(ZoneId.of("Asia/Seoul")),
+                "review-player-" + account.getId(), 1, 0, 0));
+        var content = contents.findBySlugAndPublishedTrue("taberu").orElseThrow();
+        todaySessionItems.saveAndFlush(new TodayStudySessionItem(session, content, 0, StudyActivityType.REVIEW));
+
+        mvc.perform(get("/today").with(user(account.getLoginId())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("<details class=\"today-review-reveal\">")))
+                .andExpect(content().string(containsString("<summary>답 보기</summary>")))
+                .andExpect(content().string(containsString("다시 볼게요")))
+                .andExpect(content().string(containsString("기억했어요")))
+                .andExpect(content().string(containsString("value=\"INCORRECT\"")))
+                .andExpect(content().string(containsString("value=\"CORRECT\"")));
     }
 
     @Test
@@ -133,12 +166,15 @@ class RedesignedViewsTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("SESSION COMPLETE")))
                 .andExpect(content().string(containsString("10 EXP")));
-        mvc.perform(get("/").with(user(account.getLoginId())))
+        MvcResult home = mvc.perform(get("/").with(user(account.getLoginId())))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("data-state=\"goal-complete\"")))
-                .andExpect(content().string(containsString("data-animation-manifest=\"/images/characters/haru/animation.json\"")))
-                .andExpect(content().string(containsString("Daily Mission")))
-                .andExpect(content().string(containsString("오늘 학습 완료")));
+                .andExpect(content().string(containsString("오늘 목표")))
+                .andExpect(content().string(containsString("오늘 학습 완료"))).andReturn();
+        assertThat(home.getResponse().getContentAsString()).doesNotContain("data-character-scene");
+        mvc.perform(get("/haru").with(user(account.getLoginId())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Haru")))
+                .andExpect(content().string(containsString("/images/characters/haru/haru-stage-1.png")));
         mvc.perform(get("/statistics").with(user(account.getLoginId()))).andExpect(status().isOk());
         assertThat(learning.overview(account).character().experience()).isEqualTo(10);
         assertThat(streak.status(account).currentStreak()).isEqualTo(1);
@@ -180,18 +216,18 @@ class RedesignedViewsTest {
     }
 
     @Test
-    void showsHappyReactionOnceAfterLearningBeforeGoalCompletion() throws Exception {
+    void keepsCharacterGrowthOutOfHomeAfterLearning() throws Exception {
         var account = register();
         var session = new MockHttpSession();
         mvc.perform(post("/today/taberu/complete").session(session)
                         .with(user(account.getLoginId())).with(csrf()).param("result", "CORRECT"))
                 .andExpect(redirectedUrl("/today"));
-        mvc.perform(get("/").session(session).with(user(account.getLoginId())))
+        MvcResult home = mvc.perform(get("/").session(session).with(user(account.getLoginId())))
+                .andExpect(status().isOk()).andReturn();
+        assertThat(home.getResponse().getContentAsString()).doesNotContain("data-character-scene");
+        mvc.perform(get("/haru").session(session).with(user(account.getLoginId())))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("data-state=\"happy\"")));
-        mvc.perform(get("/").session(session).with(user(account.getLoginId())))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("data-state=\"idle\"")));
+                .andExpect(content().string(containsString("Haru")));
     }
 
     @Test

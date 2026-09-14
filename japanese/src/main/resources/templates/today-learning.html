@@ -3,25 +3,47 @@
 <head th:replace="~{fragments/layout :: head('오늘의 학습')}"></head>
 <body class="study-mode"><header th:replace="~{fragments/layout :: header('today')}"></header>
 <main id="main-content" class="page-shell today-study-shell">
-    <span class="sr-only">TODAY'S SESSION</span>
     <header class="today-study-header">
         <a class="study-exit" href="/">← 오늘 학습 나가기</a>
         <div class="study-progress"><div class="study-progress-copy"><strong th:text="${todaySession.currentNumber + ' / ' + todaySession.totalCount}">1 / 10</strong><span th:text="${todaySession.remainingCount + '개 남음'}">9개 남음</span></div><div class="progress-track" role="progressbar" aria-label="오늘 학습 진행" aria-valuemin="0" th:attr="aria-valuemax=${todaySession.totalCount},aria-valuenow=${todaySession.completedCount}"><span class="progress-fill" th:style="${'--value:' + (todaySession.totalCount == 0 ? 0 : todaySession.completedCount * 100 / todaySession.totalCount) + '%'}"></span></div></div>
         <div class="study-kinds" th:text="${'복습 ' + dailyMission.review.completed + '/' + dailyMission.review.target + ' · 새 단어 ' + dailyMission.newWords.completed + '/' + dailyMission.newWords.target + ' · 새 문법 ' + dailyMission.newGrammar.completed + '/' + dailyMission.newGrammar.target}">복습 0/0 · 새 단어 0/0 · 새 문법 0/0</div>
     </header>
-    <div class="study-workspace today-study-workspace">
-        <article class="learning-sheet">
-            <div class="card-meta"><span th:text="${todaySession.currentActivityType.name() == 'REVIEW' ? '복습' : '새 학습'}">복습</span><span th:text="${lesson.summary.type.name() == 'WORD' ? '단어' : '문법'}">단어</span><span th:each="level : ${lesson.summary.levels}" th:text="${level.system + ' ' + level.code}">JLPT N5</span></div>
-            <header class="lesson-heading"><div><h1 lang="ja" th:text="${lesson.summary.title}">食べる</h1><p class="learning-reading" lang="ja" th:if="${lesson.summary.reading != null}" th:text="${lesson.summary.reading}">たべる</p></div></header>
-            <div class="learning-rule"></div>
-            <div class="learning-body" th:replace="~{fragments/content :: lessonBody(${lesson})}"></div>
-            <p class="today-read-note">내용을 충분히 읽은 뒤 기억 상태를 선택하세요. 화면을 여는 것만으로는 완료되지 않습니다.</p>
+
+    <div class="today-study-workspace">
+        <article class="today-focus-card" th:classappend="${todaySession.currentActivityType.name() == 'REVIEW' ? ' is-review' : ' is-new'}">
+            <div class="today-card-meta"><span th:text="${todaySession.currentActivityType.name() == 'REVIEW' ? '복습' : '새 학습'}">복습</span><span th:text="${lesson.summary.type.name() == 'WORD' ? '단어' : '문법'}">단어</span><span th:each="level : ${lesson.summary.levels}" th:text="${level.system + ' ' + level.code}">JLPT N5</span></div>
+
+            <section class="today-review-prompt" th:if="${todaySession.currentActivityType.name() == 'REVIEW'}" aria-labelledby="today-prompt-title">
+                <h1 id="today-prompt-title" lang="ja" th:text="${lesson.summary.title}">する</h1>
+                <p>먼저 뜻을 떠올려보세요.</p>
+            </section>
+
+            <details class="today-review-reveal" th:if="${todaySession.currentActivityType.name() == 'REVIEW'}">
+                <summary>답 보기</summary>
+                <div class="today-answer-content">
+                    <header class="today-answer-heading"><h2 lang="ja" th:text="${lesson.summary.title}">する</h2><p class="today-reading" lang="ja" th:if="${lesson.summary.reading != null and !lesson.summary.reading.isBlank()}" th:text="${lesson.summary.reading}">する</p></header>
+                    <p class="today-core-meaning" th:if="${lesson.summary.type.name() == 'WORD' and !#lists.isEmpty(lesson.meanings)}" th:text="${lesson.meanings[0].text}">하다</p>
+                    <p class="today-core-meaning" th:if="${lesson.summary.type.name() == 'WORD' and #lists.isEmpty(lesson.meanings) and lesson.summary.description != null}" th:text="${lesson.summary.description}">핵심 의미</p>
+                    <p class="today-core-meaning" th:if="${lesson.grammar != null}" th:text="${lesson.grammar.explanation}">핵심 문법 설명</p>
+                    <div class="today-example-list" th:if="${!#lists.isEmpty(lesson.examples)}"><article class="today-example" th:each="example, exampleStatus : ${lesson.examples}" th:if="${exampleStatus.index < 2}"><p lang="ja" th:text="${example.japaneseText}">毎朝運動をする。</p><p th:if="${example.translation != null and !example.translation.isBlank()}" th:text="${example.translation}">매일 아침 운동을 한다.</p></article></div>
+                    <a class="today-detail-link" th:href="@{/contents/{slug}(slug=${lesson.summary.slug})}">상세 보기</a>
+                </div>
+                <div class="today-grade-actions" aria-label="복습 결과 선택">
+                    <form th:action="@{/today/{slug}/complete(slug=${lesson.summary.slug})}" method="post"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="result" value="INCORRECT"><button class="today-grade-retry" type="submit">다시 볼게요</button></form>
+                    <form th:action="@{/today/{slug}/complete(slug=${lesson.summary.slug})}" method="post"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="result" value="CORRECT"><button class="today-grade-correct" type="submit">기억했어요</button></form>
+                </div>
+            </details>
+
+            <section class="today-new-content" th:if="${todaySession.currentActivityType.name() != 'REVIEW'}" aria-labelledby="today-new-title">
+                <header class="today-answer-heading"><h1 id="today-new-title" lang="ja" th:text="${lesson.summary.title}">なる</h1><p class="today-reading" lang="ja" th:if="${lesson.summary.reading != null and !lesson.summary.reading.isBlank()}" th:text="${lesson.summary.reading}">なる</p></header>
+                <p class="today-kind" th:if="${lesson.partOfSpeech != null}" th:text="${lesson.partOfSpeech}">동사</p>
+                <p class="today-core-meaning" th:if="${lesson.summary.type.name() == 'WORD' and !#lists.isEmpty(lesson.meanings)}" th:text="${lesson.meanings[0].text}">되다</p>
+                <p class="today-core-meaning" th:if="${lesson.summary.type.name() == 'WORD' and #lists.isEmpty(lesson.meanings) and lesson.summary.description != null}" th:text="${lesson.summary.description}">핵심 의미</p>
+                <p class="today-core-meaning" th:if="${lesson.grammar != null}" th:text="${lesson.grammar.explanation}">핵심 문법 설명</p>
+                <div class="today-example-list" th:if="${!#lists.isEmpty(lesson.examples)}"><article class="today-example" th:each="example, exampleStatus : ${lesson.examples}" th:if="${exampleStatus.index < 2}"><p lang="ja" th:text="${example.japaneseText}">必要なら追加します。</p><p th:if="${example.translation != null and !example.translation.isBlank()}" th:text="${example.translation}">필요하면 추가합니다.</p></article></div>
+                <a class="today-detail-link" th:href="@{/contents/{slug}(slug=${lesson.summary.slug})}">상세 보기</a>
+                <form class="today-new-action" th:action="@{/today/{slug}/complete(slug=${lesson.summary.slug})}" method="post"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="result" value="CORRECT"><button type="submit">이해했어요 · 다음</button></form>
+            </section>
         </article>
-        <aside class="study-companion character-scene" data-character-scene th:attr="data-growth-stage=${overview.character.pendingGrowthStageKey},data-growth-pending=${overview.character.growthPresentationPending},data-character=${overview.character.characterKey},data-stage=${overview.character.animationStageKey},data-asset-directory=${overview.character.assetDirectory},data-animation-manifest=${overview.character.animationManifestPath},data-state=${characterReaction != null ? characterReaction : 'study'}" aria-label="Haru 학습 반응 영역"><div class="study-companion-label"><span>함께 학습 중</span><strong th:text="${overview.character.characterName}">Haru</strong></div><div class="study-companion-figure character-renderer" data-character-renderer><img class="character-frame is-visible" data-character-frame th:if="${overview.character.illustrationPath != null}" th:src="${overview.character.illustrationPath}" th:alt="${overview.character.characterName + '가 학습을 함께하는 모습'}"></div><p class="study-companion-reaction" th:text="${characterReaction == 'happy' ? '좋아요. 다음 내용도 차분히 이어가요.' : todaySession.currentActivityType.name() == 'REVIEW' ? '천천히 기억을 꺼내 봐요.' : '예문까지 읽고 다음으로 가요.'}"></p></aside>
-    </div>
-    <div class="today-study-actions">
-        <form th:action="@{/today/{slug}/complete(slug=${lesson.summary.slug})}" method="post"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="result" value="INCORRECT"><button class="button-secondary" type="submit">다시 볼게요</button></form>
-        <form th:action="@{/today/{slug}/complete(slug=${lesson.summary.slug})}" method="post"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="result" value="CORRECT"><button type="submit" th:text="${todaySession.currentActivityType.name() == 'REVIEW' ? '기억하고 있어요 · 다음' : '이해했어요 · 다음'}">이해했어요 · 다음</button></form>
-        <a class="text-link" th:href="@{/contents/{slug}(slug=${lesson.summary.slug})}">사전 상세 보기</a>
     </div>
 </main></body></html>

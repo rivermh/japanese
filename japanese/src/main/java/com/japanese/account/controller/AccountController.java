@@ -5,7 +5,6 @@ import com.japanese.account.service.AccountService;
 import com.japanese.account.service.AccountManagementService;
 import com.japanese.account.service.CurrentUserService;
 import com.japanese.learning.service.LearningService;
-import com.japanese.learning.character.CharacterCatalog;
 import com.japanese.content.service.ContentQueryService;
 import com.japanese.learning.service.ReminderPreferenceService;
 import java.time.LocalTime;
@@ -24,11 +23,10 @@ public class AccountController {
     private final AccountService accountService;
     private final CurrentUserService currentUserService;
     private final LearningService learningService;
-    private final CharacterCatalog characterCatalog;
     private final ContentQueryService contentQueryService;
     private final AccountManagementService accountManagement;
     private final ReminderPreferenceService reminderPreferences;
-    public AccountController(AccountService accountService, CurrentUserService currentUserService, LearningService learningService, CharacterCatalog characterCatalog, ContentQueryService contentQueryService, AccountManagementService accountManagement, ReminderPreferenceService reminderPreferences) { this.accountService = accountService; this.currentUserService = currentUserService; this.learningService = learningService; this.characterCatalog = characterCatalog; this.contentQueryService = contentQueryService; this.accountManagement = accountManagement; this.reminderPreferences = reminderPreferences; }
+    public AccountController(AccountService accountService, CurrentUserService currentUserService, LearningService learningService, ContentQueryService contentQueryService, AccountManagementService accountManagement, ReminderPreferenceService reminderPreferences) { this.accountService = accountService; this.currentUserService = currentUserService; this.learningService = learningService; this.contentQueryService = contentQueryService; this.accountManagement = accountManagement; this.reminderPreferences = reminderPreferences; }
     @GetMapping("/signup") public String signup(Model model) {
         if (!model.containsAttribute("registrationRequest")) model.addAttribute("registrationRequest", new RegistrationRequest());
         return "signup";
@@ -87,7 +85,6 @@ public class AccountController {
     @GetMapping("/settings") public String settings(Model model) {
         var account = currentUserService.currentAccount();
         model.addAttribute("account", account); model.addAttribute("dailyProgress", learningService.todayProgress(account));
-        model.addAttribute("learner", learningService.overview(account)); model.addAttribute("characterOptions", characterCatalog.all());
         model.addAttribute("filterOptions", contentQueryService.filterOptions());
         model.addAttribute("learningScope", learningService.learningScope(account));
         model.addAttribute("studyPreferences", learningService.studyPreferences(account));

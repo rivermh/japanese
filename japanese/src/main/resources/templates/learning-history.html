@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('학습 기록')}"></head>
-<body><header th:replace="~{fragments/layout :: header('history')}"></header>
+<body class="editorial-page history-page"><header th:replace="~{fragments/layout :: header('history')}"></header>
 <main id="main-content" class="page-shell">
     <header class="page-heading"><div><p class="eyebrow">LEARNING HISTORY</p><h1>학습 기록</h1><p class="subtle">실제 학습과 퀴즈 기록을 날짜별로 확인합니다.</p></div><a class="button button-secondary" href="/today">오늘의 학습</a></header>
     <section class="surface detail-section"><div class="section-heading"><a class="button-quiet" th:href="@{/history(month=${previousMonth})}">← 이전</a><h2 th:text="${activity.month}"></h2><a class="button-quiet" th:href="@{/history(month=${nextMonth})}">다음 →</a></div><div class="activity-calendar"><a th:each="day : ${activity.days}" th:classappend="${day.totalActivityCount > 0 ? ' has-activity' : ''}" th:href="@{/history(month=${activity.month},date=${day.date})}"><time th:text="${day.date.dayOfMonth}"></time><strong th:if="${day.totalActivityCount > 0}" th:text="${day.totalActivityCount}"></strong></a></div><p class="subtle">숫자는 새 학습·복습·재학습·퀴즈를 합친 활동 수입니다.</p></section>

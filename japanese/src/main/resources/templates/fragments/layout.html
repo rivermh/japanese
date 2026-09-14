@@ -14,27 +14,27 @@
 <body>
 <header th:fragment="header(active)" class="app-header" th:classappend="${@currentUserService.isAuthenticated() ? ' is-authenticated' : ' is-guest'}" th:with="signedIn=${@currentUserService.isAuthenticated()},account=${signedIn ? @currentUserService.currentAccount() : null}">
     <a class="skip-link" href="#main-content">본문으로 건너뛰기</a>
-    <aside class="app-rail" th:if="${signedIn}">
-        <a class="brand" href="/" aria-label="Japanese 홈"><span class="brand-mark" aria-hidden="true">日</span><span>Japanese</span></a>
-        <nav class="rail-nav" aria-label="주 메뉴">
-            <a class="rail-link" href="/" th:classappend="${active == 'home' ? ' active' : ''}"><span aria-hidden="true">⌂</span>홈</a>
-            <a class="rail-link" href="/today" th:classappend="${active == 'today' ? ' active' : ''}"><span aria-hidden="true">▣</span>오늘의 학습</a>
-            <a class="rail-link" href="/dictionary" th:classappend="${active == 'search' ? ' active' : ''}"><span aria-hidden="true">⌕</span>사전</a>
-            <a class="rail-link" href="/study?reviewOnly=true" th:classappend="${active == 'review' or active == 'weaknesses' ? ' active' : ''}"><span aria-hidden="true">↻</span>복습</a>
-            <a class="rail-link" href="/my-learning" th:classappend="${active == 'my' or active == 'bookmarks' or active == 'queue' or active == 'collections' or active == 'history' or active == 'progress' or active == 'statistics' or active == 'settings' ? ' active' : ''}"><span aria-hidden="true">▥</span>내 학습</a>
-        </nav>
-        <div class="rail-divider"></div><p class="rail-subhead">바로가기</p>
-        <nav class="rail-nav" aria-label="학습 바로가기"><a class="rail-link" href="/weaknesses">약점노트</a><a class="rail-link" href="/bookmarks">저장함</a><a class="rail-link" href="/report/weekly">주간 리포트</a><a class="rail-link" href="/progress">JLPT 진도</a></nav>
-        <div class="rail-footer"><a class="rail-user" href="/settings"><span class="avatar" th:text="${#strings.substring(account.displayName,0,1)}">나</span><span><strong th:text="${account.displayName}">학습자</strong><small>학습 설정</small></span></a><form action="/logout" method="post"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button type="submit">로그아웃</button></form></div>
-    </aside>
     <div class="app-topbar">
-        <a class="mobile-brand brand" href="/"><span class="brand-mark" aria-hidden="true">日</span><span>Japanese</span></a>
-        <strong class="topbar-title" th:text="${active == 'home' ? '홈' : active == 'today' ? '오늘의 학습' : active == 'search' ? '사전' : (active == 'review' or active == 'weaknesses') ? '복습' : (active == 'my' or active == 'bookmarks' or active == 'queue' or active == 'collections' or active == 'history' or active == 'progress' or active == 'statistics' or active == 'settings') ? '내 학습' : 'Japanese'}">Japanese</strong>
-        <form class="global-search" action="/dictionary" method="get" role="search"><label class="sr-only" for="global-search">사전 검색</label><input id="global-search" name="keyword" placeholder="단어, 읽기, 뜻, 문법 검색"><button type="submit" aria-label="검색">⌕</button></form>
-        <a class="header-link" th:if="${signedIn}" href="/settings">학습 계획</a><a class="header-cta" th:if="${signedIn}" href="/today">오늘 학습</a>
-        <div class="guest-actions" th:unless="${signedIn}"><a href="/dictionary">사전</a><a href="/login">로그인</a><a class="header-cta" href="/signup">시작하기</a></div>
+        <div class="topbar-inner">
+            <a class="shell-brand" href="/" aria-label="Japanese 홈">Japanese</a>
+            <nav class="desktop-nav" th:if="${signedIn}" aria-label="주 메뉴">
+                <a href="/" th:classappend="${active == 'home' ? ' active' : ''}" th:attr="aria-current=${active == 'home' ? 'page' : null}">홈</a>
+                <a href="/today" th:classappend="${active == 'today' ? ' active' : ''}" th:attr="aria-current=${active == 'today' ? 'page' : null}">오늘</a>
+                <a href="/dictionary" th:classappend="${active == 'search' ? ' active' : ''}" th:attr="aria-current=${active == 'search' ? 'page' : null}">사전</a>
+                <a href="/study?reviewOnly=true" th:classappend="${active == 'review' or active == 'weaknesses' ? ' active' : ''}" th:attr="aria-current=${active == 'review' or active == 'weaknesses' ? 'page' : null}">복습</a>
+                <details class="nav-menu" th:classappend="${active == 'my' or active == 'haru' or active == 'bookmarks' or active == 'queue' or active == 'collections' or active == 'history' or active == 'progress' or active == 'statistics' or active == 'settings' ? ' active' : ''}">
+                    <summary>내 학습 <span aria-hidden="true">⌄</span></summary>
+                    <div class="nav-menu-panel"><a href="/my-learning">내 학습 홈</a><a href="/haru">Haru</a><a href="/weaknesses">약점노트</a><a href="/bookmarks">저장함</a><a href="/history">학습 기록</a><a href="/report/weekly">주간 리포트</a><a href="/progress">JLPT 진도</a></div>
+                </details>
+            </nav>
+            <strong class="topbar-title" th:if="${signedIn}" th:text="${active == 'home' ? '홈' : active == 'today' ? '오늘' : active == 'search' ? '사전' : (active == 'review' or active == 'weaknesses') ? '복습' : '내 학습'}">Japanese</strong>
+            <form class="global-search" action="/dictionary" method="get" role="search"><label class="sr-only" for="global-search">사전 검색</label><input id="global-search" name="keyword" placeholder="일본어 검색"><button type="submit" aria-label="검색">⌕</button></form>
+            <details class="profile-menu" th:if="${signedIn}"><summary><span class="avatar" th:text="${#strings.substring(account.displayName,0,1)}">나</span><span th:text="${account.displayName}">학습자</span><span aria-hidden="true">⌄</span></summary><div class="profile-menu-panel"><a href="/settings">학습 설정</a><form action="/logout" method="post"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button type="submit">로그아웃</button></form></div></details>
+            <a class="mobile-profile-link" th:if="${signedIn}" href="/settings" aria-label="학습 설정"><span class="avatar" th:text="${#strings.substring(account.displayName,0,1)}">나</span></a>
+            <div class="guest-actions" th:unless="${signedIn}"><a class="guest-nav-dictionary" href="/dictionary">사전</a><a class="guest-header-login" href="/login">로그인</a><a class="header-cta" href="/signup">시작하기</a></div>
+        </div>
     </div>
-    <nav class="mobile-tabbar" th:if="${signedIn}" aria-label="모바일 주 메뉴"><a href="/" th:classappend="${active == 'home' ? ' active' : ''}"><span>⌂</span>홈</a><a href="/today" th:classappend="${active == 'today' ? ' active' : ''}"><span>▣</span>오늘</a><a href="/dictionary" th:classappend="${active == 'search' ? ' active' : ''}"><span>⌕</span>사전</a><a href="/study?reviewOnly=true" th:classappend="${active == 'review' or active == 'weaknesses' ? ' active' : ''}"><span>↻</span>복습</a><a href="/my-learning" th:classappend="${active == 'my' or active == 'bookmarks' or active == 'queue' or active == 'collections' or active == 'history' or active == 'progress' or active == 'statistics' or active == 'settings' ? ' active' : ''}"><span>▥</span>내 학습</a></nav>
+    <nav class="mobile-tabbar" th:if="${signedIn}" aria-label="모바일 주 메뉴"><a href="/" th:classappend="${active == 'home' ? ' active' : ''}"><span>⌂</span>홈</a><a href="/today" th:classappend="${active == 'today' ? ' active' : ''}"><span>▣</span>오늘</a><a href="/dictionary" th:classappend="${active == 'search' ? ' active' : ''}"><span>⌕</span>사전</a><a href="/study?reviewOnly=true" th:classappend="${active == 'review' or active == 'weaknesses' ? ' active' : ''}"><span>↻</span>복습</a><a href="/my-learning" th:classappend="${active == 'my' or active == 'haru' or active == 'bookmarks' or active == 'queue' or active == 'collections' or active == 'history' or active == 'progress' or active == 'statistics' or active == 'settings' ? ' active' : ''}"><span>▥</span>내 학습</a></nav>
 </header>
 <footer th:fragment="footer" class="app-footer"><span>Japanese <span aria-hidden="true">/</span> 매일, 조금씩 더 가까이.</span><nav aria-label="추가 메뉴"><a href="/categories">학습 분야</a><a href="/study">자유 학습</a><a href="/quiz">확인 문제</a></nav></footer>
 </body>

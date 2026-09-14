@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 public class HaruPresentationService {
     private final HaruAssetResolver assets;
     public HaruPresentationService(HaruAssetResolver assets) { this.assets = assets; }
-    public String guestPoster() { return assets.resolve(CharacterGrowthStage.YOUNG).path(); }
     public CharacterStatus status(LearnerProfile profile, CharacterDefinition character) {
         var stage = CharacterGrowthStage.forExperience(profile.getExperience());
         var next = stage.next();

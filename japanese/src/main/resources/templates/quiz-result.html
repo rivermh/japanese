@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('확인 문제 결과')}"></head>
-<body>
-<header th:replace="~{fragments/layout :: header('search')}"></header>
-<main id="main-content" class="page-shell detail-shell">
+<body class="editorial-page quiz-focus-mode quiz-single-page">
+<main id="main-content" class="page-shell detail-shell quiz-single-shell">
     <a class="back-link" href="/quiz">← 문제 목록</a>
     <article class="detail-card quiz-result-card">
         <header class="page-heading">
@@ -17,10 +16,9 @@
             <span th:if="${result.answerKorean != ''}" th:text="${result.answerKorean}">뜻</span>
             <p th:if="${result.explanation != ''}" th:text="${result.explanation}">해설</p>
         </div>
-        <p class="quiz-progress" th:text="${result.overview.character.stageName + ' · 레벨 ' + result.overview.character.level + ' · 현재 EXP ' + result.overview.character.experience + ' · +' + (result.correct ? 10 : 2) + ' EXP'}">새싹 · 레벨 1 · 현재 EXP 10 · +10 EXP</p>
+        <p class="quiz-progress">확인 결과는 학습 기록에 반영됩니다.</p>
         <a class="quiz-next-link" href="/quiz">다음 문제 풀기 →</a>
     </article>
 </main>
-<footer th:replace="~{fragments/layout :: footer}"></footer>
 </body>
 </html>

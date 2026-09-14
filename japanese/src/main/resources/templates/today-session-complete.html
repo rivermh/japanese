@@ -11,18 +11,7 @@
                 <h1>오늘의 학습을 마쳤어요.</h1>
                 <p class="subtle">실제 StudyRecord를 기준으로 오늘 결과를 정리했습니다. 확인 문제를 풀지 않아도 학습은 완료됩니다.</p>
             </div>
-            <div class="completion-companion character-scene" data-character-scene
-                 th:attr="data-growth-stage=${overview.character.pendingGrowthStageKey},data-growth-pending=${overview.character.growthPresentationPending},data-character=${overview.character.characterKey},data-stage=${overview.character.animationStageKey},data-asset-directory=${overview.character.assetDirectory},data-animation-manifest=${overview.character.animationManifestPath},data-state=${overview.character.growthPresentationPending ? 'growth' : 'goal-complete'}"
-                 aria-label="학습 완료를 함께 기뻐하는 Haru">
-                <div class="character-renderer" data-character-renderer>
-                    <img class="character-frame is-visible" data-character-frame
-                         th:if="${overview.character.illustrationPath != null}"
-                         th:src="${overview.character.illustrationPath}"
-                         th:alt="${overview.character.characterName + ' · 오늘 학습 완료'}">
-                </div>
-            </div>
         </div>
-        <p th:if="${overview.character.growthNoticePending}" role="status">Haru가 성장했어요. <span th:text="${overview.character.stageName}"></span>와 함께 다음 공부도 이어가요.</p>
         <dl class="completion-summary">
             <div><dt>새 단어</dt><dd th:text="${todayReport.newWordCount + '개'}">0개</dd></div>
             <div><dt>새 문법</dt><dd th:text="${todayReport.newGrammarCount + '개'}">0개</dd></div>

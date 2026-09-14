@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Haru')}"></head>
+<body class="haru-page">
+<header th:replace="~{fragments/layout :: header('haru')}"></header>
+<main id="main-content" class="page-shell">
+    <div class="haru-shell">
+        <header class="page-heading">
+            <div>
+                <p class="eyebrow">HARU</p>
+                <h1>Haru</h1>
+                <p>함께 공부한 시간이 쌓이면서 Haru도 조금씩 성장합니다.</p>
+            </div>
+        </header>
+
+        <section class="haru-current" aria-labelledby="haru-stage-title">
+            <div class="haru-copy">
+                <p class="haru-kicker">현재 모습</p>
+                <h2 id="haru-stage-title" th:text="${learner.character.stageName}">어린 Haru</h2>
+                <p class="haru-description" th:text="${learner.character.stageDescription}">차분히 함께 공부를 이어가요.</p>
+                <div class="haru-growth">
+                    <div class="haru-growth-heading">
+                        <span th:text="${learner.character.finalStage ? '현재 성장 단계' : '다음 성장까지'}">다음 성장까지</span>
+                        <strong th:text="${learner.character.finalStage ? '현재 단계' : learner.character.experienceToNextStage + ' EXP'}">300 EXP</strong>
+                    </div>
+                    <div class="progress-track" role="progressbar" aria-label="Haru 성장 진행률" aria-valuemin="0" aria-valuemax="100" th:attr="aria-valuenow=${learner.character.stageProgressPercent}">
+                        <span class="progress-fill" th:style="${'--value:' + learner.character.stageProgressPercent + '%'}"></span>
+                    </div>
+                    <p class="haru-experience" th:text="${learner.character.experience + ' EXP'}">0 EXP</p>
+                </div>
+            </div>
+            <div class="haru-portrait">
+                <img th:if="${learner.character.illustrationPath != null}" th:src="${learner.character.illustrationPath}" th:alt="${learner.character.characterName + '의 현재 모습'}">
+                <p th:unless="${learner.character.illustrationPath != null}" th:text="${learner.character.characterName}">Haru</p>
+            </div>
+        </section>
+
+        <form class="haru-growth-notice" th:if="${learner.character.growthNoticePending}" th:action="@{/character/growth/acknowledge}" method="post" role="status">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <input type="hidden" name="returnTo" value="/haru">
+            <input type="hidden" name="stageKey" th:value="${learner.character.pendingGrowthStageKey}">
+            <span>새로운 모습으로 성장했어요.</span>
+            <button class="button-quiet" type="submit">확인</button>
+        </form>
+
+        <dl class="haru-records" aria-label="Haru와 쌓은 학습 기록">
+            <div><dt>현재 연속 학습</dt><dd th:text="${streak.currentStreak + '일'}">0일</dd></div>
+            <div><dt>누적 학습 기록</dt><dd th:text="${learner.totalAnswers + '개'}">0개</dd></div>
+        </dl>
+    </div>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

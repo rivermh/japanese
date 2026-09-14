@@ -1,9 +1,8 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('확인 문제')}"></head>
-<body>
-<header th:replace="~{fragments/layout :: header('search')}"></header>
-<main id="main-content" class="page-shell detail-shell">
+<body class="editorial-page quiz-focus-mode quiz-single-page">
+<main id="main-content" class="page-shell detail-shell quiz-single-shell">
     <a class="back-link" href="/quiz">← 문제 목록</a>
     <article class="detail-card quiz-detail-card">
         <header class="page-heading">
@@ -31,6 +30,5 @@
 
     </article>
 </main>
-<footer th:replace="~{fragments/layout :: footer}"></footer>
 </body>
 </html>

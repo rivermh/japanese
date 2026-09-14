@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('빠른 퀴즈 결과')}"></head>
-<body>
-<header th:replace="~{fragments/layout :: header('quiz')}"></header>
+<body class="editorial-page quiz-result-page">
+<header th:replace="~{fragments/layout :: header('my')}"></header>
 <main id="main-content" class="page-shell quiz-result-shell">
     <header class="page-heading"><div><p class="eyebrow">QUIZ COMPLETE</p><h1>빠른 퀴즈 완료</h1><p class="subtle">정규 학습과 분리된 확인 활동 결과입니다.</p></div></header>
     <section class="surface quiz-result-summary" aria-labelledby="quiz-result-title">

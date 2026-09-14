@@ -75,11 +75,9 @@ public class StudyController {
             @RequestParam(required = false) String type,
             @RequestParam(defaultValue = "false") boolean reviewOnly,
             @RequestParam(required = false) String sessionKey,
-            RedirectAttributes redirectAttributes,
-            HttpSession session
+            RedirectAttributes redirectAttributes
     ) {
-        var answer = learningService.answer(currentUserService.currentAccount(), slug, result, sessionKey, false);
-        if (answer.earnedExperience() > 0) session.setAttribute("characterReaction", "happy");
+        learningService.answer(currentUserService.currentAccount(), slug, result, sessionKey, false);
         if (level != null && !level.isBlank()) {
             redirectAttributes.addAttribute("level", level);
         }
@@ -95,11 +93,9 @@ public class StudyController {
     @PostMapping("/study/relearn/{target}/{slug}/answer")
     public String relearnAnswer(@PathVariable String target, @PathVariable String slug,
                                 @RequestParam StudyResult result,
-                                @RequestParam(required = false) String sessionKey,
-                                HttpSession session) {
+                                @RequestParam(required = false) String sessionKey) {
         RelearningTarget relearnTarget = parseTarget(target);
-        var answer = learningService.answer(currentUserService.currentAccount(), slug, result, sessionKey, true);
-        if (answer.earnedExperience() > 0) session.setAttribute("characterReaction", "happy");
+        learningService.answer(currentUserService.currentAccount(), slug, result, sessionKey, true);
         return "redirect:/study/relearn/" + relearnTarget.name().toLowerCase(Locale.ROOT);
     }
 

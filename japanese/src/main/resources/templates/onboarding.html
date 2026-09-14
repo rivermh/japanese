@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('학습 시작 설정')}"></head>
-<body><header th:replace="~{fragments/layout :: header('onboarding')}"></header>
+<body class="editorial-page onboarding-page"><header th:replace="~{fragments/layout :: header('onboarding')}"></header>
 <main id="main-content" class="page-shell onboarding-shell">
     <header class="page-heading"><div><p class="eyebrow">SET UP YOUR PLAN</p><h1>어떤 일본어를 공부할까요?</h1><p class="subtle">나중에 설정에서 언제든 바꿀 수 있어요. 1분이면 충분합니다.</p></div></header>
     <p class="form-message" role="alert" th:if="${onboardingError}" th:text="${onboardingError}"></p>

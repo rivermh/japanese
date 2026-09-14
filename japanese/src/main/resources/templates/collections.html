@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('나만의 단어장')}"></head>
-<body><header th:replace="~{fragments/layout :: header('collections')}"></header>
+<body class="editorial-page saved-page"><header th:replace="~{fragments/layout :: header('collections')}"></header>
 <main id="main-content" class="page-shell">
     <header class="page-heading"><div><h1>저장함</h1><p class="subtle">단어와 문법을 목적별로 함께 정리하고 자유 학습으로 다시 볼 수 있습니다.</p></div></header>
     <nav class="saved-subnav" aria-label="저장함 메뉴"><a href="/bookmarks">북마크</a><a href="/study-queue">학습 목록</a><a class="active" href="/collections">나만의 단어장 <span th:text="${#lists.size(collections)}"></span></a></nav>

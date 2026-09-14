@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('일본어 사전')}"></head>
-<body><header th:replace="~{fragments/layout :: header('search')}"></header>
+<body class="editorial-page dictionary-page"><header th:replace="~{fragments/layout :: header('search')}"></header>
 <main id="main-content" class="page-shell"><div class="dictionary-shell">
     <header class="dictionary-head"><div class="dictionary-title"><h1>일본어 사전</h1><p>표기·읽기·한국어 뜻·문법을 한 번에 찾습니다.</p></div><form class="dictionary-query" action="/dictionary" method="get" role="search"><label class="sr-only" for="dictionary-keyword">단어 또는 문법 검색</label><input id="dictionary-keyword" name="keyword" type="search" th:value="${keyword}" placeholder="食べる, たべる, 먹다, ～ように" autocomplete="off"><input type="hidden" name="type" th:value="${type}"><input type="hidden" name="level" th:value="${level}"><input type="hidden" name="category" th:value="${category}"><button type="submit">검색</button></form></header>
     <div class="dictionary-layout">

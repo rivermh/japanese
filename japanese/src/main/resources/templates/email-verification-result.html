@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('이메일 인증 결과')}"></head>
-<body><header th:replace="~{fragments/layout :: header('home')}"></header>
+<body class="editorial-page secondary-auth-page"><header th:replace="~{fragments/layout :: header('home')}"></header>
 <main id="main-content" class="page-shell auth-shell"><section class="surface detail-section account-result">
   <p class="eyebrow">EMAIL VERIFICATION</p>
   <h1 th:if="${verificationResult.name() == 'SUCCESS'}">이메일 인증을 완료했습니다</h1>

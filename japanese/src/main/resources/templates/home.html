@@ -1,33 +1,62 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('오늘의 일본어')}"></head>
-<body><header th:replace="~{fragments/layout :: header('home')}"></header>
+<body th:classappend="${authenticated ? 'home-page' : 'guest-index-page'}"><header th:replace="~{fragments/layout :: header('home')}"></header>
 <main id="main-content" class="page-shell">
     <div class="home-v2" th:if="${authenticated}">
         <header class="page-heading"><div><h1 th:text="${'오늘도 한 걸음씩, ' + learner.displayName + '님.'}">오늘도 한 걸음씩.</h1><p th:text="${#lists.isEmpty(studyPreferences.scope.levelCodes) ? '나에게 맞는 일본어를 꾸준히 쌓고 있어요.' : #strings.listJoin(studyPreferences.scope.levelCodes, ', ') + ' 범위를 중심으로 공부하고 있어요.'}"></p></div><a class="quiet-link" href="/settings">학습 계획 수정</a></header>
-        <section class="home-desk" aria-label="오늘의 학습과 Haru">
+        <section class="home-desk" aria-label="오늘의 학습">
             <div class="today-panel">
                 <p class="date-line" th:text="${learningStatus.mission.completed ? '오늘 학습 완료' : learningStatus.mission.started ? '진행 중인 오늘 세션' : '오늘의 학습 계획'}">오늘의 학습 계획</p>
-                <div class="next-action"><span>지금 할 일</span><h2 th:text="${learningStatus.nextAction.title}">오늘의 학습 시작하기</h2><p class="lead" th:text="${learningStatus.nextAction.description}"></p></div>
+                <div class="next-action"><h2 th:text="${learningStatus.nextAction.title}">오늘의 학습 시작하기</h2><p class="lead" th:text="${learningStatus.nextAction.description}"></p></div>
                 <p class="home-reminder" th:if="${learningStatus.reminder.visible}" th:text="${learningStatus.reminder.message}">오늘 복습할 카드가 준비되어 있어요.</p>
-                <div class="session-breakdown">
-                    <div class="session-row" th:classappend="${learningStatus.mission.review.done ? ' done' : ''}"><span class="session-index">01</span><span><strong>복습</strong><small>오늘 세션에 준비된 복습</small></span><span class="session-count" th:text="${learningStatus.mission.review.completed + ' / ' + learningStatus.mission.review.target}">0 / 0</span></div>
-                    <div class="session-row" th:classappend="${learningStatus.mission.newWords.done ? ' done' : ''}"><span class="session-index">02</span><span><strong>새 단어</strong><small th:text="${'설정 상한 ' + studyPreferences.dailyNewWordLimit + '개'}"></small></span><span class="session-count" th:text="${learningStatus.mission.newWords.completed + ' / ' + learningStatus.mission.newWords.target}">0 / 0</span></div>
-                    <div class="session-row" th:classappend="${learningStatus.mission.newGrammar.done ? ' done' : ''}"><span class="session-index">03</span><span><strong>새 문법</strong><small th:text="${'설정 상한 ' + studyPreferences.dailyNewGrammarLimit + '개'}"></small></span><span class="session-count" th:text="${learningStatus.mission.newGrammar.completed + ' / ' + learningStatus.mission.newGrammar.target}">0 / 0</span></div>
-                </div>
-                <div class="goal-line"><div class="goal-copy"><span>Daily Mission</span><strong th:text="${learningStatus.mission.completedCount + ' / ' + learningStatus.mission.total}">0 / 10</strong></div><div class="progress-track" role="progressbar" aria-label="오늘 미션 진행률" aria-valuemin="0" aria-valuemax="100" th:attr="aria-valuenow=${learningStatus.mission.completionPercent}"><span class="progress-fill" th:style="${'--value:' + learningStatus.mission.completionPercent + '%'}"></span></div><div class="today-actions"><a class="button" th:href="${learningStatus.nextAction.target}" th:attr="data-character-action=${learningStatus.mission.completed ? null : 'study'},data-character-action-delay=${learningStatus.mission.completed ? null : 720}" th:text="${learningStatus.nextAction.actionLabel + ' →'}">시작하기 →</a></div></div>
+                <div class="today-actions"><a class="button" th:href="${learningStatus.nextAction.target}" th:text="${learningStatus.nextAction.actionLabel + ' →'}">시작하기 →</a></div>
             </div>
-            <aside class="haru-room" data-character-scene th:attr="data-growth-stage=${learner.character.pendingGrowthStageKey},data-growth-pending=${learner.character.growthPresentationPending},data-character=${learner.character.characterKey},data-stage=${learner.character.animationStageKey},data-asset-directory=${learner.character.assetDirectory},data-animation-manifest=${learner.character.animationManifestPath},data-state=${characterState}" aria-label="Haru 캐릭터와 성장 상태">
-                <div class="haru-stage"><div class="haru-context"><span><i class="presence-dot"></i>함께 공부하는 자리</span><strong th:text="${learningStatus.mission.completed ? '오늘 목표를 함께 마쳤어요' : '오늘 남은 학습 ' + (learningStatus.mission.total - learningStatus.mission.completedCount) + '개'}"></strong></div><div class="character-renderer" data-character-renderer><img class="character-frame is-visible" data-character-frame th:if="${learner.character.illustrationPath != null}" th:src="${learner.character.illustrationPath}" th:alt="${learner.character.characterName + ' · ' + learner.character.stageName}" width="1024" height="1024"><div th:unless="${learner.character.illustrationPath != null}" class="character-fallback"><span lang="ja">学</span><strong th:text="${learner.character.characterName}"></strong></div></div><span class="shared-desk" aria-hidden="true"><i></i></span><form class="growth-notice" th:if="${learner.character.growthNoticePending}" th:action="@{/character/growth/acknowledge}" method="post"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="hidden" name="returnTo" value="/"><input type="hidden" name="stageKey" th:value="${learner.character.pendingGrowthStageKey}"><span>새로운 모습으로 성장했어요.</span><button class="button-quiet" type="submit">확인</button></form></div>
-                <div class="haru-presence"><div class="haru-presence-top"><strong th:text="${learner.character.characterName + ' · ' + learner.character.stageName}">Haru</strong><span class="stage-label" th:text="${'Lv.' + learner.character.level}">Lv.1</span></div><p th:text="${learner.character.stageDescription}"></p><div class="exp-line"><span th:text="${learner.character.experience + ' EXP'}">0 EXP</span><div class="progress-track" th:unless="${learner.character.finalStage}"><span class="progress-fill" th:style="${'--value:' + learner.character.stageProgressPercent + '%'}"></span></div><span th:text="${learner.character.experienceToNextStage > 0 ? '다음 성장 ' + learner.character.experienceToNextStage : '최종 단계'}"></span></div></div>
-            </aside>
+            <div class="today-summary">
+                <dl class="home-counts" aria-label="오늘 계획한 학습 분량">
+                    <div th:if="${learningStatus.mission.review.target > 0}"><dt>복습</dt><dd th:text="${learningStatus.mission.review.target + '개'}"></dd></div>
+                    <div th:if="${learningStatus.mission.newWords.target > 0}"><dt>새 단어</dt><dd th:text="${learningStatus.mission.newWords.target + '개'}"></dd></div>
+                    <div th:if="${learningStatus.mission.newGrammar.target > 0}"><dt>새 문법</dt><dd th:text="${learningStatus.mission.newGrammar.target + '개'}"></dd></div>
+                </dl>
+                <p class="home-volume" th:text="${'총 ' + learningStatus.mission.total + '개 · 남은 학습 ' + (learningStatus.mission.total - learningStatus.mission.completedCount) + '개'}"></p>
+                <div class="goal-line"><div class="goal-copy"><span>오늘 목표</span><strong th:text="${learningStatus.mission.completedCount + ' / ' + learningStatus.mission.total}">0 / 10</strong></div><div class="progress-track" role="progressbar" aria-label="오늘 미션 진행률" aria-valuemin="0" aria-valuemax="100" th:attr="aria-valuenow=${learningStatus.mission.completionPercent}"><span class="progress-fill" th:style="${'--value:' + learningStatus.mission.completionPercent + '%'}"></span></div>
+                <p class="home-mission-detail"><span th:if="${learningStatus.mission.review.target > 0}" th:text="${'복습 ' + learningStatus.mission.review.completed + '/' + learningStatus.mission.review.target}">복습 0/0</span><span th:if="${learningStatus.mission.newWords.target > 0}" th:text="${'새 단어 ' + learningStatus.mission.newWords.completed + '/' + learningStatus.mission.newWords.target}">새 단어 0/0</span><span th:if="${learningStatus.mission.newGrammar.target > 0}" th:text="${'새 문법 ' + learningStatus.mission.newGrammar.completed + '/' + learningStatus.mission.newGrammar.target}">새 문법 0/0</span></p>
+                </div>
+            </div>
         </section>
-        <div class="home-lower">
-            <section><div class="section-title"><h2>이번 주 학습 리듬</h2><a class="quiet-link" href="/report/weekly">주간 리포트</a></div><div class="rhythm-strip" aria-label="최근 7일 학습"><div class="rhythm-day" th:each="day : ${streak.recentDays}" th:classappend="${day.studied ? ' done' : ''}"><span th:text="${#temporals.format(day.date,'E')}">월</span><i></i><small th:text="${#temporals.format(day.date,'MM.dd')}">09.12</small></div></div><p class="rhythm-summary"><strong th:text="${streak.currentStreak + '일 연속 학습'}"></strong><span th:text="${' · 최고 ' + streak.longestStreak + '일'}"></span></p></section>
-            <section><div class="section-title"><h2>다음에 볼 곳</h2></div><div class="learning-links"><a class="learning-link" href="/weaknesses"><span><strong>약점 표현 다시 보기</strong><small>실제 오답 기록으로 집중 복습</small></span><span class="arrow">→</span></a><a class="learning-link" href="/progress"><span><strong>JLPT 학습 진도</strong><small>단어와 문법의 현재 상태 확인</small></span><span class="arrow">→</span></a></div></section>
+        <div class="home-weekly">
+            <section><div class="section-title"><h2>이번 주 학습 리듬</h2><a class="quiet-link" href="/report/weekly">주간 리포트</a></div><div class="rhythm-strip" aria-label="최근 7일 학습"><div class="rhythm-day" th:each="day : ${streak.recentDays}" th:classappend="${day.studied ? ' done' : ''}"><span th:text="${#temporals.format(day.date,'E')}">월</span><i aria-hidden="true" th:text="${day.studied ? '✓' : '–'}"></i><span class="sr-only" th:text="${day.studied ? '학습함' : '학습 기록 없음'}"></span><small th:text="${#temporals.format(day.date,'MM.dd')}">09.12</small></div></div><p class="rhythm-summary"><strong th:text="${streak.currentStreak + '일 연속 학습'}"></strong><span th:text="${' · 최고 ' + streak.longestStreak + '일'}"></span></p></section>
         </div>
-        <section class="content-section"><div class="section-heading"><h2>최근 학습</h2><a class="quiet-link" href="/history">전체 기록</a></div><div class="recent-history-list" th:unless="${#lists.isEmpty(recentHistory)}"><a class="recent-history-row" th:each="entry : ${recentHistory}" th:href="@{/contents/{slug}(slug=${entry.slug})}"><span class="history-result" th:classappend="${entry.result.name() == 'CORRECT' ? ' correct' : ' retry'}" th:text="${entry.result.name() == 'CORRECT' ? '완료' : '다시 보기'}"></span><strong lang="ja" th:text="${entry.title}"></strong><span class="history-reading" lang="ja" th:text="${entry.reading}"></span><time th:text="${#temporals.format(entry.studiedAt,'MM.dd HH:mm')}"></time></a></div><div class="empty-state" th:if="${#lists.isEmpty(recentHistory)}">첫 학습을 마치면 이곳에서 바로 이어볼 수 있어요.</div></section>
+        <div class="home-lower">
+            <section class="home-weakness"><div class="section-title"><h2>복습이 필요한 표현</h2></div>
+                <p>헷갈렸던 표현을 약점노트에서 다시 살펴보세요.</p>
+                <a class="quiet-link" href="/weaknesses">약점 보기 →</a>
+            </section>
+        <section class="content-section"><div class="section-heading"><h2>최근 학습</h2><a class="quiet-link" href="/history">전체 기록</a></div><div class="recent-history-list" th:unless="${#lists.isEmpty(recentHistory)}"><a class="recent-history-row" th:each="entry, entryStatus : ${recentHistory}" th:if="${entryStatus.index < 3}" th:href="@{/contents/{slug}(slug=${entry.slug})}"><span class="history-result" th:classappend="${entry.result.name() == 'CORRECT' ? ' correct' : ' retry'}" th:text="${entry.result.name() == 'CORRECT' ? '완료' : '다시 보기'}"></span><strong lang="ja" th:text="${entry.title}"></strong><span class="history-reading" lang="ja" th:text="${entry.reading}"></span><time th:text="${#temporals.format(entry.studiedAt,'MM.dd HH:mm')}"></time></a></div><div class="empty-state" th:if="${#lists.isEmpty(recentHistory)}">첫 학습을 마치면 이곳에서 바로 이어볼 수 있어요.</div></section>
+        </div>
     </div>
-    <section class="guest-welcome" th:unless="${authenticated}"><div><p class="eyebrow">매일 돌아오는 일본어 학습 데스크</p><h1>찾고, 이해하고,<br>잊기 전에 복습하세요.</h1><p>단어와 문법을 실제 예문으로 배우고 나에게 맞는 일정으로 오래 기억합니다.</p><div class="toolbar"><a class="button" href="/signup">나의 학습 시작하기 →</a><a class="quiet-link" href="/dictionary">사전 둘러보기</a></div></div><div class="guest-companion"><img th:if="${guestHaruPoster != null}" th:src="${guestHaruPoster}" alt="책을 든 학습 파트너 Haru" width="1024" height="1024"><span class="guest-caption">매일의 공부를 함께, Haru.</span></div></section>
-    <section class="guest-dictionary" th:unless="${authenticated}"><div><h2>궁금한 일본어를 바로 찾아보세요.</h2><p>표기, 히라가나·가타카나 읽기, 한국어 뜻과 문법 설명을 검색합니다.</p></div><form class="dictionary-query" action="/dictionary" method="get"><label class="sr-only" for="guest-keyword">사전 검색</label><input id="guest-keyword" name="keyword" placeholder="食べる, たべる, 먹다, ～ように"><button type="submit">검색</button></form></section>
+    <div class="guest-index" th:unless="${authenticated}">
+        <section class="guest-hero" aria-labelledby="guest-hero-title">
+            <p class="guest-kicker">매일 이어가는 일본어 학습 데스크</p>
+            <h1 id="guest-hero-title">찾고, 이해하고,<br>잊기 전에 다시 만나요.</h1>
+            <p class="guest-hero-copy">단어와 문법을 실제 예문으로 배우고 나에게 맞는 시점에 다시 복습합니다.</p>
+            <div class="guest-hero-actions"><a class="guest-primary-action" href="/signup">학습 시작하기</a><a class="guest-secondary-action" href="/dictionary">사전 둘러보기</a></div>
+        </section>
+
+        <section class="guest-search-section" aria-labelledby="guest-search-title">
+            <div><h2 id="guest-search-title">궁금한 일본어가 있나요?</h2><p>표기, 읽기, 뜻과 문법 설명을 바로 찾아보세요.</p></div>
+            <form class="guest-search-form" action="/dictionary" method="get" role="search"><label class="sr-only" for="guest-keyword">사전 검색</label><input id="guest-keyword" name="keyword" placeholder="食べる, たべる, 먹다, ～ように"><button type="submit">검색</button></form>
+        </section>
+
+        <section class="guest-learning-flow" aria-labelledby="guest-learning-title">
+            <header><p class="guest-kicker">Japanese의 학습 흐름</p><h2 id="guest-learning-title">찾아본 표현을 오래 기억하는 학습으로 이어갑니다.</h2></header>
+            <div class="guest-learning-columns">
+                <article><h3>오늘의 학습</h3><p>단어와 문법, 복습 항목을 오늘의 학습 흐름으로 이어갑니다.</p></article>
+                <article><h3>기억에 남도록</h3><p>실제 예문을 읽고, 잊기 전에 다시 복습할 수 있습니다.</p></article>
+                <article><h3>사전에서 학습까지</h3><p>찾아본 일본어를 그 자리에서 학습 흐름으로 이어갈 수 있습니다.</p></article>
+            </div>
+        </section>
+
+        <section class="guest-final-action" aria-labelledby="guest-final-title"><div><h2 id="guest-final-title">오늘부터 일본어를 이어가세요.</h2><p>내 학습 기록과 오늘의 복습을 차분하게 쌓아갈 수 있어요.</p></div><a class="guest-primary-action" href="/signup">학습 시작하기</a></section>
+    </div>
 </main><footer th:replace="~{fragments/layout :: footer}"></footer></body></html>

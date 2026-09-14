@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.server.ResponseStatusException;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
-import jakarta.servlet.http.HttpSession;
 
 @Controller
 public class ContentController {
@@ -70,8 +69,7 @@ public class ContentController {
             @RequestParam(required = false) String category,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size,
-            Model model,
-            HttpSession session
+            Model model
     ) {
         boolean dictionaryRequest = (keyword != null && !keyword.isBlank()) || type != null
                 || (level != null && !level.isBlank()) || (category != null && !category.isBlank()) || page > 0;
@@ -80,24 +78,15 @@ public class ContentController {
         }
         boolean authenticated = currentUserService.isAuthenticated();
         model.addAttribute("authenticated", authenticated);
-        model.addAttribute("guestHaruPoster", learningService.guestHaruPoster());
         if (authenticated) {
             var account = currentUserService.currentAccount();
             if (onboardingService.status(account).required()) return "redirect:/onboarding";
             var learner = learningService.overview(account);
             var dailyProgress = learningService.todayProgress(account);
             var learningStatus = learningGuidanceService.status(account);
-            String reaction = (String) session.getAttribute("characterReaction");
-            session.removeAttribute("characterReaction");
-            String characterState = learner.character().growthPresentationPending()
-                    ? "growth"
-                    : learningStatus.mission().completed()
-                    ? "goal-complete"
-                    : "happy".equals(reaction) ? "happy" : "idle";
             model.addAttribute("learner", learner);
             model.addAttribute("dailyProgress", dailyProgress);
             model.addAttribute("learningStatus", learningStatus);
-            model.addAttribute("characterState", characterState);
             model.addAttribute("studyPreferences", learningService.studyPreferences(account));
             model.addAttribute("recentHistory", learningService.recentHistory(account, 5));
             model.addAttribute("recentQuizHistory", learningService.recentQuizHistory(account, 5));

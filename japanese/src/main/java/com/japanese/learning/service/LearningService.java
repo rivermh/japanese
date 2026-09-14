@@ -419,7 +419,6 @@ public class LearningService {
         profileForUpdate(account).acknowledgeGrowth(stageKey);
     }
 
-    public String guestHaruPoster() { return haruPresentation.guestPoster(); }
     private LearnerProfile profile(UserAccount account) {
         return learnerProfileRepository.findByUserAccountLoginId(account.getLoginId())
                 .orElseGet(() -> learnerProfileRepository.save(new LearnerProfile(account, dailyGoal, characterCatalog.defaultCharacter().key())));

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head(${comparison.left.pattern + ' · ' + comparison.right.pattern})}"></head>
-<body><header th:replace="~{fragments/layout :: header('search')}"></header>
+<body class="editorial-page grammar-reference-page"><header th:replace="~{fragments/layout :: header('search')}"></header>
 <main id="main-content" class="page-shell detail-shell">
   <div class="breadcrumb"><a href="/dictionary?type=GRAMMAR">문법</a><span aria-hidden="true">/</span><span>비교</span></div>
   <article class="surface lesson-paper comparison-paper">

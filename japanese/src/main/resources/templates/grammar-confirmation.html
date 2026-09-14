@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('문법 이해 확인')}"></head>
-<body><header th:replace="~{fragments/layout :: header('study')}"></header>
+<body class="editorial-page grammar-check-page"><header th:replace="~{fragments/layout :: header('my')}"></header>
 <main id="main-content" class="page-shell detail-shell"><div class="page-heading"><div><p class="eyebrow">OPTIONAL CHECK</p><h1>문법 이해 확인</h1><p class="subtle">먼저 학습 내용을 읽은 뒤, 짧게 이해를 점검합니다. 정규 학습 목표와 EXP는 바뀌지 않습니다.</p></div><a class="text-link" th:href="@{/contents/{slug}(slug=${grammarSlug})}">문법 상세로</a></div>
 <section class="surface lesson-paper confirmation-paper" th:if="${!#lists.isEmpty(questions)}"><article th:each="question, status : ${questions}" class="confirmation-question"><p class="eyebrow" th:text="${'QUESTION ' + (status.index + 1)}"></p><p class="example-japanese" th:if="${question.context != null and !question.context.isBlank()}" lang="ja" th:text="${question.context}"></p><h2 th:text="${question.prompt}"></h2><form th:action="@{/grammars/confirmations/{id}/answer(id=${question.id})}" method="post"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><div class="choice-list"><label th:each="choice : ${question.choices}"><input type="radio" name="choiceId" required th:value="${choice.id}"><span th:text="${choice.text}"></span></label></div><button class="button" type="submit">확인하기</button></form></article></section>
 <section class="surface empty-state" th:if="${#lists.isEmpty(questions)}"><p>공개 검토가 끝난 확인 문제는 아직 없습니다.</p></section>

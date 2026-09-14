@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head(${content.summary.title})}"></head>
-<body><header th:replace="~{fragments/layout :: header('search')}"></header>
+<body class="editorial-page dictionary-detail-page"><header th:replace="~{fragments/layout :: header('search')}"></header>
 <main id="main-content" class="page-shell detail-shell">
     <div class="breadcrumb"><a href="/dictionary">사전</a><span aria-hidden="true">/</span><span th:text="${content.summary.type.name() == 'WORD' ? '단어 상세' : '문법 상세'}"></span></div>
     <article class="lesson-paper">
@@ -10,7 +10,7 @@
         <div class="tag-row detail-tags" th:if="${!#lists.isEmpty(content.summary.categories)}"><a th:each="category : ${content.summary.categories}" th:href="@{/dictionary(category=${category.slug})}" th:text="${category.name}"></a></div>
         <div th:replace="~{fragments/content :: source(${content})}"></div>
     </article>
-    <aside class="reading-footer detail-action-rail">
+    <aside class="reading-footer detail-action-rail" aria-label="학습 및 저장">
         <section><h2>학습 상태</h2><p th:if="${learningStatus != null}" th:text="${learningStatus.label}"></p><p th:unless="${learningStatus != null}">로그인하면 학습 상태를 확인할 수 있습니다.</p></section>
         <div class="detail-actions" th:if="${authenticated}">
             <form th:if="${queueStatus.queued}" th:action="@{/contents/{slug}/study-queue/remove(slug=${content.summary.slug})}" method="post"><input type="hidden" name="returnTo" th:value="${'/contents/' + content.summary.slug}"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button class="button-secondary" type="submit">학습 목록에서 제거</button></form>

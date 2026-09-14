@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/layout :: head('학습 목록')}"></head>
-<body><header th:replace="~{fragments/layout :: header('queue')}"></header>
+<body class="editorial-page saved-page"><header th:replace="~{fragments/layout :: header('queue')}"></header>
 <main id="main-content" class="page-shell">
     <header class="page-heading"><div><h1>저장함</h1><p class="subtle">학습 목록은 오늘의 새 콘텐츠를 고를 때 일반 후보보다 먼저 반영됩니다.</p></div><a class="button button-secondary" href="/today">오늘의 학습</a></header>
     <nav class="saved-subnav" aria-label="저장함 메뉴"><a href="/bookmarks">북마크</a><a class="active" href="/study-queue">학습 목록 <span th:text="${#lists.size(queue)}"></span></a><a href="/collections">나만의 단어장</a></nav>

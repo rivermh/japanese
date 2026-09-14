@@ -24,6 +24,7 @@ class PersonalLearningAccessTest {
         mvc.perform(get("/study-queue")).andExpect(redirectedUrl("/login"));
         mvc.perform(get("/collections")).andExpect(redirectedUrl("/login"));
         mvc.perform(get("/history")).andExpect(redirectedUrl("/login"));
+        mvc.perform(get("/haru")).andExpect(redirectedUrl("/login"));
         mvc.perform(get("/api/v1/study/queue")).andExpect(redirectedUrl("/login"));
         mvc.perform(get("/api/v1/collections")).andExpect(redirectedUrl("/login"));
         mvc.perform(get("/api/v1/history/month").param("month", "2026-09"))
