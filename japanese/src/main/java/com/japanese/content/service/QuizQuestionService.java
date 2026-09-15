@@ -60,11 +60,12 @@ public class QuizQuestionService {
 
     @Transactional
     public Optional<QuizAnswerResult> answer(Long id, String submittedAnswer, UserAccount account) {
-        return findById(id).map(question -> {
+        return repository.findByIdAndNoteType(id, QUESTION_NOTE_TYPE).map(record -> {
+            QuizQuestionDetails question = toDetails(record);
             String submitted = normalize(submittedAnswer);
             boolean correct = submitted.equals(normalize(question.answerJapanese()))
                     || submitted.equals(normalize(question.answerKorean()));
-            StudyOverview overview = learningService.recordQuizAnswer(account, id, correct);
+            StudyOverview overview = learningService.recordImportedQuizAnswer(account, record, correct);
             return new QuizAnswerResult(correct, question.answerJapanese(), question.answerKorean(),
                     question.explanation(), overview);
         });

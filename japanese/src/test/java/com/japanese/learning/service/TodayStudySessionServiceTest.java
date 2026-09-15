@@ -9,6 +9,12 @@ import com.japanese.config.SampleContentDataLoader;
 import com.japanese.learning.entity.StudyResult;
 import com.japanese.learning.repository.LearnerProfileRepository;
 import com.japanese.learning.repository.StudyRecordRepository;
+import com.japanese.learning.repository.LearningProgressRepository;
+import com.japanese.content.repository.ContentItemRepository;
+import com.japanese.learning.entity.LearningProgress;
+import com.japanese.learning.entity.LearningState;
+import java.time.Instant;
+import org.springframework.test.util.ReflectionTestUtils;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -28,6 +34,8 @@ class TodayStudySessionServiceTest {
     @Autowired private UserAccountRepository accounts;
     @Autowired private LearnerProfileRepository profiles;
     @Autowired private StudyRecordRepository records;
+    @Autowired private LearningProgressRepository progress;
+    @Autowired private ContentItemRepository contents;
     private UserAccount account;
 
     @BeforeEach
@@ -66,5 +74,25 @@ class TodayStudySessionServiceTest {
         var report = history.day(account, LocalDate.now(ZoneId.of("Asia/Seoul")));
         assertThat(report.regularGoalCompleted()).isEqualTo(resumed.totalCount());
         assertThat(report.earnedExperience()).isEqualTo(resumed.totalCount() * 10);
+    }
+
+    @Test
+    void eligibilityChangesDoNotRebuildAnExistingTodaySnapshot() {
+        var item = contents.findBySlugAndPublishedTrue("taberu").orElseThrow();
+        var profile = profiles.findByUserAccountLoginId(account.getLoginId()).orElseThrow();
+        LearningProgress due = new LearningProgress(profile, item, StudyResult.CORRECT);
+        ReflectionTestUtils.setField(due, "nextReviewAt", Instant.now().minusSeconds(60));
+        progress.saveAndFlush(due);
+
+        var started = sessions.startOrResume(account);
+        int originalTotal = started.totalCount();
+        String originalCurrent = started.currentSlug();
+        ReflectionTestUtils.setField(due, "learningState", LearningState.SUSPENDED);
+        progress.saveAndFlush(due);
+
+        var resumed = sessions.startOrResume(account);
+        assertThat(resumed.sessionKey()).isEqualTo(started.sessionKey());
+        assertThat(resumed.totalCount()).isEqualTo(originalTotal);
+        assertThat(resumed.currentSlug()).isEqualTo(originalCurrent);
     }
 }

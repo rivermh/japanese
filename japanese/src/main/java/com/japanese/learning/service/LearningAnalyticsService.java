@@ -9,7 +9,6 @@ import com.japanese.learning.dto.WeakContent;
 import com.japanese.learning.entity.StudyRecord;
 import com.japanese.learning.entity.StudyResult;
 import com.japanese.learning.repository.LearnerProfileRepository;
-import com.japanese.learning.repository.LearningProgressRepository;
 import com.japanese.learning.repository.QuizAttemptRepository;
 import com.japanese.learning.repository.StudyRecordRepository;
 import java.time.Instant;
@@ -25,9 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class LearningAnalyticsService {
     private final LearnerProfileRepository profileRepository; private final StudyRecordRepository studyRepository;
-    private final QuizAttemptRepository quizRepository; private final LearningProgressRepository progressRepository; private final LearningService learningService; private final ZoneId learningZone;
+    private final QuizAttemptRepository quizRepository; private final LearningService learningService; private final ZoneId learningZone;
+    private final DueReviewQueryService dueReviews; private final LearningTime time;
     private final WeaknessNoteService weaknessNotes;
-    public LearningAnalyticsService(LearnerProfileRepository p, StudyRecordRepository s, QuizAttemptRepository q, LearningProgressRepository progressRepository, LearningService l, WeaknessNoteService weaknessNotes, @org.springframework.beans.factory.annotation.Value("${japanese.learning.time-zone:Asia/Seoul}") String learningTimeZone) { profileRepository=p; studyRepository=s; quizRepository=q; this.progressRepository=progressRepository; learningService=l; this.weaknessNotes=weaknessNotes; learningZone=ZoneId.of(learningTimeZone); }
+    public LearningAnalyticsService(LearnerProfileRepository p, StudyRecordRepository s, QuizAttemptRepository q, LearningService l, WeaknessNoteService weaknessNotes, DueReviewQueryService dueReviews, LearningTime time, @org.springframework.beans.factory.annotation.Value("${japanese.learning.time-zone:Asia/Seoul}") String learningTimeZone) { profileRepository=p; studyRepository=s; quizRepository=q; learningService=l; this.weaknessNotes=weaknessNotes; this.dueReviews=dueReviews; this.time=time; learningZone=ZoneId.of(learningTimeZone); }
     @Transactional(readOnly = true) public LearningStatistics statistics(UserAccount account) {
         var profile = profileRepository.findByUserAccountLoginId(account.getLoginId()).orElseThrow(); String key=profile.getLearnerKey();
         long correct=studyRepository.countByLearnerProfileLearnerKeyAndResult(key, StudyResult.CORRECT)+quizRepository.countByLearnerProfileLearnerKeyAndResult(key, StudyResult.CORRECT);
@@ -43,8 +43,7 @@ public class LearningAnalyticsService {
                 item.regularIncorrectCount()+item.confirmationIncorrectCount())).toList();
     }
     @Transactional(readOnly = true) public List<LevelStudyProgress> levelProgress(UserAccount account) {
-        String key=profileRepository.findByUserAccountLoginId(account.getLoginId()).orElseThrow().getLearnerKey();
-        return progressRepository.summarizeByJlptLevel(key, Instant.now());
+        return dueReviews.summarizeByJlptLevel(account, time.now());
     }
     @Transactional(readOnly = true) public List<StudyHistoryEntry> recentErrors(UserAccount account, int size) {
         String key=profileRepository.findByUserAccountLoginId(account.getLoginId()).orElseThrow().getLearnerKey();

@@ -42,8 +42,19 @@ public class QuizQuestionFactory {
     @Transactional(readOnly = true)
     public List<QuestionSpec> create(UserAccount account, String seed, int requestedCount) {
         var scope = learning.learningScope(account);
-        List<ContentItem> candidates = contents.findByPublishedTrueOrderById(PageRequest.of(0, CANDIDATE_LIMIT))
-                .stream().filter(item -> inScope(item, scope.levelCodes(), scope.categorySlugs())).toList();
+        List<Long> candidateIds = contents.findPublishedQuizCandidateIds(
+                !scope.allLevels(), queryValues(scope.levelCodes()),
+                !scope.allCategories(), queryValues(scope.categorySlugs()),
+                PageRequest.of(0, CANDIDATE_LIMIT));
+        if (candidateIds.isEmpty()) return List.of();
+        Map<Long, ContentItem> hydrated = contents.findPublishedForSummaryByIdIn(candidateIds).stream()
+                .collect(java.util.stream.Collectors.toMap(ContentItem::getId, item -> item));
+        // The hydrate query uses an IN clause, so restore the deterministic id
+        // order returned by the candidate query before building choice pools.
+        List<ContentItem> candidates = candidateIds.stream()
+                .map(hydrated::get)
+                .filter(Objects::nonNull)
+                .toList();
         List<String> meanings = distinct(candidates.stream().filter(item -> item.getWord() != null)
                 .map(this::primaryMeaning).filter(Objects::nonNull).toList(), false);
         List<String> expressions = distinct(candidates.stream().filter(item -> item.getWord() != null)
@@ -170,12 +181,8 @@ public class QuizQuestionFactory {
         return item.getWord().getMeanings().stream().filter(meaning -> "ko".equalsIgnoreCase(meaning.getLanguageTag()))
                 .map(Meaning::getText).filter(this::hasText).findFirst().orElse(null);
     }
-    private boolean inScope(ContentItem item, List<String> levels, List<String> categories) {
-        boolean level = levels == null || levels.isEmpty() || item.getLevels().stream()
-                .anyMatch(value -> levels.contains(value.getSystem() + ":" + value.getCode()));
-        boolean category = categories == null || categories.isEmpty() || item.getCategories().stream()
-                .anyMatch(value -> categories.contains(value.getSlug()));
-        return level && category;
+    private List<String> queryValues(List<String> values) {
+        return values == null || values.isEmpty() ? List.of("__NO_SCOPE_VALUE__") : values;
     }
 
     public String choicesJson(List<String> choices) {

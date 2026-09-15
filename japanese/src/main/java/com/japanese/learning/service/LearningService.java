@@ -4,6 +4,7 @@ import com.japanese.content.dto.ContentSummary;
 import com.japanese.account.entity.UserAccount;
 import com.japanese.content.entity.ContentItem;
 import com.japanese.content.entity.ContentType;
+import com.japanese.content.entity.ImportedSourceRecord;
 import com.japanese.content.repository.ContentItemRepository;
 import com.japanese.content.repository.CategoryRepository;
 import com.japanese.content.repository.LevelRepository;
@@ -23,6 +24,7 @@ import com.japanese.learning.entity.CharacterGrowthStage;
 import com.japanese.learning.entity.LearningProgress;
 import com.japanese.learning.entity.LearnerStudyPreference;
 import com.japanese.learning.entity.QuizAttempt;
+import com.japanese.learning.entity.QuizSessionItem;
 import com.japanese.learning.entity.StudyRecord;
 import com.japanese.learning.entity.StudyResult;
 import com.japanese.learning.repository.LearnerProfileRepository;
@@ -73,6 +75,8 @@ public class LearningService {
     private final CharacterCatalog characterCatalog;
     private final com.japanese.learning.character.HaruPresentationService haruPresentation;
     private final StreakService streakService;
+    private final DueReviewQueryService dueReviews;
+    private final LearningTime time;
     private final int dailyGoal;
     private final ZoneId learningZone;
 
@@ -90,6 +94,8 @@ public class LearningService {
             CharacterCatalog characterCatalog,
             com.japanese.learning.character.HaruPresentationService haruPresentation,
             StreakService streakService,
+            DueReviewQueryService dueReviews,
+            LearningTime time,
             @Value("${japanese.learning.daily-goal:10}") int dailyGoal,
             @Value("${japanese.learning.time-zone:Asia/Seoul}") String learningTimeZone
     ) {
@@ -106,6 +112,8 @@ public class LearningService {
         this.characterCatalog = characterCatalog;
         this.haruPresentation = haruPresentation;
         this.streakService = streakService;
+        this.dueReviews = dueReviews;
+        this.time = time;
         this.dailyGoal = Math.max(dailyGoal, 1);
         this.learningZone = ZoneId.of(learningTimeZone);
     }
@@ -139,9 +147,9 @@ public class LearningService {
     public List<ContentSummary> cards(UserAccount account, String levelCode, ContentType type, boolean reviewOnly) {
         LearnerProfile profile = profile(account);
         Set<Long> levelIds = levelIds(levelCode);
-        List<ContentItem> dueItems = learningProgressRepository.findDueForLearner(
-                        profile.getLearnerKey(), Instant.now(), type, !levelIds.isEmpty(), queryIds(levelIds),
-                        false, queryIds(Set.of()), PageRequest.of(0, MAX_CARDS)).stream()
+        DueReviewCriteria criteria = dueReviews.explicitScope(
+                profile.getLearnerKey(), time.now(), levelIds, Set.of());
+        List<ContentItem> dueItems = dueReviews.findDue(criteria, type, PageRequest.of(0, MAX_CARDS)).stream()
                 .map(LearningProgress::getContentItem)
                 .toList();
         if (reviewOnly) {
@@ -156,49 +164,69 @@ public class LearningService {
 
     @Transactional(readOnly = true)
     public TodayLearningPlan todayPlan(UserAccount account) {
+        return todayPlan(account, time.now());
+    }
+
+    @Transactional(readOnly = true)
+    TodayLearningPlan todayPlan(UserAccount account, Instant asOf) {
         LearnerProfile profile = profile(account);
         LearnerStudyPreference preference = preferenceOrDefault(profile);
         Set<Long> levelIds = new LinkedHashSet<>(preference.getLevelIds());
         Set<Long> categoryIds = new LinkedHashSet<>(preference.getCategoryIds());
-        int totalDueReviewCount = (int) Math.min(Integer.MAX_VALUE, learningProgressRepository.countDueForLearner(
-                profile.getLearnerKey(), Instant.now(), !levelIds.isEmpty(), queryIds(levelIds),
-                !categoryIds.isEmpty(), queryIds(categoryIds)));
-        int remaining = (int) Math.min(MAX_CARDS, todayProgress(account).remaining());
+        DueReviewCriteria dueCriteria = dueReviews.explicitScope(
+                profile.getLearnerKey(), asOf, levelIds, categoryIds);
+        int totalDueReviewCount = (int) Math.min(Integer.MAX_VALUE, dueReviews.countDue(dueCriteria));
+        int remaining = (int) Math.min(MAX_CARDS, todayProgress(account, asOf).remaining());
         if (remaining <= 0) return new TodayLearningPlan(List.of(), 0, 0, 0, totalDueReviewCount, totalDueReviewCount);
-        List<ContentItem> reviewItems = learningProgressRepository.findDueForLearner(
-                        profile.getLearnerKey(), Instant.now(), null, !levelIds.isEmpty(), queryIds(levelIds),
-                        !categoryIds.isEmpty(), queryIds(categoryIds), PageRequest.of(0, remaining)).stream()
+        List<ContentItem> reviewItems = dueReviews.findDue(dueCriteria, null, PageRequest.of(0, remaining)).stream()
                 .map(LearningProgress::getContentItem).toList();
         int reviewCount = reviewItems.size();
         List<ContentItem> selected = new java.util.ArrayList<>(reviewItems);
         int newSlots = remaining - reviewCount;
-        Instant todayStart = startOfToday();
+        Instant todayStart = startOfDay(asOf);
         long newWordsToday = studyRecordRepository.countByLearnerAndStudiedAtGreaterThanEqualAndActivityType(
                 profile.getLearnerKey(), todayStart, StudyActivityType.NEW, ContentType.WORD);
         long newGrammarToday = studyRecordRepository.countByLearnerAndStudiedAtGreaterThanEqualAndActivityType(
                 profile.getLearnerKey(), todayStart, StudyActivityType.NEW, ContentType.GRAMMAR);
-        // New-content settings are per-type caps. If one type has no available content,
-        // leave that slot empty instead of silently changing the learner's chosen pace.
-        int wordSlots = Math.min(newSlots, Math.max(preference.getDailyNewWordLimit() - (int) newWordsToday, 0));
-        int grammarSlots = Math.min(newSlots - wordSlots,
-                Math.max(preference.getDailyNewGrammarLimit() - (int) newGrammarToday, 0));
+        int wordLimit = preference.getDailyNewWordLimit();
+        int grammarLimit = preference.getDailyNewGrammarLimit();
+        int remainingWordCap = remainingCap(wordLimit, newWordsToday);
+        int remainingGrammarCap = remainingCap(grammarLimit, newGrammarToday);
         // A learner explicitly placing an item in the queue is an intentional override
-        // of the general level/category scope. It remains behind due reviews and still
-        // respects each content type's daily new-content cap.
-        List<ContentItem> queuedWords = wordSlots == 0 ? List.of() : studyQueueRepository.findUnstartedPublishedForToday(
-                account.getId(), profile.getLearnerKey(), ContentType.WORD, PageRequest.of(0, wordSlots));
-        List<ContentItem> queuedGrammar = grammarSlots == 0 ? List.of() : studyQueueRepository.findUnstartedPublishedForToday(
-                account.getId(), profile.getLearnerKey(), ContentType.GRAMMAR, PageRequest.of(0, grammarSlots));
-        List<ContentItem> newWords = new java.util.ArrayList<>(queuedWords);
-        List<ContentItem> newGrammar = new java.util.ArrayList<>(queuedGrammar);
+        // of the general level/category scope. Queue candidates are selected before
+        // general candidates, while balancing types within the same priority tier.
+        List<ContentItem> queuedWordCandidates = newSlots == 0 || remainingWordCap == 0 ? List.of()
+                : studyQueueRepository.findUnstartedPublishedForToday(account.getId(), profile.getLearnerKey(),
+                        ContentType.WORD, PageRequest.of(0, Math.min(remainingWordCap, newSlots)));
+        List<ContentItem> queuedGrammarCandidates = newSlots == 0 || remainingGrammarCap == 0 ? List.of()
+                : studyQueueRepository.findUnstartedPublishedForToday(account.getId(), profile.getLearnerKey(),
+                        ContentType.GRAMMAR, PageRequest.of(0, Math.min(remainingGrammarCap, newSlots)));
+        LocalDate learningDate = asOf.atZone(learningZone).toLocalDate();
+        var queuedAllocation = TodayNewContentAllocator.allocate(newSlots, wordLimit, grammarLimit,
+                newWordsToday, newGrammarToday, queuedWordCandidates.size(), queuedGrammarCandidates.size(),
+                profile.getLearnerKey(), learningDate);
+        List<ContentItem> newWords = new java.util.ArrayList<>(
+                queuedWordCandidates.subList(0, queuedAllocation.wordCount()));
+        List<ContentItem> newGrammar = new java.util.ArrayList<>(
+                queuedGrammarCandidates.subList(0, queuedAllocation.grammarCount()));
         Set<Long> selectedNewContentIds = new LinkedHashSet<>();
-        queuedWords.forEach(item -> selectedNewContentIds.add(item.getId()));
-        queuedGrammar.forEach(item -> selectedNewContentIds.add(item.getId()));
-        newWords.addAll(newItems(profile.getLearnerKey(), ContentType.WORD, levelIds, categoryIds,
-                Math.max(wordSlots - queuedWords.size(), 0), selectedNewContentIds));
-        selectedNewContentIds.addAll(newWords.stream().map(ContentItem::getId).toList());
-        newGrammar.addAll(newItems(profile.getLearnerKey(), ContentType.GRAMMAR, levelIds, categoryIds,
-                Math.max(grammarSlots - queuedGrammar.size(), 0), selectedNewContentIds));
+        newWords.forEach(item -> selectedNewContentIds.add(item.getId()));
+        newGrammar.forEach(item -> selectedNewContentIds.add(item.getId()));
+
+        int generalSlots = newSlots - queuedAllocation.total();
+        int generalWordCap = remainingCap(wordLimit, newWordsToday + newWords.size());
+        int generalGrammarCap = remainingCap(grammarLimit, newGrammarToday + newGrammar.size());
+        List<ContentItem> generalWordCandidates = generalSlots == 0 ? List.of()
+                : newItems(profile.getLearnerKey(), ContentType.WORD, levelIds, categoryIds,
+                        Math.min(generalWordCap, generalSlots), selectedNewContentIds);
+        List<ContentItem> generalGrammarCandidates = generalSlots == 0 ? List.of()
+                : newItems(profile.getLearnerKey(), ContentType.GRAMMAR, levelIds, categoryIds,
+                        Math.min(generalGrammarCap, generalSlots), selectedNewContentIds);
+        var generalAllocation = TodayNewContentAllocator.allocate(generalSlots, wordLimit, grammarLimit,
+                newWordsToday + newWords.size(), newGrammarToday + newGrammar.size(),
+                generalWordCandidates.size(), generalGrammarCandidates.size(), profile.getLearnerKey(), learningDate);
+        newWords.addAll(generalWordCandidates.subList(0, generalAllocation.wordCount()));
+        newGrammar.addAll(generalGrammarCandidates.subList(0, generalAllocation.grammarCount()));
         selected.addAll(newWords);
         selected.addAll(newGrammar);
         return new TodayLearningPlan(selected.stream().map(this::toSummary).toList(), reviewCount, newWords.size(), newGrammar.size(),
@@ -232,6 +260,14 @@ public class LearningService {
                 .map(level -> level.getSystem() + ":" + level.getCode()).sorted().toList();
         List<String> categorySlugs = categoryRepository.findAllById(selectedCategoryIds).stream()
                 .map(com.japanese.content.entity.Category::getSlug).sorted().toList();
+        // Do not turn stale persisted ids into an empty scope: an empty scope
+        // means "all" and would silently widen a learner's selection.
+        if (!selectedLevelIds.isEmpty() && levelCodes.isEmpty()) {
+            levelCodes = List.of("__STALE_LEVEL_SCOPE__");
+        }
+        if (!selectedCategoryIds.isEmpty() && categorySlugs.isEmpty()) {
+            categorySlugs = List.of("__STALE_CATEGORY_SCOPE__");
+        }
         return new LearningScope(levelCodes, categorySlugs);
     }
 
@@ -329,23 +365,57 @@ public class LearningService {
     }
 
     @Transactional
-    public StudyOverview recordQuizAnswer(UserAccount account, Long questionSourceRecordId, boolean correct) {
-        return recordQuizAward(account, questionSourceRecordId, correct, true).overview();
+    public StudyOverview recordImportedQuizAnswer(
+            UserAccount account, ImportedSourceRecord question, boolean correct) {
+        LearnerProfile profile = profileForUpdate(account);
+        StudyResult result = correct ? StudyResult.CORRECT : StudyResult.INCORRECT;
+        int earnedExperience = correct ? CORRECT_EXP : INCORRECT_EXP;
+        earnExperience(profile, earnedExperience);
+        quizAttemptRepository.save(QuizAttempt.forImportedQuestion(profile, question, result, earnedExperience));
+        streakService.recordActivity(profile);
+        return toOverview(profile);
     }
 
     @Transactional
     public com.japanese.learning.dto.QuizAward recordQuizSessionAnswer(
-            UserAccount account, Long questionSourceRecordId, boolean correct) {
-        return recordQuizAward(account, questionSourceRecordId, correct, false);
+            UserAccount account, QuizSessionItem item, boolean correct) {
+        LearnerProfile profile = profileForUpdate(account);
+        if (!item.getSession().learnerProfileId().equals(profile.getId())) {
+            throw new IllegalArgumentException("Quiz session item belongs to another learner");
+        }
+        if (quizAttemptRepository.existsByQuizSessionItemId(item.getId())) {
+            throw new IllegalStateException("Quiz session item already has an attempt");
+        }
+        StudyResult result = correct ? StudyResult.CORRECT : StudyResult.INCORRECT;
+        int earnedExperience = correct ? CORRECT_EXP : INCORRECT_EXP;
+        earnExperience(profile, earnedExperience);
+        quizAttemptRepository.save(QuizAttempt.forSessionItem(profile, item, result, earnedExperience));
+        return new com.japanese.learning.dto.QuizAward(toOverview(profile), earnedExperience);
     }
 
-    private com.japanese.learning.dto.QuizAward recordQuizAward(
+    /** @deprecated Use an origin-specific method for new production writes. */
+    @Deprecated
+    @Transactional
+    public StudyOverview recordQuizAnswer(UserAccount account, Long questionSourceRecordId, boolean correct) {
+        return recordUnknownQuizAward(account, questionSourceRecordId, correct, true).overview();
+    }
+
+    /** @deprecated Compatibility helper for tests and pre-normalization callers. */
+    @Deprecated
+    @Transactional
+    public com.japanese.learning.dto.QuizAward recordQuizSessionAnswer(
+            UserAccount account, Long questionSourceRecordId, boolean correct) {
+        return recordUnknownQuizAward(account, questionSourceRecordId, correct, false);
+    }
+
+    private com.japanese.learning.dto.QuizAward recordUnknownQuizAward(
             UserAccount account, Long questionSourceRecordId, boolean correct, boolean recordStreak) {
         LearnerProfile profile = profileForUpdate(account);
         StudyResult result = correct ? StudyResult.CORRECT : StudyResult.INCORRECT;
         int earnedExperience = correct ? CORRECT_EXP : INCORRECT_EXP;
         earnExperience(profile, earnedExperience);
-        quizAttemptRepository.save(new QuizAttempt(profile, questionSourceRecordId, result, earnedExperience, recordStreak));
+        quizAttemptRepository.save(QuizAttempt.forLegacyUnknown(
+                profile, questionSourceRecordId, result, earnedExperience, recordStreak));
         if (recordStreak) streakService.recordActivity(profile);
         return new com.japanese.learning.dto.QuizAward(toOverview(profile), earnedExperience);
     }
@@ -377,9 +447,14 @@ public class LearningService {
 
     @Transactional(readOnly = true)
     public DailyLearningProgress todayProgress(UserAccount account) {
+        return todayProgress(account, time.now());
+    }
+
+    @Transactional(readOnly = true)
+    DailyLearningProgress todayProgress(UserAccount account, Instant asOf) {
         LearnerProfile profile = profile(account);
         String learnerKey = profile.getLearnerKey();
-        Instant todayStart = LocalDate.now(learningZone).atStartOfDay(learningZone).toInstant();
+        Instant todayStart = startOfDay(asOf);
         long completed = studyRecordRepository.countRegularContentByLearnerAndStudiedAtGreaterThanEqual(
                 learnerKey, todayStart, StudyActivityType.RETRAIN);
         long correctAnswers = studyRecordRepository.countRegularByLearnerAndResultAndStudiedAtGreaterThanEqual(
@@ -458,8 +533,12 @@ public class LearningService {
         return values.isEmpty() ? java.util.List.of(-1L) : values;
     }
 
-    private Instant startOfToday() {
-        return LocalDate.now(learningZone).atStartOfDay(learningZone).toInstant();
+    private int remainingCap(int limit, long used) {
+        return (int) Math.max(Math.min((long) Math.max(limit, 0) - Math.max(used, 0), Integer.MAX_VALUE), 0);
+    }
+
+    private Instant startOfDay(Instant asOf) {
+        return asOf.atZone(learningZone).toLocalDate().atStartOfDay(learningZone).toInstant();
     }
 
     private String normalizeSessionKey(String sessionKey) {
@@ -487,8 +566,7 @@ public class LearningService {
                 profile.getLearnerKey(), StudyResult.CORRECT);
         incorrectAnswers += quizAttemptRepository.countByLearnerProfileLearnerKeyAndResult(
                 profile.getLearnerKey(), StudyResult.INCORRECT);
-        long dueReviewCount = learningProgressRepository
-                .countByLearnerProfileLearnerKeyAndNextReviewAtLessThanEqual(profile.getLearnerKey(), Instant.now());
+        long dueReviewCount = dueReviews.countDue(dueReviews.currentScope(profile, time.now()));
         CharacterDefinition character = characterCatalog.resolve(profile.getCharacterKey());
         return new StudyOverview(
                 profile.getDisplayName(),

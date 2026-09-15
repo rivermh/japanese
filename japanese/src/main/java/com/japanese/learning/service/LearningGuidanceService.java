@@ -3,7 +3,6 @@ package com.japanese.learning.service;
 import com.japanese.account.entity.UserAccount;
 import com.japanese.learning.dto.*;
 import com.japanese.learning.repository.LearnerProfileRepository;
-import com.japanese.learning.repository.LearningProgressRepository;
 import com.japanese.learning.repository.QuizAttemptRepository;
 import com.japanese.learning.repository.StudyRecordRepository;
 import java.time.Instant;
@@ -22,32 +21,33 @@ public class LearningGuidanceService {
     private final LearnerProfileRepository profiles;
     private final StudyRecordRepository records;
     private final QuizAttemptRepository quizzes;
-    private final LearningProgressRepository progress;
     private final LearningTime time;
+    private final DueReviewQueryService dueReviews;
     public LearningGuidanceService(DailyMissionService missions, ReminderPreferenceService reminderPreferences,
             LearningService learning, WeaknessNoteService weaknesses, StreakService streaks,
             LearnerProfileRepository profiles, StudyRecordRepository records, QuizAttemptRepository quizzes,
-            LearningProgressRepository progress, LearningTime time) {
+            LearningTime time, DueReviewQueryService dueReviews) {
         this.missions=missions; this.reminderPreferences=reminderPreferences; this.learning=learning;
         this.weaknesses=weaknesses; this.streaks=streaks; this.profiles=profiles; this.records=records;
-        this.quizzes=quizzes; this.progress=progress; this.time=time;
+        this.quizzes=quizzes; this.time=time; this.dueReviews=dueReviews;
     }
 
     @Transactional(readOnly = true)
     public LearningHomeStatus status(UserAccount account) {
-        DailyMission mission = missions.today(account);
+        Instant asOf = time.now();
+        DailyMission mission = missions.today(account, asOf);
         StreakStatus streak = streaks.status(account);
         ReminderPreference preference = reminderPreferences.preference(account);
         var profile = profiles.findByUserAccountLoginId(account.getLoginId()).orElseThrow();
         int weaknessesAvailable = needsWeaknessCheck(mission) ? weaknesses.notebook(account, 1).availableForFocusedReview() : 0;
-        DailyLearningProgress daily = learning.todayProgress(account);
+        DailyLearningProgress daily = learning.todayProgress(account, asOf);
         NextLearningAction next = nextAction(mission, weaknessesAvailable, daily.completed());
         Instant lastStudy = latest(
                 records.findFirstByLearnerProfileLearnerKeyOrderByStudiedAtDesc(profile.getLearnerKey()).map(value -> value.getStudiedAt()).orElse(null),
                 quizzes.findFirstByLearnerProfileLearnerKeyOrderByAnsweredAtDesc(profile.getLearnerKey()).map(value -> value.getAnsweredAt()).orElse(null));
-        Instant nextReview = progress.findNextReviewAt(profile.getLearnerKey());
+        Instant nextReview = dueReviews.findNextScheduledAt(dueReviews.currentScope(profile, asOf));
         LearningReminder reminder = reminder(mission, streak, preference, lastStudy, nextReview, daily.remaining() == 0);
-        return new LearningHomeStatus(time.today(), mission, next, reminder);
+        return new LearningHomeStatus(time.dateAt(asOf), mission, next, reminder);
     }
 
     private boolean needsWeaknessCheck(DailyMission mission) { return mission.total() == 0 || mission.completed(); }

@@ -33,6 +33,28 @@ public interface ContentItemRepository extends JpaRepository<ContentItem, Long>,
             """)
     List<ContentItem> findPublishedForSummaryByIdIn(@Param("ids") java.util.Collection<Long> ids);
 
+    /** Scope is applied in SQL before the candidate page is limited. */
+    @Query("""
+            select distinct item.id
+            from ContentItem item
+            where item.published = true
+              and (:filterLevels = false or exists (
+                    select 1 from ContentItem levelItem join levelItem.levels level
+                    where levelItem.id = item.id
+                      and concat(concat(level.system, ':'), level.code) in :levelCodes))
+              and (:filterCategories = false or exists (
+                    select 1 from ContentItem categoryItem join categoryItem.categories category
+                    where categoryItem.id = item.id
+                      and category.slug in :categorySlugs))
+            order by item.id
+            """)
+    List<Long> findPublishedQuizCandidateIds(
+            @Param("filterLevels") boolean filterLevels,
+            @Param("levelCodes") java.util.Collection<String> levelCodes,
+            @Param("filterCategories") boolean filterCategories,
+            @Param("categorySlugs") java.util.Collection<String> categorySlugs,
+            Pageable pageable);
+
     Optional<ContentItem> findByIdAndPublishedFalse(Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

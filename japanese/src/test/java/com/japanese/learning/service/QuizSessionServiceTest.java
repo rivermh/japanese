@@ -64,6 +64,11 @@ class QuizSessionServiceTest {
                 account, started.sessionId(), first.getId(), "not-an-offered-choice")))
                 .isInstanceOf(QuizRequestException.class);
         var firstAnswer = quizzes.answer(account, started.sessionId(), first.getId(), first.getCorrectAnswer());
+        QuizAttempt recordedAttempt = attempts.findByLearnerProfileLearnerKeyOrderByAnsweredAtDesc(
+                profile.getLearnerKey(), org.springframework.data.domain.PageRequest.of(0, 1)).get(0);
+        assertThat(recordedAttempt.getOriginType()).isEqualTo(QuizAttemptOriginType.QUIZ_SESSION_ITEM);
+        assertThat(recordedAttempt.getQuizSessionItem().getId()).isEqualTo(first.getId());
+        assertThat(recordedAttempt.getImportedSourceRecord()).isNull();
         int experienceAfterFirst = learning.overview(account).character().experience();
         var duplicate = quizzes.answer(account, started.sessionId(), first.getId(), "tampered retry");
         assertThat(duplicate.feedback()).isEqualTo(firstAnswer.feedback());

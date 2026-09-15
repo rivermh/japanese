@@ -16,6 +16,10 @@ import com.japanese.learning.entity.RelearningTarget;
 import com.japanese.content.entity.ContentItem;
 import com.japanese.content.service.BookmarkService;
 import com.japanese.content.repository.ContentItemRepository;
+import com.japanese.content.repository.ImportedSourceRecordRepository;
+import com.japanese.content.entity.ImportedSourceRecord;
+import com.japanese.learning.entity.QuizAttemptOriginType;
+import com.japanese.learning.repository.QuizAttemptRepository;
 import com.japanese.learning.repository.LearnerProfileRepository;
 import com.japanese.learning.repository.LearningProgressRepository;
 import com.japanese.learning.repository.StudyRecordRepository;
@@ -47,6 +51,8 @@ class LearningServiceTest {
     @Autowired private LearnerProfileRepository learnerProfileRepository;
     @Autowired private LearningProgressRepository learningProgressRepository;
     @Autowired private ContentItemRepository contentItemRepository;
+    @Autowired private ImportedSourceRecordRepository importedSourceRecordRepository;
+    @Autowired private QuizAttemptRepository quizAttemptRepository;
     @Autowired private StudyRecordRepository studyRecordRepository;
     @Autowired private LearnerStudyPreferenceRepository learnerStudyPreferenceRepository;
     @Autowired private BookmarkService bookmarkService;
@@ -162,6 +168,27 @@ class LearningServiceTest {
         assertThat(learningService.todayProgress(account).completed()).isZero();
         assertThat(learningService.todayProgress(account).remaining()).isEqualTo(10);
         assertThat(learningService.recentQuizHistory(account, 5)).hasSize(1);
+    }
+
+    @Test
+    void recordsImportedQuizWithExplicitProvenanceAndLegacySemantics() {
+        ImportedSourceRecord question = importedSourceRecordRepository.saveAndFlush(new ImportedSourceRecord(
+                "test-source", "quiz-test", Math.abs(UUID.randomUUID().getMostSignificantBits()),
+                "N5", "", "Prompt", "Answer"));
+
+        StudyOverview result = learningService.recordImportedQuizAnswer(account, question, true);
+        String learnerKey = learnerProfileRepository.findByUserAccountLoginId(account.getLoginId())
+                .orElseThrow().getLearnerKey();
+        var attempt = quizAttemptRepository.findByLearnerProfileLearnerKeyOrderByAnsweredAtDesc(
+                learnerKey, org.springframework.data.domain.PageRequest.of(0, 1)).get(0);
+
+        assertThat(attempt.getOriginType()).isEqualTo(QuizAttemptOriginType.IMPORTED_SOURCE);
+        assertThat(attempt.getImportedSourceRecord().getId()).isEqualTo(question.getId());
+        assertThat(attempt.getQuizSessionItem()).isNull();
+        assertThat(attempt.getResult()).isEqualTo(StudyResult.CORRECT);
+        assertThat(attempt.getEarnedExperience()).isEqualTo(10);
+        assertThat(attempt.isStreakEligible()).isTrue();
+        assertThat(result.character().experience()).isEqualTo(10);
     }
 
     @Test

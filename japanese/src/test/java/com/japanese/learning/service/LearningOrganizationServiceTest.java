@@ -7,6 +7,11 @@ import com.japanese.account.entity.UserAccount;
 import com.japanese.account.entity.UserRole;
 import com.japanese.account.repository.UserAccountRepository;
 import com.japanese.config.SampleContentDataLoader;
+import com.japanese.content.entity.ContentItem;
+import com.japanese.content.entity.ContentType;
+import com.japanese.content.entity.Grammar;
+import com.japanese.content.entity.Meaning;
+import com.japanese.content.entity.Word;
 import com.japanese.content.repository.ContentItemRepository;
 import com.japanese.learning.entity.StudyResult;
 import com.japanese.learning.repository.LearnerProfileRepository;
@@ -63,6 +68,27 @@ class LearningOrganizationServiceTest {
         learningService.answer(account, "server", StudyResult.CORRECT, "queued-server", false);
         assertThat(queueService.list(account)).isEmpty();
         assertThat(progressRepository.findByLearnerProfileLearnerKeyAndContentItemId(key, serverId)).isPresent();
+    }
+
+    @Test
+    void queuedWordAndGrammarAreBalancedBeforeGeneralCandidates() {
+        UserAccount account = account("balanced-queue-" + java.util.UUID.randomUUID());
+        learningService.overview(account);
+        learningService.updateDailyGoal(account, 2);
+        learningService.updateNewContentLimits(account, 2, 2);
+        ContentItem word = word("queued-word-" + java.util.UUID.randomUUID());
+        ContentItem grammar = grammar("queued-grammar-" + java.util.UUID.randomUUID());
+        contentRepository.saveAndFlush(word);
+        contentRepository.saveAndFlush(grammar);
+        queueService.add(account, word.getSlug());
+        queueService.add(account, grammar.getSlug());
+
+        var plan = learningService.todayPlan(account);
+
+        assertThat(plan.newWordCount()).isEqualTo(1);
+        assertThat(plan.newGrammarCount()).isEqualTo(1);
+        assertThat(plan.items()).extracting(item -> item.slug())
+                .containsExactly(word.getSlug(), grammar.getSlug());
     }
 
     @Test
@@ -123,5 +149,19 @@ class LearningOrganizationServiceTest {
 
     private UserAccount account(String loginId) {
         return accountRepository.save(new UserAccount(loginId, loginId + "@example.test", "hash", loginId, UserRole.USER));
+    }
+
+    private ContentItem word(String slug) {
+        ContentItem item = new ContentItem(slug, ContentType.WORD, "test", true);
+        Word word = new Word(slug, slug, "noun", null);
+        word.addMeaning(new Meaning("ko", slug, 1));
+        item.attachWord(word);
+        return item;
+    }
+
+    private ContentItem grammar(String slug) {
+        ContentItem item = new ContentItem(slug, ContentType.GRAMMAR, "test", true);
+        item.attachGrammar(new Grammar(slug, slug, null));
+        return item;
     }
 }

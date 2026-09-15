@@ -10,9 +10,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface LearningProgressRepository extends JpaRepository<LearningProgress, Long> {
-    @Query("select min(progress.nextReviewAt) from LearningProgress progress where progress.learnerProfile.learnerKey=:learnerKey")
-    java.time.Instant findNextReviewAt(@Param("learnerKey") String learnerKey);
-
     Optional<LearningProgress> findByLearnerProfileLearnerKeyAndContentItemId(
             String learnerKey, Long contentItemId);
 
@@ -21,27 +18,28 @@ public interface LearningProgressRepository extends JpaRepository<LearningProgre
 
     long countByLearnerProfileLearnerKey(String learnerKey);
 
-    List<LearningProgress> findByLearnerProfileLearnerKeyAndNextReviewAtLessThanEqualOrderByNextReviewAtAsc(
-            String learnerKey, Instant now, Pageable pageable);
-
     @Query("""
             select distinct progress
             from LearningProgress progress
             join fetch progress.contentItem item
-            left join item.levels level
-            left join item.categories category
             where progress.learnerProfile.learnerKey = :learnerKey
               and progress.nextReviewAt <= :now
               and item.published = true
+              and (progress.learningState is null or progress.learningState <> :suspended)
               and (:type is null or item.type = :type)
-              and (:filterLevels = false or level.id in :levelIds)
-              and (:filterCategories = false or category.id in :categoryIds)
+              and (:filterLevels = false or exists (
+                    select 1 from ContentItem levelItem join levelItem.levels level
+                    where levelItem.id = item.id and level.id in :levelIds))
+              and (:filterCategories = false or exists (
+                    select 1 from ContentItem categoryItem join categoryItem.categories category
+                    where categoryItem.id = item.id and category.id in :categoryIds))
             order by progress.nextReviewAt asc
             """)
-    List<LearningProgress> findDueForLearner(
+    List<LearningProgress> findEligibleDue(
             @Param("learnerKey") String learnerKey,
             @Param("now") Instant now,
             @Param("type") com.japanese.content.entity.ContentType type,
+            @Param("suspended") com.japanese.learning.entity.LearningState suspended,
             @Param("filterLevels") boolean filterLevels,
             @Param("levelIds") java.util.Collection<Long> levelIds,
             @Param("filterCategories") boolean filterCategories,
@@ -49,30 +47,69 @@ public interface LearningProgressRepository extends JpaRepository<LearningProgre
             Pageable pageable
     );
 
-    long countByLearnerProfileLearnerKeyAndNextReviewAtLessThanEqual(String learnerKey, Instant now);
+    @Query("""
+            select count(distinct progress)
+            from LearningProgress progress
+            join progress.contentItem item
+            where progress.learnerProfile.learnerKey = :learnerKey
+              and progress.nextReviewAt <= :now
+              and item.published = true
+              and (progress.learningState is null or progress.learningState <> :suspended)
+              and (:filterLevels = false or exists (
+                    select 1 from ContentItem levelItem join levelItem.levels level
+                    where levelItem.id = item.id and level.id in :levelIds))
+              and (:filterCategories = false or exists (
+                    select 1 from ContentItem categoryItem join categoryItem.categories category
+                    where categoryItem.id = item.id and category.id in :categoryIds))
+            """)
+    long countEligibleDue(
+            @Param("learnerKey") String learnerKey,
+            @Param("now") Instant now,
+            @Param("suspended") com.japanese.learning.entity.LearningState suspended,
+            @Param("filterLevels") boolean filterLevels,
+            @Param("levelIds") java.util.Collection<Long> levelIds,
+            @Param("filterCategories") boolean filterCategories,
+            @Param("categoryIds") java.util.Collection<Long> categoryIds);
 
-    long countByLearnerProfileLearnerKeyAndNextReviewAtGreaterThanEqualAndNextReviewAtLessThan(
-            String learnerKey, Instant startedAt, Instant endedAt);
+    @Query("""
+            select min(progress.nextReviewAt)
+            from LearningProgress progress
+            join progress.contentItem item
+            where progress.learnerProfile.learnerKey = :learnerKey
+              and item.published = true
+              and (progress.learningState is null or progress.learningState <> :suspended)
+              and (:filterLevels = false or exists (
+                    select 1 from ContentItem levelItem join levelItem.levels level
+                    where levelItem.id = item.id and level.id in :levelIds))
+              and (:filterCategories = false or exists (
+                    select 1 from ContentItem categoryItem join categoryItem.categories category
+                    where categoryItem.id = item.id and category.id in :categoryIds))
+            """)
+    Instant findNextEligibleReviewAt(@Param("learnerKey") String learnerKey,
+            @Param("suspended") com.japanese.learning.entity.LearningState suspended,
+            @Param("filterLevels") boolean filterLevels, @Param("levelIds") java.util.Collection<Long> levelIds,
+            @Param("filterCategories") boolean filterCategories, @Param("categoryIds") java.util.Collection<Long> categoryIds);
 
     @Query("""
             select count(distinct progress)
             from LearningProgress progress
             join progress.contentItem item
-            left join item.levels level
-            left join item.categories category
             where progress.learnerProfile.learnerKey = :learnerKey
-              and progress.nextReviewAt <= :now
+              and progress.nextReviewAt >= :start and progress.nextReviewAt < :end
               and item.published = true
-              and (:filterLevels = false or level.id in :levelIds)
-              and (:filterCategories = false or category.id in :categoryIds)
+              and (progress.learningState is null or progress.learningState <> :suspended)
+              and (:filterLevels = false or exists (
+                    select 1 from ContentItem levelItem join levelItem.levels level
+                    where levelItem.id = item.id and level.id in :levelIds))
+              and (:filterCategories = false or exists (
+                    select 1 from ContentItem categoryItem join categoryItem.categories category
+                    where categoryItem.id = item.id and category.id in :categoryIds))
             """)
-    long countDueForLearner(
-            @Param("learnerKey") String learnerKey,
-            @Param("now") Instant now,
-            @Param("filterLevels") boolean filterLevels,
-            @Param("levelIds") java.util.Collection<Long> levelIds,
-            @Param("filterCategories") boolean filterCategories,
-            @Param("categoryIds") java.util.Collection<Long> categoryIds);
+    long countEligibleScheduledBetween(@Param("learnerKey") String learnerKey,
+            @Param("start") Instant start, @Param("end") Instant end,
+            @Param("suspended") com.japanese.learning.entity.LearningState suspended,
+            @Param("filterLevels") boolean filterLevels, @Param("levelIds") java.util.Collection<Long> levelIds,
+            @Param("filterCategories") boolean filterCategories, @Param("categoryIds") java.util.Collection<Long> categoryIds);
 
     @Query("select progress.contentItem.id from LearningProgress progress where progress.learnerProfile.learnerKey = :learnerKey")
     java.util.Set<Long> findLearnedContentIds(@Param("learnerKey") String learnerKey);
@@ -87,9 +124,12 @@ public interface LearningProgressRepository extends JpaRepository<LearningProgre
             join item.levels level
             where progress.learnerProfile.learnerKey = :learnerKey
               and level.system = 'JLPT'
+              and item.published = true
+              and (progress.learningState is null or progress.learningState <> :suspended)
             group by level.code
             order by level.code
             """)
-    List<com.japanese.learning.dto.LevelStudyProgress> summarizeByJlptLevel(
-            @Param("learnerKey") String learnerKey, @Param("now") Instant now);
+    List<com.japanese.learning.dto.LevelStudyProgress> summarizeEligibleByJlptLevel(
+            @Param("learnerKey") String learnerKey, @Param("now") Instant now,
+            @Param("suspended") com.japanese.learning.entity.LearningState suspended);
 }

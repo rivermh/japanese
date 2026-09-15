@@ -11,7 +11,6 @@ import com.japanese.learning.entity.StudyActivityType;
 import com.japanese.learning.entity.StudyRecord;
 import com.japanese.learning.entity.StudyResult;
 import com.japanese.learning.repository.LearnerProfileRepository;
-import com.japanese.learning.repository.LearningProgressRepository;
 import com.japanese.learning.repository.QuizAttemptRepository;
 import com.japanese.learning.repository.StudyRecordRepository;
 import java.time.Instant;
@@ -32,7 +31,8 @@ public class LearningHistoryService {
     private final LearnerProfileRepository profileRepository;
     private final StudyRecordRepository studyRecordRepository;
     private final QuizAttemptRepository quizAttemptRepository;
-    private final LearningProgressRepository progressRepository;
+    private final DueReviewQueryService dueReviews;
+    private final LearningTime time;
     private final LearningService learningService;
     private final StreakService streakService;
     private final ZoneId learningZone;
@@ -41,15 +41,17 @@ public class LearningHistoryService {
             LearnerProfileRepository profileRepository,
             StudyRecordRepository studyRecordRepository,
             QuizAttemptRepository quizAttemptRepository,
-            LearningProgressRepository progressRepository,
             LearningService learningService,
             StreakService streakService,
+            DueReviewQueryService dueReviews,
+            LearningTime time,
             @Value("${japanese.learning.time-zone:Asia/Seoul}") String learningTimeZone
     ) {
         this.profileRepository = profileRepository;
         this.studyRecordRepository = studyRecordRepository;
         this.quizAttemptRepository = quizAttemptRepository;
-        this.progressRepository = progressRepository;
+        this.dueReviews = dueReviews;
+        this.time = time;
         this.learningService = learningService;
         this.streakService = streakService;
         this.learningZone = ZoneId.of(learningTimeZone);
@@ -98,7 +100,8 @@ public class LearningHistoryService {
                     normalizedActivityType(record), record.getResult(), record.getStudiedAt()));
         }
         quizzes.forEach(quiz -> addQuiz(counts, quiz));
-        LocalDate today = LocalDate.now(learningZone);
+        Instant asOf = time.now();
+        LocalDate today = time.dateAt(asOf);
         int goal = learningService.todayProgress(account).goal();
         int regularGoalCompleted = date.equals(today)
                 ? (int) learningService.todayProgress(account).completed()
@@ -106,14 +109,10 @@ public class LearningHistoryService {
         Instant tomorrowStart = today.plusDays(1).atStartOfDay(learningZone).toInstant();
         Instant dayAfterTomorrow = today.plusDays(2).atStartOfDay(learningZone).toInstant();
         Instant upcomingEnd = today.plusDays(8).atStartOfDay(learningZone).toInstant();
-        int dueNow = (int) Math.min(Integer.MAX_VALUE,
-                progressRepository.countByLearnerProfileLearnerKeyAndNextReviewAtLessThanEqual(learnerKey, Instant.now()));
-        int tomorrow = (int) Math.min(Integer.MAX_VALUE,
-                progressRepository.countByLearnerProfileLearnerKeyAndNextReviewAtGreaterThanEqualAndNextReviewAtLessThan(
-                        learnerKey, tomorrowStart, dayAfterTomorrow));
-        int upcoming = (int) Math.min(Integer.MAX_VALUE,
-                progressRepository.countByLearnerProfileLearnerKeyAndNextReviewAtGreaterThanEqualAndNextReviewAtLessThan(
-                        learnerKey, dayAfterTomorrow, upcomingEnd));
+        DueReviewCriteria criteria = dueReviews.currentScope(account, asOf);
+        int dueNow = safe(dueReviews.countDue(criteria));
+        int tomorrow = safe(dueReviews.countScheduledBetween(criteria, tomorrowStart, dayAfterTomorrow));
+        int upcoming = safe(dueReviews.countScheduledBetween(criteria, dayAfterTomorrow, upcomingEnd));
         return new DailyLearningReport(date, counts.newWordCount, counts.newGrammarCount, counts.reviewCount,
                 counts.retrainCount, counts.correctCount, counts.incorrectCount, regularGoalCompleted, goal, dueNow,
                 counts.experience, streakService.status(account).currentStreak(), tomorrow, upcoming,
@@ -124,6 +123,10 @@ public class LearningHistoryService {
         return profileRepository.findByUserAccountLoginId(account.getLoginId())
                 .orElseThrow(() -> new java.util.NoSuchElementException("Learner profile not found"))
                 .getLearnerKey();
+    }
+
+    private int safe(long value) {
+        return (int) Math.min(Integer.MAX_VALUE, Math.max(value, 0));
     }
 
     private void addRecord(Counts counts, StudyRecord record) {

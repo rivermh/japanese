@@ -11,7 +11,6 @@ import com.japanese.learning.entity.StudyActivityType;
 import com.japanese.learning.entity.StudyResult;
 import com.japanese.learning.repository.GrammarConfirmationAttemptRepository;
 import com.japanese.learning.repository.LearnerProfileRepository;
-import com.japanese.learning.repository.LearningProgressRepository;
 import com.japanese.learning.repository.QuizAttemptRepository;
 import com.japanese.learning.repository.StudyRecordRepository;
 import java.time.Instant;
@@ -31,22 +30,25 @@ public class WeeklyLearningReportService {
     private final StudyRecordRepository records;
     private final QuizAttemptRepository quizzes;
     private final GrammarConfirmationAttemptRepository confirmations;
-    private final LearningProgressRepository progress;
+    private final DueReviewQueryService dueReviews;
+    private final LearningTime time;
     private final WeaknessNoteService weaknesses;
     private final StreakService streaks;
     private final ZoneId zone;
 
     public WeeklyLearningReportService(LearnerProfileRepository profiles, StudyRecordRepository records,
             QuizAttemptRepository quizzes, GrammarConfirmationAttemptRepository confirmations,
-            LearningProgressRepository progress, WeaknessNoteService weaknesses, StreakService streaks,
-            @Value("${japanese.learning.time-zone:Asia/Seoul}") String timeZone) {
+            WeaknessNoteService weaknesses, StreakService streaks, DueReviewQueryService dueReviews,
+            LearningTime time, @Value("${japanese.learning.time-zone:Asia/Seoul}") String timeZone) {
         this.profiles=profiles; this.records=records; this.quizzes=quizzes; this.confirmations=confirmations;
-        this.progress=progress; this.weaknesses=weaknesses; this.streaks=streaks; this.zone=ZoneId.of(timeZone);
+        this.weaknesses=weaknesses; this.streaks=streaks; this.dueReviews=dueReviews;
+        this.time=time; this.zone=ZoneId.of(timeZone);
     }
 
     @Transactional(readOnly = true)
     public WeeklyLearningReport report(UserAccount account) {
-        LocalDate endDate=LocalDate.now(zone);
+        Instant asOf = time.now();
+        LocalDate endDate=time.dateAt(asOf);
         LocalDate startDate=endDate.minusDays(6);
         Instant start=startDate.atStartOfDay(zone).toInstant();
         Instant end=endDate.plusDays(1).atStartOfDay(zone).toInstant();
@@ -73,7 +75,7 @@ public class WeeklyLearningReportService {
         List<WeaknessNoteItem> currentWeaknesses=weeklyWeaknesses.recent();
         List<WeaknessNoteItem> weakWords=filter(currentWeaknesses, ContentType.WORD);
         List<WeaknessNoteItem> weakGrammar=filter(currentWeaknesses, ContentType.GRAMMAR);
-        long due=progress.countByLearnerProfileLearnerKeyAndNextReviewAtLessThanEqual(learnerKey, Instant.now());
+        long due=dueReviews.countDue(dueReviews.currentScope(account, asOf));
         return new WeeklyLearningReport(startDate, endDate, current, previous, currentQuiz, previousQuiz,
                 currentConfirmation, previousConfirmation, learningDays, previousLearningDays,
                 streaks.status(account).currentStreak(), List.copyOf(daily),

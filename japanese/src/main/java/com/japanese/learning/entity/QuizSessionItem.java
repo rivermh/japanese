@@ -49,6 +49,7 @@ public class QuizSessionItem {
     }
 
     public Long getId() { return id; }
+    public QuizSession getSession() { return session; }
     public ContentItem getContentItem() { return contentItem; }
     public int getPosition() { return position; }
     public QuizQuestionType getQuestionType() { return questionType; }

@@ -8,6 +8,10 @@ import com.japanese.config.SampleContentDataLoader;
 import com.japanese.content.entity.*;
 import com.japanese.content.repository.*;
 import com.japanese.content.service.GrammarCurationService;
+import com.japanese.learning.entity.LearnerProfile;
+import com.japanese.learning.entity.LearnerStudyPreference;
+import com.japanese.learning.repository.LearnerProfileRepository;
+import com.japanese.learning.repository.LearnerStudyPreferenceRepository;
 import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +29,10 @@ class QuizQuestionFactoryTest {
     @Autowired private ContentItemRepository contents;
     @Autowired private GrammarCurationService curation;
     @Autowired private GrammarConfirmationQuestionRepository confirmationQuestions;
+    @Autowired private LearnerStudyPreferenceRepository preferences;
+    @Autowired private LearnerProfileRepository profiles;
+    @Autowired private LevelRepository levels;
+    @Autowired private CategoryRepository categories;
     @Autowired private LearningService learning;
     @Autowired private QuizQuestionFactory factory;
     @Autowired private QuizAnswerEvaluator evaluator;
@@ -92,5 +100,50 @@ class QuizQuestionFactoryTest {
         assertThat(generated).anyMatch(value -> value.type() == com.japanese.learning.entity.QuizQuestionType.GRAMMAR_CONTEXT_CHOICE
                 && value.prompt().contains("빈칸을 고르세요"));
         assertThat(generated).noneMatch(value -> value.prompt().contains("PENDING CONTEXT"));
+    }
+
+    @Test
+    void appliesScopeBeforeCandidateLimitAndNeverWidensAStaleScope() {
+        Level n5 = levels.findBySystemAndCode("JLPT", "N5").orElseThrow();
+        Level n1 = levels.findBySystemAndCode("JLPT", "N1")
+                .orElseGet(() -> levels.saveAndFlush(new Level("JLPT", "N1", "JLPT N1")));
+        Category dailyLife = categories.findBySlug("daily-life").orElseThrow();
+
+        // Fill the first candidate page with another level. The two N1 cards
+        // must still be selected when the scope is applied in SQL first.
+        List<ContentItem> filler = new ArrayList<>();
+        for (int index = 0; index < 501; index++) {
+            ContentItem item = new ContentItem("quiz-scope-filler-" + UUID.randomUUID(), ContentType.WORD,
+                    "test", true);
+            item.addLevel(n5);
+            filler.add(item);
+        }
+        contents.saveAllAndFlush(filler);
+        ContentItem firstN1 = scopedWord("quiz-scope-n1-a-" + UUID.randomUUID(), n1, dailyLife, "scope-a");
+        ContentItem secondN1 = scopedWord("quiz-scope-n1-b-" + UUID.randomUUID(), n1, dailyLife, "scope-b");
+        contents.saveAllAndFlush(List.of(firstN1, secondN1));
+
+        learning.updateLearningScope(account, List.of("JLPT:N1"), List.of("daily-life"));
+        var generated = factory.create(account, "scope-first", 20);
+        assertThat(generated).anyMatch(value -> value.content().getId().equals(firstN1.getId()));
+        assertThat(generated).anyMatch(value -> value.content().getId().equals(secondN1.getId()));
+        assertThat(generated).noneMatch(value -> value.content().getId() <= filler.get(filler.size() - 1).getId());
+
+        var profile = profiles.findByUserAccountLoginId(account.getLoginId()).orElseThrow();
+        var preference = preferences.findByLearnerProfileId(profile.getId())
+                .orElseGet(() -> preferences.save(new LearnerStudyPreference(profile)));
+        preference.replace(Set.of(Long.MAX_VALUE), Set.of());
+        preferences.saveAndFlush(preference);
+        assertThat(factory.create(account, "stale-scope", 20)).isEmpty();
+    }
+
+    private ContentItem scopedWord(String slug, Level level, Category category, String key) {
+        ContentItem item = new ContentItem(slug, ContentType.WORD, "test", true);
+        Word word = new Word("scope-" + key, "すこぷ" + key, "명사", null);
+        word.addMeaning(new Meaning("ko", "범위 " + key, 1));
+        item.attachWord(word);
+        item.addLevel(level);
+        item.addCategory(category);
+        return item;
     }
 }

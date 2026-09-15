@@ -76,7 +76,7 @@ public class QuizSessionService {
             throw new QuizRequestException("제공된 선택지 중 하나를 골라주세요.");
         }
         boolean correct = evaluator.matches(item.getQuestionType(), answer, item.getCorrectAnswer());
-        QuizAward award = learning.recordQuizSessionAnswer(account, item.getId(), correct);
+        QuizAward award = learning.recordQuizSessionAnswer(account, item, correct);
         item.answer(answer, correct, award.earnedExperience());
         session.recordAnswer(correct, award.earnedExperience());
         return new QuizAnswerSubmission(view(session), feedback(item));

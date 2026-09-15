@@ -42,6 +42,7 @@ public class QuizSession {
     }
 
     public Long getId() { return id; }
+    public Long learnerProfileId() { return learnerProfile.getId(); }
     public String getPublicId() { return publicId; }
     public String getSessionKey() { return sessionKey; }
     public QuizMode getMode() { return mode; }

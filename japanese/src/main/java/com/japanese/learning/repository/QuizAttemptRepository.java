@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, Long> {
+    boolean existsByQuizSessionItemId(Long quizSessionItemId);
     java.util.Optional<QuizAttempt> findFirstByLearnerProfileLearnerKeyOrderByAnsweredAtDesc(String learnerKey);
 
     long countByLearnerProfileLearnerKeyAndResult(String learnerKey, StudyResult result);
