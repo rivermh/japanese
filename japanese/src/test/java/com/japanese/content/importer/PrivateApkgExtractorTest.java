@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.List;
@@ -123,5 +124,70 @@ class PrivateApkgExtractorTest {
             }
         }
         assertThat(PrivateApkgExtractor.category("Alien", List.of())).isEqualTo("OTHER");
+    }
+
+    @Test
+    void stripsHtmlAudioElementVariantsWhilePreservingSurroundingMarkupAndText() throws Exception {
+        Path sqlite = temp.resolve("audio-variants.anki21");
+        String richField =
+                "<span class=\"kor\">텍스트1</span>"
+                        + "<audio src=\"secret1.mp3\"></audio>"
+                        + "<ruby>猫<rt>ねこ</rt></ruby>"
+                        + "<audio src='secret2.mp3'>"
+                        + "<div class=\"jp\">テキスト2</div>"
+                        + "<audio controls data-x=\"y\" src=\"secret3.mp3\" preload=\"none\">"
+                        + "<AUDIO SRC=\"secret4.mp3\"></AUDIO>"
+                        + "<span>텍스트3</span>"
+                        + "<audio\n  src=\"secret5.mp3\"\n  controls\n></audio>"
+                        + "<table><tr><td>표</td></tr></table>";
+        try (Connection source = DriverManager.getConnection("jdbc:sqlite:" + sqlite);
+             Statement sql = source.createStatement()) {
+            sql.execute("create table notetypes(id integer primary key,name text)");
+            sql.execute("create table fields(ntid integer,ord integer,name text)");
+            sql.execute("create table decks(id integer primary key,name text)");
+            sql.execute("create table notes(id integer primary key,guid text,mid integer,tags text,flds text)");
+            sql.execute("create table cards(id integer primary key,nid integer,did integer,ord integer)");
+            sql.execute("insert into notetypes values(1,'JLPT MAX덱 어휘')");
+            sql.execute("insert into fields values(1,0,'ExamplesRendered')");
+            sql.execute("insert into decks values(1,'JLPT MAX덱/어휘')");
+            try (PreparedStatement insert = source.prepareStatement("insert into notes values(1,'gaudio',1,'',?)")) {
+                insert.setString(1, richField);
+                insert.executeUpdate();
+            }
+            sql.execute("insert into cards values(20,1,1,0)");
+        }
+        Path apkg = temp.resolve("audio-variants.apkg");
+        try (ZipOutputStream zip = new ZipOutputStream(Files.newOutputStream(apkg))) {
+            zip.putNextEntry(new ZipEntry("collection.anki21"));
+            Files.copy(sqlite, zip);
+            zip.closeEntry();
+        }
+        String url = "jdbc:h2:mem:audio_variant_stage_" + UUID.randomUUID() + ";MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1";
+        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration/h2")
+                .cleanDisabled(true).load().migrate();
+        DriverManagerDataSource db = new DriverManagerDataSource(url, "sa", "");
+        PrivateApkgExtractor extractor = new PrivateApkgExtractor(db, new ObjectMapper(), new GrammarHtmlParser());
+        var result = extractor.extract(apkg, "private-audio-variants");
+        assertThat(result.notes()).isEqualTo(1);
+        assertThat(result.audioReferenceNotes()).isEqualTo(1);
+        try (Connection target = db.getConnection(); Statement sql = target.createStatement();
+             ResultSet rows = sql.executeQuery("select field_values from private_apkg_notes where source_note_id=1")) {
+            assertThat(rows.next()).isTrue();
+            String stored = rows.getString(1);
+            // Every audio-tag variant (double/single quote src, extra attributes, case, multi-line,
+            // with/without explicit closing tag) must be gone - filenames and the <audio markup itself.
+            assertThat(stored)
+                    .doesNotContain("secret1.mp3", "secret2.mp3", "secret3.mp3", "secret4.mp3", "secret5.mp3")
+                    .doesNotContainIgnoringCase("<audio");
+            // Non-audio HTML and the surrounding Korean/Japanese text must survive untouched.
+            assertThat(stored)
+                    .contains("텍스트1", "텍스트3", "猫", "ねこ",
+                            "テキスト2", "표")
+                    .contains("<span", "<ruby", "<rt", "<div", "<table", "<tr", "<td");
+        }
+        // Re-running against the same source must still be idempotent after the hardening change.
+        var repeat = extractor.extract(apkg, "private-audio-variants");
+        assertThat(repeat.inserted()).isZero();
+        assertThat(repeat.skipped()).isEqualTo(1);
     }
 }

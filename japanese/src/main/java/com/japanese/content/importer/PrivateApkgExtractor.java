@@ -31,6 +31,15 @@ public class PrivateApkgExtractor {
     private static final int BATCH = 100;
     private static final int MAX_FIELD_CHARS = 8_000_000;
     private static final Pattern SOUND = Pattern.compile("(?i)\\[sound:[^\\]\\r\\n]*\\]");
+    private static final Pattern AUDIO_TAG_HINT = Pattern.compile("(?is)<audio\\b");
+    /**
+     * Matches an {@code <audio ...>} opening tag plus, only when it is immediately adjacent (no
+     * other markup/content in between), its matching {@code </audio>} closing tag. Rendered audio
+     * controls in this dataset are always empty leaf elements, so this intentionally never spans
+     * with a lazy {@code .*?} to "the next" {@code </audio>} in the document - that would risk
+     * swallowing unrelated sibling content whenever a tag is left unclosed or self-closed.
+     */
+    private static final Pattern AUDIO_ELEMENT = Pattern.compile("(?is)<audio\\b[^>]*>(?:\\s*</audio\\s*>)?");
     private static final Pattern LEVEL = Pattern.compile("(?i)(?:jlpt[-_ ]*)?(n[1-5])");
     private final DataSource dataSource;
     private final ObjectMapper json;
@@ -116,11 +125,17 @@ public class PrivateApkgExtractor {
                         String name = model.fields().get(i);
                         String value = i < values.length ? values[i] : "";
                         Matcher matches = SOUND.matcher(value);
-                        while (matches.find()) audioCount++;
+                        int bracketAudio = 0;
+                        while (matches.find()) bracketAudio++;
                         if (isAudioField(name)) {
-                            if (!value.isBlank() && audioCount == 0) audioCount++;
+                            audioCount += !value.isBlank() && bracketAudio == 0 ? 1 : bracketAudio;
                             value = "";
-                        } else value = SOUND.matcher(value).replaceAll("");
+                        } else {
+                            String withoutBrackets = bracketAudio > 0 ? SOUND.matcher(value).replaceAll("") : value;
+                            AudioElementStrip stripped = stripAudioElements(withoutBrackets);
+                            audioCount += bracketAudio + stripped.elementCount();
+                            value = stripped.value();
+                        }
                         if (value.length() > MAX_FIELD_CHARS) throw new SQLException("Oversized field on note " + id);
                         safeValues.add(value);
                         byName.put(name, value);
@@ -198,6 +213,35 @@ public class PrivateApkgExtractor {
         return name.toLowerCase(java.util.Locale.ROOT).contains("audio") || name.equals("MediaIntentsV2")
                 || name.toLowerCase(java.util.Locale.ROOT).contains("media");
     }
+
+    /**
+     * Removes {@code <audio ...>} elements (and their immediately-adjacent closing tag, if any)
+     * from rendered HTML fields, regardless of quote style, attribute order, casing, or
+     * self-closing form. Only invoked when the value contains an {@code <audio} hint, so plain
+     * sentinel/text fields skip this entirely. Everything else in the fragment
+     * (ruby/div/span/section/table/mark/br text and markup) is left untouched.
+     */
+    private AudioElementStrip stripAudioElements(String value) {
+        if (value == null || value.isEmpty() || !AUDIO_TAG_HINT.matcher(value).find()) {
+            return new AudioElementStrip(value, 0);
+        }
+        Matcher matcher = AUDIO_ELEMENT.matcher(value);
+        int count = 0;
+        StringBuilder result = new StringBuilder(value.length());
+        int last = 0;
+        while (matcher.find()) {
+            result.append(value, last, matcher.start());
+            last = matcher.end();
+            count++;
+        }
+        if (count == 0) {
+            return new AudioElementStrip(value, 0);
+        }
+        result.append(value, last, value.length());
+        return new AudioElementStrip(result.toString(), count);
+    }
+
+    private record AudioElementStrip(String value, int elementCount) { }
 
     private String normalized(String category, Map<String, String> fields) {
         Map<String, Object> result = new LinkedHashMap<>();
