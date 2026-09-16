@@ -1,0 +1,374 @@
+JLPT-MAX Ticket 3A.1 — Grammar Profiling Utility Extension
+Report date: 2026-09-16
+Author: Claude (cloud session), on behalf of kmh000904@gmail.com
+
+================================================================================
+1. VERDICT
+================================================================================
+
+UTILITY BUILT, NOT RUN AGAINST REAL DATA.
+
+This session implemented and verified (compile + synthetic-fixture execution +
+full regression suite) a test/dev-scope Grammar profiling utility that fulfils
+every measurement requested by Ticket 3A.1 (sections 5-16 of the ticket). It
+was NOT executed against the real JLPT-MAX-Deck-2.1.1.apkg, because that file
+does not exist anywhere in this cloud environment. Every number quoted below
+as "real" is carried over, unchanged, from the Ticket 1/1.5/2 log entries
+already in docs/development/IMPLEMENTATION_LOG.md (i.e. facts already on
+record from a session that did have the real file) — nothing new was measured
+against real data in this session. All ten mandatory questions in section 21
+are therefore answered UNRESOLVED, per the ticket's own instruction not to
+force a YES/NO without real measurement.
+
+================================================================================
+2. BRANCH / HEAD
+================================================================================
+
+- Local branch at session start: claude/grammar-profiling-utility-6y8tgj
+  (HEAD c1183d0) — this branch's own history has NO relation to the
+  JLPT-MAX/Phase 1A work described in the ticket brief (different, unrelated
+  commit history). Its origin remote branch had also just been deleted
+  upstream (visible as a `[deleted]` ref on `git fetch --prune`), consistent
+  with a separate, already-merged PR.
+- After `git fetch origin --prune`, `origin/ui/japanese-ui-consolidation` was
+  found and confirmed to contain fcb2820 as its tip commit — exactly the
+  Ticket 3A baseline named in the brief.
+- Working branch used for this Ticket: `ui/japanese-ui-consolidation`,
+  checked out via `git checkout -B ui/japanese-ui-consolidation
+  origin/ui/japanese-ui-consolidation`.
+- HEAD at start of Ticket 3A.1 work: fcb28200f3f5c4ee5a36355656599dd7313f0bba
+  (verified identical to the stated Ticket 3A baseline; no commits landed
+  between Ticket 3A and this session).
+- HEAD at end of Ticket 3A.1 work: unchanged (fcb2820) — nothing was
+  committed in this session (see section 23).
+
+================================================================================
+3. STARTING STATE / EXISTING TICKET 3A.1 RECOVERY CHECK
+================================================================================
+
+- `git status`: clean at fcb2820 (no uncommitted changes).
+- `git ls-files --others --exclude-standard`: empty (no untracked files).
+- Searched for any prior Ticket 3A.1 trace:
+  - `*GrammarNormalizationProfiling*`, `*GrammarProfiling*`: none found.
+  - `docs/development/JLPT_MAX_TICKET3A1_GRAMMAR_PROFILING_2026-09-16.txt`:
+    did not exist before this session.
+  - `docs/development/IMPLEMENTATION_LOG.md`: last entry is Ticket 2
+    (Vocabulary Normalization Parser); no Ticket 3A or 3A.1 entry present
+    (consistent with Ticket 3A being read-only/no-commit, as stated).
+  - `JlptMaxStagingProfilingReport.java`: present, unchanged from Ticket 1.5
+    state, contains only the section D grammar profiling described in the
+    ticket brief (aggregate-only, no note-level cross-tab).
+  - No `*.apkg` file anywhere on disk (`find / -iname "*.apkg"` empty; also
+    excluded by `.gitignore`).
+- Conclusion: no prior Ticket 3A.1 work exists in this repository. This was a
+  clean start, not a resumption.
+
+================================================================================
+4. CHANGED FILES
+================================================================================
+
+New files (untracked, NOT committed):
+- japanese/src/test/java/com/japanese/content/importer/GrammarNormalizationProfilingReport.java
+- japanese/src/test/java/com/japanese/content/importer/GrammarNormalizationProfilingReportSyntheticTest.java
+- docs/development/JLPT_MAX_TICKET3A1_GRAMMAR_PROFILING_2026-09-16.txt (this file)
+
+No other file was modified. In particular:
+- No file under japanese/src/main/** was touched.
+- `japanese/build.gradle` was temporarily edited (toolchain languageVersion
+  17 -> 21) ONLY to compile/run tests locally, because this cloud environment
+  has JDK 21 installed and no JDK 17, and the repo has no toolchain
+  auto-provisioning configured. It was reverted to 17 before finishing this
+  session; `git diff -- japanese/build.gradle` is empty.
+- `japanese/gradlew` briefly picked up a `chmod +x` (needed to invoke it at
+  all); the executable bit was reverted afterward, `git diff -- japanese/gradlew`
+  is empty.
+- `git status --porcelain` at the end of this session shows only the two new
+  test files listed above.
+
+================================================================================
+5. PROFILING UTILITY — WHAT WAS BUILT
+================================================================================
+
+Reviewed the existing `JlptMaxStagingProfilingReport.java` (412 lines, all
+categories/note-types in one file, section D already does aggregate-only
+Grammar profiling). Given how much additional note-level, DOM-structural, and
+cross-tab detail Ticket 3A.1 asks for, extending that already-dense file
+further would have hurt readability, so a **new, separate, Grammar-only**
+test-scope file was created instead, following the same conventions already
+established by `VocabularyNormalizationRealApkgReport.java` (Ticket 2's
+analogous per-ticket real-apkg report):
+
+- `GrammarNormalizationProfilingReport` (main tool, opt-in gated):
+  - `-Djapanese.actual-apkg=<path>` opt-in only, `assumeTrue` skip otherwise
+    (same gate as `PrivateApkgExtractorTest.optionalActualApkgRunsOnlyInFreshH2Staging`
+    and the Ticket 1/2 report tools) — the general suite/CI never depends on
+    the real apkg file.
+  - Uses `PrivateApkgExtractor` into a fresh isolated in-memory H2 only
+    (`jdbc:h2:mem:ticket3a1_grammar_profiling_<uuid>`), never a persistent or
+    production DB.
+  - Reads only `private_apkg_notes` columns already produced by the existing
+    extractor (`category`, `tags`, `field_names`, `field_values`) — no ZIP
+    media entry, no audio binary, no `SELECT *` into unrelated tables.
+  - Writes a plain-text report to
+    `build/reports/jlpt-max-profiling/grammar-profiling.txt` (build-output
+    only, not committed).
+  - Package-private `loadRows(Connection, ObjectMapper)` and
+    `writeReport(List<Row>, PrintWriter)` are static and testable
+    independently of the opt-in gate (this is what the synthetic test below
+    exercises).
+- `GrammarNormalizationProfilingReportSyntheticTest` (always-on sanity test,
+  NOT opt-in gated): builds a tiny synthetic 4-note SQLite/APKG fixture (2
+  normal-deck GRAMMAR notes + 2 종합 실전-deck COMPREHENSIVE notes, covering
+  `<mark>` vs `div[lang=ja]` vs BackHTML-fallback cases, `IsSentenceArrangement`
+  set on one note, varying `Kind` values), runs it through the real
+  `PrivateApkgExtractor` + H2 + Flyway path exactly like production code would,
+  then asserts `loadRows`/`writeReport` execute correctly and produce every
+  expected report section. This proves the tool's logic works end-to-end
+  without needing (or pretending to have) the real corpus.
+
+Report sections implemented (mapped to ticket asks):
+- §0: observed field-name schema for the Grammar model (self-verifies the
+  assumed field names IsBasic/IsGrammarForm/IsPassageBlank/
+  IsSentenceArrangement/Kind/UnitID/Level/FrontHTML/BackHTML rather than
+  hardcoding them as fact).
+- §5: Is* flag distinct raw values + full note-level
+  (category, IsBasic, IsGrammarForm, IsPassageBlank, IsSentenceArrangement)
+  combination counts.
+- §6: Kind distinct raw values, x category, x Level, x Is*-combo.
+- §7/8: normal-GRAMMAR FrontHTML structure — raw length stats, `<mark>` vs
+  `div[lang=ja]` vs fallback presence/selection counts, selected-element text
+  length stats + threshold buckets (>50/>80/>100/>120/>200), own-text-only and
+  first-child-element length (candidate narrower boundaries), direct child
+  tag/class frequency, and up to 8 structure-only skeletons (tag/class tree,
+  <=12-char leaf fragments, never full copyrighted text).
+- §9/10: COMPREHENSIVE BackHTML structure — descendant tag presence, div/
+  section class frequency, other tag.class candidates, form/input/ol/ul/li/
+  table/ruby presence, current selector hit-rates (`div._j4z`, `section._j4a`),
+  heuristic choice/answer/blank/ordering text signals, and up to 8 skeletons.
+- §11: IsSentenceArrangement-focused subset — category split, co-occurring
+  flags, BackHTML signal comparison vs the rest of COMPREHENSIVE.
+- §12: IsBasic/IsGrammarForm/IsPassageBlank sentinel-vs-subtype evidence
+  (active/inactive category split + average FrontHTML/BackHTML length).
+- §13: explanation>2000 broken down by category x (structured div._j4z vs
+  back.text() fallback).
+- §14: example-count distribution (min/max/avg/zero) for GRAMMAR vs
+  COMPREHENSIVE via the current `section._j4a` selector.
+- §15: UnitID non-blank/distinct counts + raw sample values by category (no
+  invented prefix-parsing rule, per the ticket's explicit caution).
+- §16: category x Level, and IsSentenceArrangement(set/empty) x Level.
+
+Explicitly NOT built (out of Ticket 3A.1 scope, per section 19 of the brief):
+GrammarNormalizationParser, any production Grammar/GrammarHtmlParser change,
+any migration, candidate table, or ContentItem creation.
+
+================================================================================
+6. ACTUAL APKG PRESENCE
+================================================================================
+
+NOT PRESENT in this cloud environment.
+- `find / -iname "*.apkg"` → no results anywhere on the filesystem.
+- The expected local path from the brief,
+  `C:\Users\icand\git\japanese\JLPT-MAX-Deck-2.1.1.apkg`, is a Windows path on
+  the user's own PC and is inherently inaccessible from this Linux cloud
+  session regardless.
+- `.gitignore` explicitly excludes `*.apkg`, confirming the file was never
+  meant to be committed/available in the repository itself.
+
+================================================================================
+7. ACTUAL APKG EXECUTION RESULT
+================================================================================
+
+NOT EXECUTED. `-Djapanese.actual-apkg=...` opt-in run is impossible without
+the file. No real-data numbers were produced in this session. Every "real"
+number cited anywhere in this report (e.g. the 3,605/1,078/2,527/371/667
+figures from the ticket brief itself) is a carry-over fact from the existing
+IMPLEMENTATION_LOG.md Ticket 1/1.5/2 entries — not something newly measured
+here.
+
+================================================================================
+8-16. Is* CROSS-TAB / Kind / FrontHTML / pattern>200 / BackHTML /
+      classification / SentenceArrangement / flag meaning / explanation>2000 /
+      examples / UnitID / JLPT level x subtype
+================================================================================
+
+UNRESOLVED — no real data available in this session to measure any of these.
+The utility built in this Ticket computes all of the above (see section 5)
+and is ready to run the moment `-Djapanese.actual-apkg=<real path>` points at
+an environment that actually has the file (e.g. the user's own PC, or a
+future cloud session with the file uploaded/attached). Until then, none of
+these questions can be answered from real data, and this report does not
+fabricate or estimate numbers to fill the gap.
+
+================================================================================
+17. UNIT ID / SUBTYPE, JLPT LEVEL x SUBTYPE
+================================================================================
+
+Same as above — UNRESOLVED, no real data measured. The utility's §15/§16
+sections are built and were exercised (against synthetic data only) via the
+synthetic test.
+
+================================================================================
+18. TEST RESULTS
+================================================================================
+
+Environment note: this cloud environment has only JDK 21 installed
+(`/usr/lib/jvm/java-21-openjdk-amd64`); the repo pins JDK 17
+(`java.toolchain.languageVersion = 17` in build.gradle) and has no toolchain
+auto-provisioning/download repository configured, so Gradle could not resolve
+a JDK 17 toolchain here. To compile and run tests at all in this session,
+`build.gradle`'s toolchain was temporarily bumped to 21, then reverted to 17
+before finishing (confirmed via `git diff -- japanese/build.gradle` = empty,
+see section 4). This is an environment limitation, not a project change.
+
+- `./gradlew compileTestJava`: SUCCESS (no errors; two informational
+  deprecation/unchecked notes from pre-existing code, unrelated to the new
+  files).
+- Synthetic fixture test
+  (`GrammarNormalizationProfilingReportSyntheticTest`): 1 test, 0 failures,
+  0 errors. Confirms `PrivateApkgExtractor` -> H2 -> `loadRows` ->
+  `writeReport` executes correctly end-to-end and every report section
+  renders, against a synthetic 4-note fixture — NOT real data.
+- Full suite (`./gradlew test`): 222 tests completed, 1 failed, 5 skipped.
+  - The 5 skips are the expected opt-in-gated real-apkg tests (4 pre-existing
+    from Ticket 1/1.5/2 + this Ticket's new
+    `GrammarNormalizationProfilingReport.ticket3a1GrammarProfiling`), all
+    skipped for the same reason: no real apkg file present. This is exactly
+    the expected count increase (baseline was 220 tests / 4 skipped per the
+    Ticket 2 log entry; this session added 2 tests, one of which is a new
+    opt-in skip: 220+2=222 tests, 4+1=5 skipped).
+  - The 1 failure is `LearningOrganizationServiceTest.
+    dailyReportAndMonthUsePersistedRecordsInsteadOfHttpSessionState`
+    (expected retrainCount=1, got 0). This is in the unrelated
+    `com.japanese.learning.service` package — nothing this Ticket touched.
+    Re-run in isolation (`--tests
+    "com.japanese.learning.service.LearningOrganizationServiceTest"`) fails
+    the same way, so it is not a suite-ordering/shared-state artifact of the
+    new files. It pre-exists independent of this Ticket's changes (this
+    Ticket added zero files under `com.japanese.learning.**` or any
+    production path). Not investigated or fixed here: out of Ticket 3A.1
+    scope (analysis/profiling-tool only, no production code changes
+    permitted), and unrelated to Grammar/JLPT-MAX work. Flagged as a NOTE
+    for a separate ticket.
+- `git diff --check`: PASS (exit 0, no output) on both new files.
+
+opt-in APKG run: NOT POSSIBLE in this environment (see sections 6-7).
+
+================================================================================
+19-20. PRODUCTION SCHEMA IMPLICATIONS
+================================================================================
+
+None to report from real data (nothing measured). The tool is built so that,
+once run against the real file, sections 7/8/13 will directly answer whether
+the existing `Grammar.pattern` (200 char) / `Grammar.explanation` (2000 char)
+limits are a parser-selector problem or a genuine schema-size problem — but
+that judgment cannot be made from synthetic data and is not attempted here.
+
+================================================================================
+21. ANSWERS TO THE 10 MANDATORY QUESTIONS
+================================================================================
+
+1. IsBasic/IsGrammarForm/IsPassageBlank는 실제 독립 subtype인가?
+   UNRESOLVED — no real note-level cross-tab was run this session.
+
+2. IsSentenceArrangement 371건은 COMPREHENSIVE에 속하는가?
+   UNRESOLVED — no real data measured.
+
+3. Kind는 Grammar.connection으로 사용 가능한 실제 문법 접속 정보인가?
+   UNRESOLVED — no real distinct-value measurement performed.
+
+4. 일반 Grammar pattern >200 문제는 production column 크기 문제인가, parser
+   문제인가?
+   UNRESOLVED — the fact of the >200 overflow (1,078/1,078) is an existing
+   Ticket 1 finding already on record, but distinguishing "parser selects too
+   much" from "the true pattern text itself exceeds 200 chars" requires the
+   §7/8 structural analysis this session could not run against real data.
+
+5. explanation >2000 문제는 parser fallback이 주원인인가?
+   UNRESOLVED — the §13 structured-vs-fallback split was built but not run
+   against real data.
+
+6. COMPREHENSIVE Grammar는 일반 Grammar knowledge content인가?
+   UNRESOLVED.
+
+7. COMPREHENSIVE Grammar는 Practice/Question 도메인으로 보는 것이 더 적절한가?
+   UNRESOLVED.
+
+8. SentenceArrangement는 별도 parser가 필요한가?
+   UNRESOLVED.
+
+9. 일반 GRAMMAR 1,078건은 Ticket 3B-1 pure parser 구현을 시작해도 안전한가?
+   UNRESOLVED — cannot be safely answered without the §7/8 real-data run.
+
+10. COMPREHENSIVE 2,527건은 다음 구현 단계에서 어떻게 분리해야 하는가?
+    UNRESOLVED.
+
+================================================================================
+22. BLOCKER / MAJOR / MINOR / NOTE
+================================================================================
+
+BLOCKER: none introduced by this Ticket.
+
+MAJOR:
+- The real JLPT-MAX-Deck-2.1.1.apkg file is not available in any cloud
+  session of this repository. All ten mandatory Ticket 3A.1 questions, and
+  the entire "GrammarNormalizationParser is safe to start" go/no-go decision
+  for Ticket 3B, remain blocked until someone runs this Ticket's profiling
+  tool with `-Djapanese.actual-apkg=<path>` against the real file (e.g. on
+  the user's own PC, where the file was originally located).
+
+MINOR:
+- This cloud environment has no JDK 17 and no toolchain auto-provisioning
+  configured in the repo (`settings.gradle`/`build.gradle` have no
+  foojay-resolver or equivalent). Every future cloud session that needs to
+  compile/run this project will hit the same problem unless a JDK 17
+  toolchain (or auto-provisioning) is made available. Not fixed here since it
+  is outside this Ticket's scope (build.gradle is production build config).
+
+NOTE:
+- `LearningOrganizationServiceTest.
+  dailyReportAndMonthUsePersistedRecordsInsteadOfHttpSessionState` fails in
+  this environment, unrelated to and unmodified by this Ticket. Flagged for
+  separate investigation; not fixed here (out of Ticket 3A.1 scope).
+- The Ticket's own git-branch bookkeeping (base branch, baseline commit) was
+  not actually where this cloud session started (see section 2) — the
+  session's default checked-out branch/HEAD had no relation to the
+  JLPT-MAX/Phase 1A history at all. Recovered by fetching and checking out
+  `origin/ui/japanese-ui-consolidation` directly, matching the ticket's
+  stated fcb2820 baseline exactly. Future sessions on this repo should
+  double check which branch they land on by default.
+
+================================================================================
+23. EXACT RECOMMENDATION FOR TICKET 3B
+================================================================================
+
+Do NOT start Ticket 3B (GrammarNormalizationParser implementation) yet.
+
+1. Someone with access to the real JLPT-MAX-Deck-2.1.1.apkg file (the user's
+   own PC, or a future cloud session with the file attached/uploaded) must
+   run:
+     ./gradlew test --tests "*.GrammarNormalizationProfilingReport" \
+       -Djapanese.actual-apkg=<path-to-JLPT-MAX-Deck-2.1.1.apkg>
+   which produces `build/reports/jlpt-max-profiling/grammar-profiling.txt`
+   with real §0/§5-§16 measurements.
+2. That report should be reviewed against the 10 mandatory questions in
+   section 21 above, and this document's UNRESOLVED answers replaced with
+   real YES/NO/UNRESOLVED + evidence.
+3. Only after that review — in particular confirming (a) whether Kind is
+   safe to use as Grammar.connection, (b) whether the normal-GRAMMAR pattern
+   boundary is a parser problem or a true schema-size problem, and (c)
+   whether COMPREHENSIVE Grammar is knowledge content or Practice/Question
+   content — should Ticket 3B (or a re-scoped Ticket 3A.2, if the real
+   numbers surface unexpected schema variants) begin.
+
+================================================================================
+FINAL DISCLOSURES (per ticket section 21 requirement)
+================================================================================
+
+- production code 변경: 없음
+- production data 변경: 없음
+- migration 생성: 없음
+- source rights 변경: 없음
+- publication 변경: 없음
+- media/audio binary 접근: 없음
+- commit: 하지 않음
+- push: 하지 않음
