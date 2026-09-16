@@ -381,7 +381,7 @@
 - `PrivateApkgExtractorTest`에 회귀 테스트를 추가했습니다: `<audio>` 변형(이중/단일 quote, controls/추가 attribute, 대소문자, 여러 줄, 닫는 태그 유무) 제거, 주변 ruby/div/span/table 및 한국어/일본어 텍스트 보존, 실제 `private_apkg_notes.field_values` DB 조회로 검증, idempotency 유지, production 테이블 미변경을 모두 확인합니다.
 - 실제 APKG로 재실행한 결과 residue가 9,168 → **0**으로 줄었습니다. notes/cards/category 분포는 20,650/38,967/동일(카테고리 불변) — 추출 결과 자체는 바뀌지 않고 audio 잔재만 제거됨을 확인했습니다. Grammar 관련 수치(fallback 2,527건 등)는 변화 없음 — 애초에 Grammar 필드에는 audio 태그가 없었기 때문입니다.
 - `JlptMaxStagingProfilingReport`(test-scope profiling 도구)를 정리했습니다: 세션별 하드코딩 절대경로를 제거하고 `build/reports/jlpt-max-profiling/`(module 상대경로) 출력으로 변경했습니다. `-Djapanese.actual-apkg=<path>` 명시적 opt-in 없이는 스킵되어 일반 Gradle test suite/CI를 깨지 않습니다(전체 suite 186 tests, 0 failures, 0 errors, 3 skipped 확인). production DB/media binary는 여전히 사용하지 않습니다. profiling 로직은 production service로 승격하지 않았습니다.
-- 발견되었으나 이번 Ticket 범위 밖으로 후속 Ticket에 분리한 사항(수정하지 않음, 기록만): 정규(비-종합실전) GRAMMAR pattern 1,078/1,078건이 production `Grammar.pattern`(200자) 제한을 초과, `Grammar.explanation`(2000자) 제한 초과 667건, COMPREHENSIVE 문법 2,527건에서 기존 `GrammarHtmlParser`가 fallback(예문 0개), PRACTICE/COMPREHENSIVE의 실제 유효 콘텐츠는 `ChoicesHTML`/`ChoicesRubyHTML`/`*Ruby*` 계열 필드에 있고 기존 정규화 설계 문서가 참조한 필드는 대부분 placeholder.
+- 발견되었으나 이번 Ticket 범위 밖으로 후속 Ticket에 분리한 사항(수정하지 않음, 기록만): 정규(비-종합실전) GRAMMAR pattern 1,078/1,078건이 production `Grammar.pattern`(200자) 제한을 초과 [**Ticket 3A.1(2026-09-16) note-level 실측으로 정정: 1,078건이라는 measurement count 자체는 정확했으나, 이 1,078건을 "정규 GRAMMAR"로 귀속한 것이 틀렸음. 실제로는 COMPREHENSIVE의 `IsPassageBlank` subtype 1,078건이며(정규 GRAMMAR 1,078건과 우연히 같은 개수), 정규 GRAMMAR(`IsBasic`) 1,078건은 pattern max 26자·avg 7.3자로 200자 제한과 전혀 무관함이 확인됨. 상세: 아래 "JLPT-MAX Ticket 3A.1" 항목 및 `docs/development/JLPT_MAX_TICKET3A1_GRAMMAR_PROFILING_2026-09-16.txt` 참고.**], `Grammar.explanation`(2000자) 제한 초과 667건 [**Ticket 3A.1 정정: 이 667건도 전부 COMPREHENSIVE/`IsPassageBlank`이며 100% `back.text()` fallback 경로에서만 발생. 정규 GRAMMAR(`IsBasic`)는 667건 중 0건 — structured explanation 추출 성공률 1,078/1,078(100%), >2000 0건.**], COMPREHENSIVE 문법 2,527건에서 기존 `GrammarHtmlParser`가 fallback(예문 0개), PRACTICE/COMPREHENSIVE의 실제 유효 콘텐츠는 `ChoicesHTML`/`ChoicesRubyHTML`/`*Ruby*` 계열 필드에 있고 기존 정규화 설계 문서가 참조한 필드는 대부분 placeholder.
 - 검증: `PrivateApkgExtractorTest`/`FlywayMigrationTest` 개별 실행, 전체 Gradle test(186/0/0/3), 실제 APKG 재실행, `git diff --check`(exit 0) 모두 통과. Grammar/Vocabulary normalization parser, schema 변경, migration, candidate table, dedup 정책, source rights/publication, audio 재생/추출은 이번 Ticket에서 구현하지 않았습니다. commit/push는 수행하지 않았습니다.
 
 ## 2026-09-16  JLPT-MAX Ticket 2 — Vocabulary Normalization Parser
@@ -405,3 +405,63 @@
   (KanjiDetails 등)의 HTML 구조는 현재 텍스트 평탄화만 수행하며 구조적 파싱은 후속 과제. 기존
   `ApkgVocabularyImporter`의 반복 meaning separator(`A / / B`) 처리 개선은 별도 후속 Ticket으로 분리
   가능.
+
+## 2026-09-16  JLPT-MAX Ticket 3A.1 — Grammar Profiling Utility Extension (actual APKG 실측 + self-review)
+
+- 작업 목적: Ticket 3B(GrammarNormalizationParser)를 설계하기 전에, Grammar-model(note_type
+  `JLPT MAX덱 문법`, 3,605건)의 Is* subtype 플래그, `Kind` 필드, FrontHTML/BackHTML 실제 구조를
+  note 단위로 실측하는 test/dev-scope profiling 도구를 만들고, 실제 `JLPT-MAX-Deck-2.1.1.apkg`로
+  검증했다. production 코드/스키마/데이터는 이번 Ticket에서 변경하지 않았다.
+- 신규 test-scope 도구: `GrammarNormalizationProfilingReport`(opt-in `-Djapanese.actual-apkg=<path>`,
+  일반 suite/CI는 항상 skip)와 `GrammarNormalizationProfilingReportSyntheticTest`(합성 fixture로
+  로직을 상시 검증). `PrivateApkgExtractor`/`GrammarHtmlParser`는 수정하지 않았다.
+- actual APKG 검증: 파일 크기 1,148,891,855 bytes, SHA-256
+  `9d8be3ff6b23e11ef890a146dffec7ec4649de4bcbd491be439a11b991fd154d` — 공식 v2.1.1 release와
+  byte-for-byte 일치 확인 후 profiling을 실행했다(GitHub 공식 release에서 세션 내 다운로드,
+  repository에는 추가하지 않음, `.gitignore`의 `*.apkg` 규칙대로 미추적).
+- **Is* subtype partition(note-level 확정)**: 3,605건 전부가 4개 flag 중 **정확히 하나**에만
+  속하며, 동시 활성화(multi-flag)나 미분류(unclassified)는 0건이다: `GRAMMAR`/`IsBasic`=1,078,
+  `COMPREHENSIVE`/`IsGrammarForm`=1,078, `COMPREHENSIVE`/`IsPassageBlank`=1,078,
+  `COMPREHENSIVE`/`IsSentenceArrangement`=371. 이는 세 개의 독립 boolean이 우연히 같은 note에서
+  같이 켜지는 것이 아니라, 서로 배타적인 4-way subtype selector임을 의미한다.
+- **`Kind` 필드**: 3,605/3,605건 전부 raw staging 값이 U+2063(INVISIBLE SEPARATOR, length=1)
+  placeholder이며, subtype/category/Level에 무관하게 동일하다. `AnkiFieldTextNormalizer` 적용 시
+  이미 `null`로 정규화된다(`private_apkg_notes.normalized_values`의 `"connection":null`로 직접
+  확인). 즉 `Kind`는 실제 문법 접속(connection) 정보를 전혀 담고 있지 않다 — 향후 Ticket 3B-1
+  설계에서 `Kind`를 `Grammar.connection`으로 매핑하면 안 된다.
+- **pattern>200 정정 (중요, 기존 기록 오류 수정)**: 기존 Ticket 1 기록의 "정규 GRAMMAR 1,078/
+  1,078건이 pattern>200 초과"는 **measurement count(1,078)는 맞았지만 category/subtype 귀속이
+  틀렸다**. note-level 재집계 결과 pattern>200은 `COMPREHENSIVE`/`IsPassageBlank`의 1,078건과
+  정확히 일치하며(총 1,078건 중 1,078건 모두 초과, max 745자), `GRAMMAR`/`IsBasic`은 1,078건 중
+  0건(max 26자), `COMPREHENSIVE`/`IsGrammarForm`은 1,078건 중 0건(max 82자),
+  `COMPREHENSIVE`/`IsSentenceArrangement`는 371건 중 0건(max 46자)이다. 두 그룹이 우연히 같은
+  개수(1,078)였기 때문에 category 분리 없이 측정했던 기존 도구가 잘못 귀속한 것으로 판단된다.
+- **explanation>2000 정정**: 667건 전부 `COMPREHENSIVE`/`IsPassageBlank`이며 100%
+  `back.text()` fallback 경로에서만 발생한다(구조화 `div._j4z` 추출로 초과한 건 0건). `GRAMMAR`/
+  `IsBasic`은 667건 중 0건 — structured explanation 추출 성공률 1,078/1,078(100%). 즉 이 문제는
+  `Grammar.explanation` 컬럼 크기 문제가 아니라, 지문형(passage-length) `IsPassageBlank` 콘텐츠에
+  Grammar용 explanation selector를 잘못 적용한 결과다.
+- **정규 GRAMMAR(`IsBasic`, 1,078건) 안정성**: `<mark>` selector 적중률 1,078/1,078(100%,
+  fallback 0), pattern max 26자·avg 7.3자(200자 제한과 무관), structured explanation 추출
+  1,078/1,078(100%, >2000 0건), example 개수 정확히 2개/노트(zeroExampleNotes 0, 분산 없음).
+  독립적으로 재작성한 self-review 스크립트로도 동일 수치가 재현되어, Ticket 3B-1(정규 GRAMMAR
+  pure parser)은 착수해도 안전하다고 판단했다.
+- **COMPREHENSIVE(2,527건) 성격**: 구조 분석 결과 한국어 지시문 + 일본어 지문(blank 포함) +
+  한국어 번역 + 4지선다 `<ol>`(`li.is-correct`로 정답 표시) 형태로, `div._j4z`/`section._j4a`
+  적중률이 0/2,527이다 — Grammar 지식 콘텐츠(pattern/explanation/example)가 아니라
+  Practice/Question 콘텐츠로 판단된다. `IsSentenceArrangement`(371건)는 `<ol>`/`<li>` 없이
+  `span.star-piece` 구조를 쓰는 별도 형태로, 나머지 두 subtype과도 다른 전용 parser가 필요하다.
+- 검증: `GrammarNormalizationProfilingReportSyntheticTest` 통과, actual APKG opt-in profiling
+  실행 성공(`build/reports/jlpt-max-profiling/grammar-profiling.txt`), self-review용 임시
+  스크립트로 note-ID 단위 교차검증 후 즉시 삭제(저장소에 흔적 없음), 전체 `./gradlew test` 222
+  tests/1 failed(기존 `LearningOrganizationServiceTest`, 별도 isolated worktree로 remote baseline
+  fcb2820에서도 동일 재현 확인 — Ticket 3A.1과 무관한 pre-existing 이슈)/5 skipped, `git diff
+  --check` 통과.
+- 상세 실측 수치와 DOM skeleton 샘플은
+  `docs/development/JLPT_MAX_TICKET3A1_GRAMMAR_PROFILING_2026-09-16.txt` 참고.
+  GrammarNormalizationParser/Practice parser 구현, production Grammar/GrammarHtmlParser 수정,
+  migration, schema 변경, source rights/publication 변경은 이번 Ticket에서 수행하지 않았다.
+- 남은 후속 과제: Ticket 3B-1(정규 GRAMMAR pure parser)은 착수 가능. COMPREHENSIVE는
+  Grammar entity 확장이 아니라 별도 Practice/Question 도메인 모델로 설계해야 하며,
+  `IsGrammarForm`/`IsPassageBlank`(4지선다)와 `IsSentenceArrangement`(단어배열)는 서로 다른
+  parser가 필요하다 — 각각 후속 Ticket으로 분리 권장.
