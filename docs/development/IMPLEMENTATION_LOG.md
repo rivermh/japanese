@@ -383,3 +383,25 @@
 - `JlptMaxStagingProfilingReport`(test-scope profiling 도구)를 정리했습니다: 세션별 하드코딩 절대경로를 제거하고 `build/reports/jlpt-max-profiling/`(module 상대경로) 출력으로 변경했습니다. `-Djapanese.actual-apkg=<path>` 명시적 opt-in 없이는 스킵되어 일반 Gradle test suite/CI를 깨지 않습니다(전체 suite 186 tests, 0 failures, 0 errors, 3 skipped 확인). production DB/media binary는 여전히 사용하지 않습니다. profiling 로직은 production service로 승격하지 않았습니다.
 - 발견되었으나 이번 Ticket 범위 밖으로 후속 Ticket에 분리한 사항(수정하지 않음, 기록만): 정규(비-종합실전) GRAMMAR pattern 1,078/1,078건이 production `Grammar.pattern`(200자) 제한을 초과, `Grammar.explanation`(2000자) 제한 초과 667건, COMPREHENSIVE 문법 2,527건에서 기존 `GrammarHtmlParser`가 fallback(예문 0개), PRACTICE/COMPREHENSIVE의 실제 유효 콘텐츠는 `ChoicesHTML`/`ChoicesRubyHTML`/`*Ruby*` 계열 필드에 있고 기존 정규화 설계 문서가 참조한 필드는 대부분 placeholder.
 - 검증: `PrivateApkgExtractorTest`/`FlywayMigrationTest` 개별 실행, 전체 Gradle test(186/0/0/3), 실제 APKG 재실행, `git diff --check`(exit 0) 모두 통과. Grammar/Vocabulary normalization parser, schema 변경, migration, candidate table, dedup 정책, source rights/publication, audio 재생/추출은 이번 Ticket에서 구현하지 않았습니다. commit/push는 수행하지 않았습니다.
+
+## 2026-09-16  JLPT-MAX Ticket 2 — Vocabulary Normalization Parser
+
+- `private_apkg_notes`의 VOCABULARY raw fields를 순수 함수로 정규화하는 `VocabularyNormalizationParser`(및
+  `VocabularyNormalizationResult`/`NormalizedMeaning`/`NormalizedExample`/`NormalizedPitchAccent`/
+  `NormalizedJlptLevel`/`VocabularyNormalizationIssue`/`VocabularyNormalizationSeverity`/
+  `VocabularyNormalizationWarning`)를 구현 완료했습니다. production entity(ContentItem/Word/Meaning/
+  Example)와 완전히 분리된 immutable result 구조이며, repository/EntityManager/JDBC/transaction 등
+  DB/side effect가 전혀 없습니다. candidate DB 저장, ContentItem 생성, Release Gate 연동은 이번
+  Ticket 범위 밖으로 구현하지 않았습니다.
+- 실제 `JLPT-MAX-Deck-2.1.1.apkg` VOCABULARY 9,160건을 전수 검증했습니다: invalid/fatal candidate
+  1건(기존 retired/card-less note와 동일 note), UNKNOWN_EXTRA_FIELD 0건, AUDIO_REFERENCE_UNEXPECTED
+  0건. vocabulary field schema는 총 59개(PRIMARY 9 / SENTINEL 40 / KNOWN_EXTRA 10, 교집합 0, 미분류
+  0)로 완전히 분류됩니다. EntryID duplicate 0건. production/migration/source rights/publication에는
+  영향이 없습니다.
+- 검증: 신규 `VocabularyNormalizationParserTest`(33건) 전부 pass, 전체 Gradle test 220건(0 failures,
+  0 errors, 4 skipped) 통과. 독립 READ-ONLY 코드 리뷰 결과 PASS WITH MINOR(BLOCKER/MAJOR 없음).
+- 후속 NOTE로만 기록(이번 Ticket에서 수정하지 않음): `validForPromotion`은 FATAL 경고 부재 신호일
+  뿐 publication 결정이 아니며, 향후 candidate storage 티켓에서 명명 재검토 가능. `KNOWN_EXTRA_FIELDS`
+  (KanjiDetails 등)의 HTML 구조는 현재 텍스트 평탄화만 수행하며 구조적 파싱은 후속 과제. 기존
+  `ApkgVocabularyImporter`의 반복 meaning separator(`A / / B`) 처리 개선은 별도 후속 Ticket으로 분리
+  가능.
