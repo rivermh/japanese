@@ -6,10 +6,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import com.japanese.content.service.ContentReleaseBatchException;
 
 @RestControllerAdvice(assignableTypes = {
         AdminContentReviewApiController.class,
-        AdminContentReviewController.class
+        AdminContentReviewController.class,
+        AdminContentReleaseController.class,
+        AdminContentSourceRightsApiController.class
 })
 public class AdminContentReviewExceptionHandler {
 
@@ -22,5 +25,10 @@ public class AdminContentReviewExceptionHandler {
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
     ResponseEntity<Map<String, String>> invalidReview(RuntimeException exception) {
         return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage()));
+    }
+
+    @ExceptionHandler(ContentReleaseBatchException.class)
+    ResponseEntity<Map<String, String>> invalidBatch(ContentReleaseBatchException exception) {
+        return ResponseEntity.badRequest().body(Map.of("error", exception.getMessage(), "code", exception.getCode()));
     }
 }

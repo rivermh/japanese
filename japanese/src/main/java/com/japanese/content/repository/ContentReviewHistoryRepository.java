@@ -10,4 +10,6 @@ public interface ContentReviewHistoryRepository extends JpaRepository<ContentRev
 
     List<ContentReviewHistory> findByContentItemIdOrderByReviewedAtDesc(Long contentItemId);
     long countByStatusAndReviewedAtGreaterThanEqual(ReviewStatus status, Instant since);
+    @org.springframework.data.jpa.repository.Query("select count(h) from ContentReviewHistory h where h.status=:status and h.reviewedAt>=:since and (h.previousStatus is null or h.previousStatus<>:status)")
+    long countStatusTransitionsSince(ReviewStatus status, Instant since);
 }

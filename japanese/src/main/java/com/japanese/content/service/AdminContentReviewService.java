@@ -23,13 +23,16 @@ public class AdminContentReviewService {
     private final GrammarComparisonRepository comparisons; private final GrammarConfirmationQuestionRepository confirmations;
     private final CurationReviewHistoryRepository curationHistories;
     private final ContentQualityAuditService qualityAudit;
+    private final ContentSourceRightsService sourceRights;
+    private final ContentReleaseGateService releaseGate;
+    private final ContentPublicationService publication;
     public AdminContentReviewService(ContentItemRepository contents,ContentReviewHistoryRepository histories,
       ImportedSourceRecordRepository rawRecords,ContentSourceRepository sources,GrammarEnrichmentRepository enrichments,
       GrammarRelationRepository relations,GrammarComparisonRepository comparisons,
       GrammarConfirmationQuestionRepository confirmations,CurationReviewHistoryRepository curationHistories,
-      ContentQualityAuditService qualityAudit){
+      ContentQualityAuditService qualityAudit,ContentSourceRightsService sourceRights,ContentReleaseGateService releaseGate,ContentPublicationService publication){
       this.contents=contents;this.histories=histories;this.rawRecords=rawRecords;this.sources=sources;this.enrichments=enrichments;
-      this.relations=relations;this.comparisons=comparisons;this.confirmations=confirmations;this.curationHistories=curationHistories;this.qualityAudit=qualityAudit;}
+      this.relations=relations;this.comparisons=comparisons;this.confirmations=confirmations;this.curationHistories=curationHistories;this.qualityAudit=qualityAudit;this.sourceRights=sourceRights;this.releaseGate=releaseGate;this.publication=publication;}
 
     @Transactional(readOnly=true)
     public Dashboard dashboard(){
@@ -37,7 +40,7 @@ public class AdminContentReviewService {
       long pending=contents.countUnpublishedByReviewStatus(ReviewStatus.PENDING,true);
       return new Dashboard(pending,countContents(ReviewStatus.PENDING,false,ContentType.WORD,null,null,null),
         countContents(ReviewStatus.PENDING,false,ContentType.GRAMMAR,null,null,null),
-        histories.countByStatusAndReviewedAtGreaterThanEqual(ReviewStatus.APPROVED,since)+curationHistories.countByStatusAndReviewedAtGreaterThanEqual(ReviewStatus.APPROVED,since),
+        histories.countStatusTransitionsSince(ReviewStatus.APPROVED,since)+curationHistories.countByStatusAndReviewedAtGreaterThanEqual(ReviewStatus.APPROVED,since),
         histories.countByStatusAndReviewedAtGreaterThanEqual(ReviewStatus.REJECTED,since)+curationHistories.countByStatusAndReviewedAtGreaterThanEqual(ReviewStatus.REJECTED,since),
         enrichments.count(spec(ReviewStatus.PENDING,null,null,null))+relations.count(relationSpec(ReviewStatus.PENDING,null,null,null,null))+
           comparisons.count(comparisonSpec(ReviewStatus.PENDING,null,null,null))+confirmations.count(questionSpec(ReviewStatus.PENDING,null,null,null)),
@@ -70,8 +73,8 @@ public class AdminContentReviewService {
     @Transactional
     public ActionResult approveContent(Long id,UserAccount reviewer,String note){ContentItem item=contents.findByIdForReview(id).orElseThrow();
       if(item.getReviewStatus()==ReviewStatus.APPROVED)return result(false,item,"이미 승인된 콘텐츠입니다.");
-      requirePending(item.getReviewStatus()); validateQualityForApproval(item); validate(item);ReviewStatus before=item.getReviewStatus();item.publish();
-      histories.save(new ContentReviewHistory(item,before,ReviewStatus.APPROVED,reviewer,clean(note)));return result(true,item,"승인하고 공개했습니다.");}
+      requirePending(item.getReviewStatus()); validateQualityForApproval(item); validate(item);ReviewStatus before=item.getReviewStatus();var decision=releaseGate.evaluate(item);item.approve(decision.releasable());
+      histories.save(new ContentReviewHistory(item,before,ReviewStatus.APPROVED,reviewer,contentApprovalNote(note,decision)));return result(true,item,contentApprovalMessage(decision));}
     @Transactional
     public ActionResult rejectContent(Long id,UserAccount reviewer,String note){String reason=clean(note);if(reason==null)throw new IllegalArgumentException("반려 사유를 입력해주세요.");
       ContentItem item=contents.findByIdForReview(id).orElseThrow();if(item.getReviewStatus()==ReviewStatus.REJECTED)return result(false,item,"이미 반려된 콘텐츠입니다.");
@@ -81,6 +84,12 @@ public class AdminContentReviewService {
     public int approveContents(Collection<Long> ids,UserAccount reviewer){if(ids==null)return 0;int changed=0;
       for(Long id:ids.stream().filter(Objects::nonNull).distinct().limit(20).toList())if(approveContent(id,reviewer,null).changed())changed++;
       return changed;}
+    public ActionResult publishContent(Long id,UserAccount reviewer,String note){return action(publication.publish(id,reviewer,note));}
+    public ActionResult unpublishContent(Long id,UserAccount reviewer,String reason){return action(publication.unpublish(id,reviewer,reason));}
+    public ActionResult republishContent(Long id,UserAccount reviewer,String note){return action(publication.republish(id,reviewer,note));}
+    public ActionResult reopenContent(Long id,UserAccount reviewer,String reason){return action(publication.reopenReview(id,reviewer,reason));}
+    @Transactional(readOnly=true) public ContentPublicationService.Diagnostics publicationDiagnostics(){return publication.diagnostics();}
+    private ActionResult action(ContentPublicationService.Result r){return new ActionResult(r.changed(),r.status(),r.published(),r.message());}
     private void validate(ContentItem item){if(item.getType()==ContentType.WORD&&(item.getWord()==null||blank(item.getWord().getExpression())||blank(item.getWord().getReading())))throw new IllegalStateException("단어 표기와 읽기가 필요합니다.");
       if(item.getType()==ContentType.GRAMMAR&&(item.getGrammar()==null||blank(item.getGrammar().getPattern())||blank(item.getGrammar().getExplanation())))throw new IllegalStateException("문법 패턴과 설명이 필요합니다.");}
     private void validateQualityForApproval(ContentItem item){List<QualityIssueType> errors=qualityAudit.audit(item).issues().stream().filter(issue->issue.severity()==QualitySeverity.ERROR).map(ContentQualityAuditService.Issue::type).toList();if(!errors.isEmpty())throw new IllegalStateException("품질 오류가 있어 승인할 수 없습니다: "+String.join(", ",errors.stream().map(Enum::name).toList()));}
@@ -96,7 +105,7 @@ public class AdminContentReviewService {
       item.getExamples().stream().map(e->new ContentDetails.ExampleDetails(e.getMeaning()==null?null:e.getMeaning().getText(),e.getJapaneseText(),e.getReading(),e.getTranslation(),e.getAudioFileName(),e.getDisplayOrder())).toList(),
       item.getGrammar()==null?null:new ContentDetails.GrammarDetails(item.getGrammar().getPattern(),item.getGrammar().getExplanation(),item.getGrammar().getConnection(),null),List.of());
       var audits=histories.findByContentItemIdOrderByReviewedAtDesc(item.getId()).stream().map(h->new Audit(h.getPreviousStatus(),h.getStatus(),h.getReviewer()==null?"system/import":h.getReviewer().getLoginId(),h.getNote(),h.getReviewedAt())).toList();
-      var raw=rawRecords.findByContentItemIdOrderById(item.getId()).stream().map(r->new RawSource(r.getSourceRef(),r.getNoteType(),r.getSourceNoteId(),r.getLevelCode(),r.getTags(),r.getFieldNames(),r.getFieldValues())).toList();return new ContentDetail(old,item.isPublished(),raw,audits,toQuality(qualityAudit.audit(item)));}
+      var raw=rawRecords.findByContentItemIdOrderById(item.getId()).stream().map(r->new RawSource(r.getSourceRef(),r.getNoteType(),r.getSourceNoteId(),r.getLevelCode(),r.getTags(),r.getFieldNames(),r.getFieldValues())).toList();var quality=qualityAudit.audit(item);return new ContentDetail(old,item.isPublished(),raw,audits,toQuality(quality),sourceRights(item.getSourceRef()),toReleaseGate(releaseGate.evaluate(item,quality)));}
     private ContentReviewSummary toLegacy(ContentItem i){var r=row(i);return new ContentReviewSummary(r.id(),r.slug(),r.type(),r.title(),r.reading(),r.summary(),r.jlpt(),i.getCategories().stream().map(Category::getName).toList(),r.reviewStatus(),i.getReviewNote(),i.getExamples().size(),r.sourceRef());}
     private SourceDetails source(String ref){if(ref==null)return null;return sources.findBySourceRef(ref).map(s->new SourceDetails(s.getSourceRef(),s.getDisplayName(),s.getVersion(),s.getLicenseSummary(),s.getLicenseUrl(),s.getAttribution(),s.getUsageNote())).orElse(null);}
     private QualityAudit toQuality(ContentQualityAuditService.Audit audit){return new QualityAudit(audit.issueCount(),audit.highestSeverity(),audit.issues().stream().map(i->new QualityIssue(i.type(),i.severity(),i.message())).toList());}
@@ -127,12 +136,20 @@ public class AdminContentReviewService {
     private CurationDetail cd(CurationRow row,String nuance,String usage,String formation,String mistake,String learner,String key,String usageDiff,String confusion,String qt,String prompt,String context,String explanation,List<Choice> choices){var audits=curationHistories.findByRecordTypeAndRecordIdOrderByReviewedAtDesc(row.type(),row.id()).stream().map(h->new Audit(h.getPreviousStatus(),h.getStatus(),h.getReviewer().getLoginId(),h.getNote(),h.getReviewedAt())).toList();return new CurationDetail(row,nuance,usage,formation,mistake,learner,key,usageDiff,confusion,qt,prompt,context,explanation,choices,audits);}
 
     @Transactional public ActionResult reviewCuration(CurationRecordType type,Long id,ReviewStatus target,UserAccount reviewer,String note){if(target!=ReviewStatus.APPROVED&&target!=ReviewStatus.REJECTED)throw new IllegalArgumentException("승인 또는 반려만 가능합니다.");String n=clean(note);if(target==ReviewStatus.REJECTED&&n==null)throw new IllegalArgumentException("반려 사유를 입력해주세요.");return switch(type){case ENRICHMENT->review(type,enrichments.findByIdForReview(id).orElseThrow(),target,reviewer,n);case RELATION->review(type,relations.findByIdForReview(id).orElseThrow(),target,reviewer,n);case COMPARISON->review(type,comparisons.findByIdForReview(id).orElseThrow(),target,reviewer,n);case CONFIRMATION->review(type,confirmations.findByIdForReview(id).orElseThrow(),target,reviewer,n);};}
-    private ActionResult review(CurationRecordType t,Object o,ReviewStatus target,UserAccount reviewer,String note){ReviewStatus before=status(o);if(before==target)return new ActionResult(false,target,published(o),"이미 처리된 항목입니다.");requirePending(before);if(target==ReviewStatus.APPROVED)approve(o);else reject(o);curationHistories.save(new CurationReviewHistory(t,id(o),before,target,reviewer,note));return new ActionResult(true,target,published(o),target==ReviewStatus.APPROVED?"승인하고 공개했습니다.":"반려했습니다.");}
+    private ActionResult review(CurationRecordType t,Object o,ReviewStatus target,UserAccount reviewer,String note){ReviewStatus before=status(o);if(before==target)return new ActionResult(false,target,published(o),"이미 처리된 항목입니다.");requirePending(before);ContentSourceRightsService.ReleaseEligibility eligibility=null;if(target==ReviewStatus.APPROVED){eligibility=sourceRights.releaseEligibility(sourceRef(o));approve(o,eligibility.allowed());}else reject(o);curationHistories.save(new CurationReviewHistory(t,id(o),before,target,reviewer,target==ReviewStatus.APPROVED?approvalNote(note,eligibility):note));return new ActionResult(true,target,published(o),target==ReviewStatus.APPROVED?approvalMessage(eligibility):"반려했습니다.");}
     private ReviewStatus status(Object o){if(o instanceof GrammarEnrichment x)return x.getReviewStatus();if(o instanceof GrammarRelation x)return x.getReviewStatus();if(o instanceof GrammarComparison x)return x.getReviewStatus();return ((GrammarConfirmationQuestion)o).getReviewStatus();}
     private boolean published(Object o){if(o instanceof GrammarEnrichment x)return x.isPublished();if(o instanceof GrammarRelation x)return x.isPublished();if(o instanceof GrammarComparison x)return x.isPublished();return ((GrammarConfirmationQuestion)o).isPublished();}
     private Long id(Object o){if(o instanceof GrammarEnrichment x)return x.getId();if(o instanceof GrammarRelation x)return x.getId();if(o instanceof GrammarComparison x)return x.getId();return ((GrammarConfirmationQuestion)o).getId();}
-    private void approve(Object o){if(o instanceof GrammarEnrichment x)x.approveForPublication();else if(o instanceof GrammarRelation x)x.approveForPublication();else if(o instanceof GrammarComparison x)x.approveForPublication();else ((GrammarConfirmationQuestion)o).approveForPublication();}
+    private String sourceRef(Object o){if(o instanceof GrammarEnrichment x)return x.getSourceRef();if(o instanceof GrammarRelation x)return x.getSourceRef();if(o instanceof GrammarComparison x)return x.getSourceRef();return ((GrammarConfirmationQuestion)o).getSourceRef();}
+    private void approve(Object o,boolean releaseAllowed){if(o instanceof GrammarEnrichment x)x.approve(releaseAllowed);else if(o instanceof GrammarRelation x)x.approve(releaseAllowed);else if(o instanceof GrammarComparison x)x.approve(releaseAllowed);else ((GrammarConfirmationQuestion)o).approve(releaseAllowed);}
     private void reject(Object o){if(o instanceof GrammarEnrichment x)x.reject();else if(o instanceof GrammarRelation x)x.reject();else if(o instanceof GrammarComparison x)x.reject();else ((GrammarConfirmationQuestion)o).reject();}
     private String jlpt(ContentItem i){return i.getLevels().stream().filter(l->"JLPT".equals(l.getSystem())).map(Level::getCode).sorted().findFirst().orElse("");}
+    private SourceRightsDetails sourceRights(String ref){var eligibility=sourceRights.releaseEligibility(ref);return ref==null?null:sources.findBySourceRef(ref).map(s->new SourceRightsDetails(s.getId(),s.getRightsStatus(),s.getRightsReviewedAt(),s.getRightsReviewNote(),s.isAttributionRequired(),s.getAttribution(),eligibility.allowed(),eligibility.blockingReason())).orElse(new SourceRightsDetails(null,null,null,null,false,null,false,eligibility.blockingReason()));}
+    private ReleaseGate toReleaseGate(ContentReleaseGateService.Result result){return new ReleaseGate(result.decision(),result.contentType(),result.releasable(),result.reason(),releaseIssues(result.blockers()),releaseIssues(result.manualReview()),releaseIssues(result.informational()));}
+    private List<ReleaseIssue> releaseIssues(List<ContentReleaseGateService.Issue> issues){return issues.stream().map(i->new ReleaseIssue(i.code(),i.classification(),i.message(),i.qualityIssueType())).toList();}
+    private String contentApprovalMessage(ContentReleaseGateService.Result result){return result.releasable()?"승인하고 공개했습니다.":"내용 검수는 승인했지만 Release Gate 때문에 공개하지 않았습니다: "+result.reason();}
+    private String contentApprovalNote(String note,ContentReleaseGateService.Result result){String n=clean(note);String transition=result.releasable()?"[APPROVE_AND_PUBLISH] published=false->true":"[APPROVE_UNPUBLISHED] published=false->false · Release Gate: "+result.reason();String value=n==null?transition:transition+" · "+n;return value.length()<=1000?value:value.substring(0,1000);}
+    private String approvalMessage(ContentSourceRightsService.ReleaseEligibility eligibility){return eligibility.allowed()?"승인하고 공개했습니다.":"내용 검수는 승인했지만 source rights 때문에 공개하지 않았습니다: "+eligibility.blockingReason();}
+    private String approvalNote(String note,ContentSourceRightsService.ReleaseEligibility eligibility){String n=clean(note);if(eligibility.allowed())return n;String blocked="source rights로 미공개: "+eligibility.blockingReason();return n==null?blocked:n+" · "+blocked;}
     private static String normalize(String s){String c=clean(s);return c==null?null:ContentSearchNormalizer.normalize(c);}private static String clean(String s){return s==null||s.isBlank()?null:s.trim();}private static boolean blank(String s){return s==null||s.isBlank();}
 }

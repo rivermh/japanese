@@ -31,5 +31,7 @@ public class TodayStudySessionItem {
     protected TodayStudySessionItem() { }
     public TodayStudySessionItem(TodayStudySession session, ContentItem contentItem, int position, StudyActivityType type) { this.session=session;this.contentItem=contentItem;this.position=position;this.plannedActivityType=type; }
     public void complete(StudyResult result) { if (!completed) { completed=true; this.result=result; completedAt=Instant.now(); } }
+    public void withdraw() { if (!completed) { completed=true; result=null; completedAt=Instant.now(); } }
     public Long getId(){return id;} public ContentItem getContentItem(){return contentItem;} public int getPosition(){return position;} public StudyActivityType getPlannedActivityType(){return plannedActivityType;} public boolean isCompleted(){return completed;}
+    public StudyResult getResult(){return result;} public boolean isWithdrawn(){return completed&&result==null;}
 }

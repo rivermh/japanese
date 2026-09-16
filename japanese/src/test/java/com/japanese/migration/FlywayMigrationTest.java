@@ -7,11 +7,13 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.output.MigrateResult;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
 
 class FlywayMigrationTest {
 
@@ -23,12 +25,15 @@ class FlywayMigrationTest {
         MigrateResult first = flyway.migrate();
         MigrateResult second = flyway.migrate();
 
-        assertThat(first.migrationsExecuted).isEqualTo(2);
+        assertThat(first.migrationsExecuted).isEqualTo(4);
         assertThat(second.migrationsExecuted).isZero();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("4");
         assertThat(tableExists(url, "content_items")).isTrue();
         assertThat(tableExists(url, "today_study_sessions")).isTrue();
         assertThat(columnExists(url, "quiz_attempts", "origin_type")).isTrue();
+        assertThat(columnExists(url, "content_sources", "rights_status")).isTrue();
+        assertThat(tableExists(url, "content_release_batches")).isTrue();
+        assertThat(tableExists(url, "content_release_batch_items")).isTrue();
     }
 
     @Test
@@ -72,7 +77,7 @@ class FlywayMigrationTest {
 
         Flyway upgraded = Flyway.configure().dataSource(url, "sa", "")
                 .locations("classpath:db/migration/h2").cleanDisabled(true).load();
-        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(3);
         assertThat(upgraded.migrate().migrationsExecuted).isZero();
 
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
@@ -97,6 +102,90 @@ class FlywayMigrationTest {
                     "update quiz_attempts set origin_type='IMPORTED_SOURCE', imported_source_record_id=10, quiz_session_item_id=20 where id=3"))
                     .isInstanceOf(java.sql.SQLException.class);
         }
+    }
+
+    @Test
+    void v3BackfillsExistingSourcesAsUnknownAndPreservesPublishedContent() throws Exception {
+        String url = databaseUrl("source_rights_backfill");
+        Flyway v2 = Flyway.configure()
+                .dataSource(url, "sa", "")
+                .locations("classpath:db/migration/h2")
+                .target("2")
+                .cleanDisabled(true)
+                .load();
+        v2.migrate();
+
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            sql.executeUpdate("insert into content_sources (id, source_ref, display_name) values (1, 'existing-source', 'Existing Source')");
+            sql.executeUpdate("insert into content_items (id, published, slug, source_ref, type, review_status) values (1, true, 'existing-published', 'existing-source', 'WORD', 'APPROVED')");
+        }
+
+        Flyway upgraded = flyway(url, false);
+        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(upgraded.migrate().migrationsExecuted).isZero();
+
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            assertThat(singleText(sql, "select rights_status from content_sources where id=1"))
+                    .isEqualTo("UNKNOWN");
+            assertThat(singleInt(sql, "select attribution_required from content_sources where id=1"))
+                    .isZero();
+            assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=true"))
+                    .isEqualTo(1);
+            sql.executeUpdate("insert into content_sources (id, source_ref, display_name) values (2, 'new-source', 'New Source')");
+            assertThat(singleText(sql, "select rights_status from content_sources where id=2"))
+                    .isEqualTo("UNKNOWN");
+        }
+    }
+
+    @Test
+    void mysqlV3MigrationIsAdditiveAndUsesConservativeDefaults() throws Exception {
+        String migration = new ClassPathResource("db/migration/mysql/V3__add_content_source_rights.sql")
+                .getContentAsString(StandardCharsets.UTF_8)
+                .toLowerCase();
+
+        assertThat(migration).contains("alter table content_sources")
+                .contains("rights_status varchar(32) not null default 'unknown'")
+                .contains("rights_reviewed_at datetime(6) null")
+                .contains("rights_review_note varchar(2000) null")
+                .contains("attribution_required bit not null default b'0'")
+                .doesNotContain("drop ")
+                .doesNotContain("delete ")
+                .doesNotContain("update content_sources")
+                .doesNotContain("allowed'");
+    }
+
+    @Test
+    void v4AddsImmutableBatchManifestWithoutChangingExistingContent() throws Exception {
+        String url = databaseUrl("release_batch_history");
+        Flyway v3 = Flyway.configure().dataSource(url, "sa", "")
+                .locations("classpath:db/migration/h2").target("3").cleanDisabled(true).load();
+        v3.migrate();
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            sql.executeUpdate("insert into user_accounts (id, joined_at, display_name, login_id, password_hash, role) values (1, current_timestamp, 'Admin', 'batch-admin', 'hash', 'ADMIN')");
+            sql.executeUpdate("insert into user_accounts (id, joined_at, display_name, login_id, password_hash, role) values (2, current_timestamp, 'Learner', 'batch-learner', 'hash', 'USER')");
+            sql.executeUpdate("insert into content_items (id, published, slug, source_ref, type, review_status) values (1, false, 'batch-content', 'source', 'WORD', 'PENDING')");
+            sql.executeUpdate("insert into learner_profiles (id, experience, created_at, updated_at, user_account_id, character_key, display_name, learner_key) values (1, 0, current_timestamp, current_timestamp, 2, 'haru', 'Learner', 'batch-learner-key')");
+            sql.executeUpdate("insert into learning_progress (id, consecutive_correct, lapse_count, review_count, content_item_id, learner_profile_id, last_studied_at, next_review_at, last_result, learning_state) values (1, 0, 0, 1, 1, 1, current_timestamp, current_timestamp, 'CORRECT', 'REVIEW')");
+        }
+        Flyway upgraded = flyway(url, false);
+        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(upgraded.migrate().migrationsExecuted).isZero();
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'")).isEqualTo(1);
+            assertThat(singleInt(sql, "select count(*) from learning_progress where id=1")).isEqualTo(1);
+            assertThat(tableExists(url, "content_release_batches")).isTrue();
+            assertThat(tableExists(url, "content_release_batch_items")).isTrue();
+        }
+    }
+
+    @Test
+    void mysqlV4MigrationIsAdditive() throws Exception {
+        String migration = new ClassPathResource("db/migration/mysql/V4__add_content_release_batch_history.sql")
+                .getContentAsString(StandardCharsets.UTF_8).toLowerCase();
+        assertThat(migration).contains("create table content_release_batches")
+                .contains("create table content_release_batch_items")
+                .contains("uk_content_release_batch_preview")
+                .doesNotContain("drop ").doesNotContain("delete ").doesNotContain("update content_items");
     }
 
     private int singleInt(Statement sql, String query) throws Exception {

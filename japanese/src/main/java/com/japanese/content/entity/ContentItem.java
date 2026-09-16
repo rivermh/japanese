@@ -91,6 +91,7 @@ public class ContentItem {
         this.type = type;
         this.sourceRef = sourceRef;
         this.published = published;
+        this.reviewStatus = published ? ReviewStatus.APPROVED : ReviewStatus.PENDING;
     }
 
     public void addCategory(Category category) {
@@ -151,11 +152,35 @@ public class ContentItem {
         return published;
     }
 
-    public void publish() {
-        this.published = true;
+    public void approve(boolean releaseAllowed) {
+        this.published = false;
         this.reviewStatus = ReviewStatus.APPROVED;
         this.reviewNote = null;
         this.reviewedAt = Instant.now();
+        if (releaseAllowed) {
+            publishApproved();
+        }
+    }
+
+    public void publishApproved() {
+        if (getReviewStatus() != ReviewStatus.APPROVED) {
+            throw new IllegalStateException("APPROVED 콘텐츠만 공개할 수 있습니다.");
+        }
+        this.published = true;
+    }
+
+    public void unpublishApproved() {
+        if (getReviewStatus() != ReviewStatus.APPROVED) {
+            throw new IllegalStateException("APPROVED 콘텐츠만 공개 상태를 변경할 수 있습니다.");
+        }
+        this.published = false;
+    }
+
+    public void reopenReview() {
+        this.published = false;
+        this.reviewStatus = ReviewStatus.PENDING;
+        this.reviewNote = null;
+        this.reviewedAt = null;
     }
 
     public void reject(String note) {
@@ -166,10 +191,7 @@ public class ContentItem {
     }
 
     public void resetReview() {
-        this.published = false;
-        this.reviewStatus = ReviewStatus.PENDING;
-        this.reviewNote = null;
-        this.reviewedAt = null;
+        reopenReview();
     }
 
     public ReviewStatus getReviewStatus() {

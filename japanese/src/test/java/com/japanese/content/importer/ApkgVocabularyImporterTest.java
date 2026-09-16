@@ -3,10 +3,13 @@ package com.japanese.content.importer;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.japanese.content.entity.ContentItem;
+import com.japanese.content.entity.ContentSourceRightsStatus;
 import com.japanese.content.repository.ContentItemRepository;
 import com.japanese.content.repository.ContentReviewHistoryRepository;
+import com.japanese.content.repository.ContentSourceRepository;
 import com.japanese.content.service.ContentQueryService;
 import com.japanese.content.service.ContentReviewService;
+import com.japanese.content.service.ContentSourceRightsService;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -44,6 +47,12 @@ class ApkgVocabularyImporterTest {
 
     @Autowired
     private ContentReviewHistoryRepository contentReviewHistoryRepository;
+
+    @Autowired
+    private ContentSourceRepository contentSourceRepository;
+
+    @Autowired
+    private ContentSourceRightsService sourceRights;
 
     @BeforeAll
     static void createFixture() throws Exception {
@@ -100,6 +109,13 @@ class ApkgVocabularyImporterTest {
         assertThat(item.getLevels()).extracting(level -> level.getCode()).containsExactly("N5");
         assertThat(contentQueryService.findBySlug("jlpt-max-ci-fixture-1")).isEmpty();
 
+        var source = contentSourceRepository.findBySourceRef("JLPT-MAX-Deck-2.1.1.apkg").orElseThrow();
+        assertThat(source.getRightsStatus()).isEqualTo(ContentSourceRightsStatus.UNKNOWN);
+        sourceRights.reviewRights(source.getId(), ContentSourceRightsStatus.MANUAL_REVIEW_REQUIRED,
+                "테스트 fixture의 권리 조건 검토", true, null);
+        sourceRights.reviewRights(source.getId(), ContentSourceRightsStatus.ALLOWED,
+                "테스트 fixture 공개 허용", true, "Fixture attribution");
+
         contentReviewService.publish(item.getId());
 
         assertThat(contentQueryService.findBySlug("jlpt-max-ci-fixture-1")).isPresent();
@@ -114,7 +130,7 @@ class ApkgVocabularyImporterTest {
                 .singleElement()
                 .satisfies(history -> assertThat(history.getStatus().name()).isEqualTo("REJECTED"));
 
-        contentReviewService.reset(rejected.getId());
+        contentReviewService.reset(rejected.getId(), "import correction");
 
         assertThat(rejected.getReviewStatus().name()).isEqualTo("PENDING");
         assertThat(rejected.getReviewNote()).isNull();

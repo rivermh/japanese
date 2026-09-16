@@ -317,9 +317,8 @@ public class LearningService {
     public List<ContentSummary> relearningCards(UserAccount account, RelearningTarget target) {
         LearnerProfile profile = profile(account);
         if (target == RelearningTarget.BOOKMARKS) {
-            return bookmarkRepository.findByUserAccountLoginIdOrderByCreatedAtDesc(account.getLoginId()).stream()
+            return bookmarkRepository.findByUserAccountLoginIdAndContentItemPublishedTrueOrderByCreatedAtDesc(account.getLoginId()).stream()
                     .map(Bookmark::getContentItem)
-                    .filter(ContentItem::isPublished)
                     .limit(MAX_CARDS)
                     .map(this::toSummary)
                     .toList();

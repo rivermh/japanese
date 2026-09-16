@@ -28,7 +28,8 @@ public class GrammarComparison {
     protected GrammarComparison() { }
     public GrammarComparison(GrammarRelation relation, String sourceRef) { this.relation = relation; this.sourceRef = sourceRef; }
     public void revise(String summary, String keyDifference, String usageDifference, String commonConfusion) { this.summary=summary; this.keyDifference=keyDifference; this.usageDifference=usageDifference; this.commonConfusion=commonConfusion; }
-    public void approveForPublication() { reviewStatus=ReviewStatus.APPROVED; published=true; reviewedAt=Instant.now(); }
+    public void approve(boolean releaseAllowed) { reviewStatus=ReviewStatus.APPROVED; published=releaseAllowed; reviewedAt=Instant.now(); }
+    public void approveForPublication() { approve(true); }
     public void reject(){reviewStatus=ReviewStatus.REJECTED;published=false;reviewedAt=Instant.now();}
     public void markPending() { reviewStatus=ReviewStatus.PENDING; published=false; reviewedAt=null; }
     public boolean isPubliclyVisible() { return published && reviewStatus==ReviewStatus.APPROVED && relation.isPubliclyVisible(); }

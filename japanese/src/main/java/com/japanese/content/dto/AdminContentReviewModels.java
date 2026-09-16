@@ -1,6 +1,9 @@
 package com.japanese.content.dto;
 
 import com.japanese.content.entity.*;
+import com.japanese.content.service.ContentReleaseDecision;
+import com.japanese.content.service.ContentReleaseIssueClassification;
+import com.japanese.content.service.ContentReleaseIssueCode;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Page;
@@ -20,7 +23,16 @@ public final class AdminContentReviewModels {
                             String tags, String fieldNames, String fieldValues) {}
     public record Audit(ReviewStatus previousStatus, ReviewStatus status, String reviewer, String note, Instant reviewedAt) {}
     public record ContentDetail(ContentReviewDetails content, boolean published, List<RawSource> rawSources,
-                                List<Audit> audits, QualityAudit qualityAudit) {}
+                                List<Audit> audits, QualityAudit qualityAudit, SourceRightsDetails sourceRights,
+                                ReleaseGate releaseGate) {}
+    public record SourceRightsDetails(Long sourceId, ContentSourceRightsStatus status, Instant reviewedAt,
+                                      String reviewNote, boolean attributionRequired, String attributionText,
+                                      boolean allowedForRelease, String blockingReason) {}
+    public record ReleaseIssue(ContentReleaseIssueCode code, ContentReleaseIssueClassification classification,
+                               String message, QualityIssueType qualityIssueType) {}
+    public record ReleaseGate(ContentReleaseDecision decision, ContentType contentType, boolean releasable,
+                              String reason, List<ReleaseIssue> blockers, List<ReleaseIssue> manualReview,
+                              List<ReleaseIssue> informational) {}
     public record CurationRow(CurationRecordType type, Long id, String grammar, String secondaryGrammar,
                               GrammarRelationType relationType, String summary, String jlpt, String sourceRef,
                               ReviewStatus reviewStatus, boolean published) {}

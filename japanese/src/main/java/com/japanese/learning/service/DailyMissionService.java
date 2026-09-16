@@ -24,12 +24,12 @@ public class DailyMissionService {
         this.sessions=sessions; this.learning=learning; this.profiles=profiles; this.records=records; this.time=time;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public DailyMission today(UserAccount account) {
         return today(account, time.now());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     DailyMission today(UserAccount account, Instant asOf) {
         var existing = sessions.findCurrent(account);
         if (existing.isPresent()) {

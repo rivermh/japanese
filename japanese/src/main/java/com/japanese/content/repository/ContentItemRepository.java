@@ -15,6 +15,7 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Collection;
 
 public interface ContentItemRepository extends JpaRepository<ContentItem, Long>, JpaSpecificationExecutor<ContentItem> {
 
@@ -56,6 +57,10 @@ public interface ContentItemRepository extends JpaRepository<ContentItem, Long>,
             Pageable pageable);
 
     Optional<ContentItem> findByIdAndPublishedFalse(Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from ContentItem c where c.id in :ids order by c.id")
+    List<ContentItem> findAllByIdInForReleaseBatch(@Param("ids") Collection<Long> ids);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from ContentItem c where c.id=:id")
@@ -116,6 +121,14 @@ public interface ContentItemRepository extends JpaRepository<ContentItem, Long>,
     long countByPublishedFalse();
 
     long countByPublishedTrueAndCategoriesSlug(String categorySlug);
+
+    @Query("select count(c) from ContentItem c where c.published=true and (c.reviewStatus is null or c.reviewStatus<>com.japanese.content.entity.ReviewStatus.APPROVED)")
+    long countInvalidPublishedState();
+
+    @Query("select count(c) from ContentItem c where c.published=true and (c.reviewStatus is null or c.reviewStatus=com.japanese.content.entity.ReviewStatus.PENDING)")
+    long countPublishedPendingOrNull();
+
+    long countByPublishedTrueAndReviewStatus(ReviewStatus reviewStatus);
 
     long countByPublishedFalseAndReviewStatus(ReviewStatus reviewStatus);
 

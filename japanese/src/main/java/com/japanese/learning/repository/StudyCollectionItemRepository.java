@@ -8,8 +8,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface StudyCollectionItemRepository extends JpaRepository<StudyCollectionItem, Long> {
     @EntityGraph(attributePaths = {"contentItem", "contentItem.word", "contentItem.word.meanings", "contentItem.grammar", "contentItem.levels", "contentItem.categories"})
-    List<StudyCollectionItem> findByStudyCollectionIdOrderByCreatedAtAsc(Long collectionId);
+    List<StudyCollectionItem> findByStudyCollectionIdAndContentItemPublishedTrueOrderByCreatedAtAsc(Long collectionId);
     Optional<StudyCollectionItem> findByStudyCollectionIdAndContentItemSlug(Long collectionId, String slug);
     void deleteByStudyCollectionIdAndContentItemSlug(Long collectionId, String slug);
     long countByStudyCollectionId(Long collectionId);
+    long countByStudyCollectionIdAndContentItemPublishedTrue(Long collectionId);
 }

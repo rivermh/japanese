@@ -10,6 +10,8 @@ import com.japanese.learning.entity.StudyResult;
 import com.japanese.learning.repository.LearnerProfileRepository;
 import com.japanese.learning.repository.StudyRecordRepository;
 import com.japanese.learning.repository.LearningProgressRepository;
+import com.japanese.learning.repository.TodayStudySessionRepository;
+import com.japanese.learning.repository.TodayStudySessionItemRepository;
 import com.japanese.content.repository.ContentItemRepository;
 import com.japanese.learning.entity.LearningProgress;
 import com.japanese.learning.entity.LearningState;
@@ -23,9 +25,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @ActiveProfiles("sample")
+@Transactional
 class TodayStudySessionServiceTest {
     @Autowired private SampleContentDataLoader sample;
     @Autowired private TodayStudySessionService sessions;
@@ -36,6 +40,8 @@ class TodayStudySessionServiceTest {
     @Autowired private StudyRecordRepository records;
     @Autowired private LearningProgressRepository progress;
     @Autowired private ContentItemRepository contents;
+    @Autowired private TodayStudySessionRepository sessionRepository;
+    @Autowired private TodayStudySessionItemRepository sessionItems;
     private UserAccount account;
 
     @BeforeEach
@@ -94,5 +100,54 @@ class TodayStudySessionServiceTest {
         assertThat(resumed.sessionKey()).isEqualTo(started.sessionKey());
         assertThat(resumed.totalCount()).isEqualTo(originalTotal);
         assertThat(resumed.currentSlug()).isEqualTo(originalCurrent);
+    }
+
+    @Test
+    void withdrawnFutureItemIsSkippedWithoutReplacingOrReorderingRemainingCards() {
+        var started = sessions.startOrResume(account);
+        var profile = profiles.findByUserAccountLoginId(account.getLoginId()).orElseThrow();
+        var entity = sessionRepository.findByLearnerProfileIdAndSessionDate(
+                profile.getId(), LocalDate.now(ZoneId.of("Asia/Seoul"))).orElseThrow();
+        var originalItems = sessionItems.findItems(entity.getId());
+        assertThat(originalItems).hasSizeGreaterThan(2);
+        var withdrawn = originalItems.get(1).getContentItem();
+        withdrawn.unpublishApproved();
+        contents.saveAndFlush(withdrawn);
+
+        var resumed = sessions.startOrResume(account);
+        assertThat(resumed.sessionKey()).isEqualTo(started.sessionKey());
+        assertThat(resumed.totalCount()).isEqualTo(started.totalCount() - 1);
+        assertThat(resumed.currentSlug()).isEqualTo(originalItems.get(0).getContentItem().getSlug());
+        assertThat(sessionItems.findItems(entity.getId())).hasSameSizeAs(originalItems);
+
+        var afterFirst = sessions.complete(account, resumed.currentSlug(), StudyResult.CORRECT);
+        assertThat(afterFirst.currentSlug()).isEqualTo(originalItems.get(2).getContentItem().getSlug());
+        assertThat(afterFirst.currentSlug()).isNotEqualTo(withdrawn.getSlug());
+    }
+
+    @Test
+    void withdrawnCurrentItemDoesNotRecordAnAnswerAndReloadContinuesAtNextSnapshotItem() {
+        var started = sessions.startOrResume(account);
+        String withdrawnSlug = started.currentSlug();
+        var withdrawn = contents.findBySlugAndPublishedTrue(withdrawnSlug).orElseThrow();
+        long recordsBefore = records.count();
+        long progressBefore = progress.count();
+        var profile = profiles.findByUserAccountLoginId(account.getLoginId()).orElseThrow();
+        var entity = sessionRepository.findByLearnerProfileIdAndSessionDate(
+                profile.getId(), LocalDate.now(ZoneId.of("Asia/Seoul"))).orElseThrow();
+        int snapshotSize = sessionItems.findItems(entity.getId()).size();
+        withdrawn.unpublishApproved();
+        contents.saveAndFlush(withdrawn);
+
+        var advanced = sessions.complete(account, withdrawnSlug, StudyResult.CORRECT);
+        assertThat(advanced.currentSlug()).isNotEqualTo(withdrawnSlug);
+        assertThat(records.count()).isEqualTo(recordsBefore);
+        assertThat(progress.count()).isEqualTo(progressBefore);
+        assertThat(sessionItems.findItems(entity.getId())).hasSize(snapshotSize);
+
+        var reloaded = sessions.startOrResume(account);
+        assertThat(reloaded.sessionKey()).isEqualTo(started.sessionKey());
+        assertThat(reloaded.currentSlug()).isEqualTo(advanced.currentSlug());
+        assertThat(reloaded.totalCount()).isEqualTo(started.totalCount() - 1);
     }
 }

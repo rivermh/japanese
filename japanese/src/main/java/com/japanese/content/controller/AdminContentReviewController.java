@@ -3,6 +3,8 @@ package com.japanese.content.controller;
 import com.japanese.account.service.CurrentUserService;
 import com.japanese.content.entity.*;
 import com.japanese.content.service.AdminContentReviewService;
+import com.japanese.content.service.ContentReleaseDryRunService;
+import com.japanese.content.dto.AdminContentReleaseDryRunModels;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -11,16 +13,25 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @Controller
 @RequestMapping("/admin")
 public class AdminContentReviewController {
-    private final AdminContentReviewService reviews; private final CurrentUserService current;
-    public AdminContentReviewController(AdminContentReviewService reviews,CurrentUserService current){this.reviews=reviews;this.current=current;}
+    private final AdminContentReviewService reviews; private final CurrentUserService current; private final ContentReleaseDryRunService dryRun;
+    public AdminContentReviewController(AdminContentReviewService reviews,CurrentUserService current,ContentReleaseDryRunService dryRun){this.reviews=reviews;this.current=current;this.dryRun=dryRun;}
     @GetMapping public String dashboard(Model model){model.addAttribute("dashboard",reviews.dashboard());return "admin/dashboard";}
     @GetMapping("/contents") public String contents(@RequestParam(required=false) ReviewStatus status,@RequestParam(required=false) Boolean published,
       @RequestParam(required=false) ContentType type,@RequestParam(required=false) String level,@RequestParam(required=false) String keyword,
       @RequestParam(required=false) String source,@RequestParam(required=false) Boolean qualityIssue,@RequestParam(required=false) QualitySeverity qualitySeverity,@RequestParam(required=false) QualityIssueType qualityIssueType,@RequestParam(defaultValue="false") boolean oldest,@RequestParam(defaultValue="0") int page,Model model){
       model.addAttribute("result",reviews.contents(status,published,type,level,keyword,source,qualityIssue,qualitySeverity,qualityIssueType,oldest,page));filters(model,status,published,type,level,keyword,source,qualityIssue,qualitySeverity,qualityIssueType,oldest);return "admin/content-list";}
     @GetMapping("/contents/{id}") public String content(@PathVariable Long id,Model model){model.addAttribute("content",reviews.content(id));return "admin/content-detail";}
+    @GetMapping("/contents/dry-run") public String dryRun(@RequestParam(required=false) ContentType type,@RequestParam(required=false) String level,
+      @RequestParam(required=false) ReviewStatus status,@RequestParam(required=false) Boolean published,@RequestParam(required=false) String source,
+      @RequestParam(required=false) ContentSourceRightsStatus sourceRightsStatus,Model model){
+      return "admin/content-dry-run";
+    }
     @PostMapping("/contents/{id}/approve") public String approve(@PathVariable Long id,@RequestParam(required=false) String note,RedirectAttributes flash){return contentAction(id,flash,()->reviews.approveContent(id,current.currentAccount(),note));}
     @PostMapping("/contents/{id}/reject") public String reject(@PathVariable Long id,@RequestParam String note,RedirectAttributes flash){return contentAction(id,flash,()->reviews.rejectContent(id,current.currentAccount(),note));}
+    @PostMapping("/contents/{id}/publish") public String publish(@PathVariable Long id,@RequestParam(required=false) String note,RedirectAttributes flash){return contentAction(id,flash,()->reviews.publishContent(id,current.currentAccount(),note));}
+    @PostMapping("/contents/{id}/unpublish") public String unpublish(@PathVariable Long id,@RequestParam String note,RedirectAttributes flash){return contentAction(id,flash,()->reviews.unpublishContent(id,current.currentAccount(),note));}
+    @PostMapping("/contents/{id}/republish") public String republish(@PathVariable Long id,@RequestParam(required=false) String note,RedirectAttributes flash){return contentAction(id,flash,()->reviews.republishContent(id,current.currentAccount(),note));}
+    @PostMapping("/contents/{id}/reopen") public String reopen(@PathVariable Long id,@RequestParam String note,RedirectAttributes flash){return contentAction(id,flash,()->reviews.reopenContent(id,current.currentAccount(),note));}
     @GetMapping("/grammars/curation") public String curation(@RequestParam(defaultValue="ENRICHMENT") CurationRecordType recordType,
       @RequestParam(required=false) ReviewStatus status,@RequestParam(required=false) Boolean published,@RequestParam(required=false) String level,
       @RequestParam(required=false) String keyword,@RequestParam(required=false) GrammarRelationType relationType,@RequestParam(defaultValue="0") int page,Model model){

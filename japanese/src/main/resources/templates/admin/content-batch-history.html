@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Batch 실행 이력')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('admin')}"></header>
+<link rel="stylesheet" href="/css/admin-release.css">
+<main id="main-content" class="page-shell admin-shell release-shell">
+<h1>Batch 실행 이력</h1>
+<nav aria-label="콘텐츠 관리"><a href="/admin/contents">콘텐츠 목록</a> · <a href="/admin/contents/dry-run">Batch Release</a></nav>
+<p>최근 실행 순으로 20건씩 표시합니다. 개별 상태 변화는 상세 manifest에서 확인하세요.</p>
+<p th:if="${history.empty}">실행 이력이 없습니다.</p>
+<div class="release-table" tabindex="0" role="region" aria-label="Batch 실행 목록">
+<table><thead><tr><th scope="col">Batch</th><th scope="col">상태</th><th scope="col">실행 시각</th><th scope="col">검토자</th><th scope="col">대상 수</th><th scope="col">Mode</th><th scope="col">Digest</th><th scope="col">Rollback</th></tr></thead>
+<tbody><tr th:each="b : ${history.content}">
+<td><a th:href="@{/admin/content-release/batches/{id}(id=${b.id})}" th:text="${'#'+b.id}"></a></td>
+<td th:text="${b.status}"></td><td th:text="${b.executedAt}"></td><td th:text="${b.reviewer}"></td><td th:text="${b.targetCount}"></td><td th:text="${b.mode}"></td>
+<td><code th:text="${#strings.substring(b.digest,0,16)}" th:title="${b.digest}"></code></td><td th:text="${b.rolledBackAt == null ? '없음' : b.rolledBackAt}"></td>
+</tr></tbody></table></div>
+<nav aria-label="이력 페이지"><a th:if="${history.hasPrevious()}" th:href="@{/admin/content-release/batches(page=${history.number - 1})}">이전</a>
+<span th:text="${(history.number + 1)+' 페이지'}"></span>
+<a th:if="${history.hasNext()}" th:href="@{/admin/content-release/batches(page=${history.number + 1})}">다음</a></nav>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body></html>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Batch 실행 상세')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('admin')}"></header>
+<link rel="stylesheet" href="/css/admin-release.css">
+<main id="main-content" class="page-shell admin-shell release-shell" data-rollback-page th:attr="data-batch-id=${batch.id}">
+<input id="release-csrf" type="hidden" th:value="${_csrf.token}" th:attr="data-header=${_csrf.headerName}">
+<h1 th:text="${'Batch #'+batch.id}"></h1>
+<nav aria-label="콘텐츠 관리"><a href="/admin/content-release/batches">실행 이력</a> · <a href="/admin/contents/dry-run">새 Dry-run</a></nav>
+<section><h2>실행 결과</h2>
+<dl>
+<dt>상태</dt><dd th:text="${batch.status}"></dd>
+<dt>검토자</dt><dd th:text="${batch.reviewer}"></dd>
+<dt>실행 사유</dt><dd th:text="${batch.executionNote}"></dd>
+<dt>Mode</dt><dd th:text="${batch.mode}"></dd>
+<dt>Gate version</dt><dd th:text="${batch.gateVersion}"></dd>
+<dt>Digest</dt><dd><code class="release-digest" th:text="${batch.previewDigest}"></code></dd>
+<dt>생성 시각</dt><dd th:text="${batch.createdAt}"></dd>
+<dt>실행 시각</dt><dd th:text="${batch.executedAt}"></dd>
+<dt>대상 / 성공</dt><dd th:text="${batch.targetCount+' / '+batch.successCount}"></dd>
+<dt>Manual override</dt><dd th:text="${batch.manualOverrideCount}"></dd>
+<dt>Rollback 시각</dt><dd th:text="${batch.rolledBackAt == null ? '없음' : batch.rolledBackAt}"></dd>
+<dt>Rollback 사유</dt><dd th:text="${batch.rollbackReason == null ? '없음' : batch.rollbackReason}"></dd>
+</dl></section>
+<section><h2>실행 시점 Manifest</h2><p>이력은 실행 당시의 snapshot입니다. 이후 rollback 여부는 위 상태에서 확인하세요.</p>
+<details><summary th:text="${'Item manifest '+batch.items.size()+'건 펼치기'}"></summary>
+<div class="release-table" tabindex="0" role="region" aria-label="Item before after manifest">
+<table><thead><tr><th scope="col">ID</th><th scope="col">검토 상태 before → after</th><th scope="col">공개 before → after</th><th scope="col">Decision / issues</th><th scope="col">Override / 사유</th><th scope="col">Source / rights snapshot</th></tr></thead>
+<tbody><tr th:each="item : ${batch.items}">
+<td><a th:href="@{/admin/contents/{id}(id=${item.contentItemId})}" th:text="${item.contentItemId}"></a></td>
+<td th:text="${item.previousReviewStatus+' → '+item.resultingReviewStatus}"></td>
+<td th:text="${item.previousPublished+' → '+item.resultingPublished}"></td>
+<td><span th:text="${item.releaseDecision}"></span><p th:text="${item.issueCodes}"></p></td>
+<td><span th:text="${item.manualOverrideIssueCodes}"></span><p th:text="${item.overrideReason}"></p></td>
+<td><span th:text="${item.sourceRef}"></span><p th:text="${item.sourceRightsStatus}"></p></td>
+</tr></tbody></table></div></details></section>
+<p id="release-message" role="status" aria-live="polite" tabindex="-1"></p>
+<section th:if="${batch.status.name() == 'EXECUTED'}">
+<h2>Rollback</h2>
+<p>모든 콘텐츠의 현재 공개·검토 상태가 manifest의 after-state와 일치할 때만 실행 전 상태로 복원합니다. 하나라도 변경되었으면 전체 요청을 거부합니다.</p>
+<p>콘텐츠 본문과 source rights는 복원하지 않습니다. LearningProgress / StudyRecord / QuizAttempt 등 학습 기록은 삭제하지 않습니다.</p>
+<form id="rollback-form">
+<label for="rollback-reason">Rollback 사유 (필수)</label><textarea id="rollback-reason" required maxlength="1000"></textarea>
+<label class="release-check"><input type="checkbox" required>복원할 공개·검토 상태와 학습 기록 보존 정책을 확인했습니다.</label>
+<button id="rollback-button" type="submit">상태 확인 후 Rollback</button>
+</form></section>
+<p th:if="${batch.status.name() == 'ROLLED_BACK'}">이미 rollback된 Batch입니다. 재rollback은 허용되지 않습니다.</p>
+</main>
+<script src="/js/admin-release.js" defer></script>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body></html>

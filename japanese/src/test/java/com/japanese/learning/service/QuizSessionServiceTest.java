@@ -109,6 +109,26 @@ class QuizSessionServiceTest {
                 started.currentQuestion().itemId(), "answer"))).isInstanceOf(QuizSessionNotFoundException.class);
     }
 
+    @Test
+    void inProgressSessionKeepsItsQuestionSnapshotWhenSourceContentIsUnpublished() {
+        var started = quizzes.startOrResume(account, QuizMode.QUICK, 5);
+        var profile = profiles.findByUserAccountLoginId(account.getLoginId()).orElseThrow();
+        QuizSession entity = sessionRepository.findOwned(profile.getId(), started.sessionId()).orElseThrow();
+        QuizSessionItem first = itemRepository.findBySessionIdOrderByPosition(entity.getId()).get(0);
+        ContentItem source = first.getContentItem();
+        source.unpublishApproved();
+        contents.saveAndFlush(source);
+
+        var resumed = quizzes.get(account, started.sessionId());
+        assertThat(resumed.currentQuestion().itemId()).isEqualTo(first.getId());
+        var answered = quizzes.answer(account, started.sessionId(), first.getId(), first.getCorrectAnswer());
+
+        assertThat(answered.feedback().correct()).isTrue();
+        assertThat(attempts.findByLearnerProfileLearnerKeyOrderByAnsweredAtDesc(
+                profile.getLearnerKey(), org.springframework.data.domain.PageRequest.of(0, 10)))
+                .anyMatch(attempt -> attempt.getQuizSessionItem().getId().equals(first.getId()));
+    }
+
     private String choicesOtherThan(QuizSessionItem item) {
         try {
             List<String> choices = new tools.jackson.databind.ObjectMapper().readValue(

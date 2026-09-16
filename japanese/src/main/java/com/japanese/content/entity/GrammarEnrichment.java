@@ -48,7 +48,8 @@ public class GrammarEnrichment {
         this.learnerNote = learnerNote;
     }
 
-    public void approveForPublication() { reviewStatus = ReviewStatus.APPROVED; published = true; reviewedAt = Instant.now(); }
+    public void approve(boolean releaseAllowed) { reviewStatus = ReviewStatus.APPROVED; published = releaseAllowed; reviewedAt = Instant.now(); }
+    public void approveForPublication() { approve(true); }
     public void reject() { reviewStatus = ReviewStatus.REJECTED; published = false; reviewedAt = Instant.now(); }
     public void markPending() { reviewStatus = ReviewStatus.PENDING; published = false; reviewedAt = null; }
     public boolean isPubliclyVisible() { return published && reviewStatus == ReviewStatus.APPROVED; }

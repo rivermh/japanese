@@ -32,17 +32,20 @@ public class ContentReviewService {
     private final ContentReviewHistoryRepository contentReviewHistoryRepository;
     private final ContentSourceRepository contentSourceRepository;
     private final ContentQualityAuditService qualityAudit;
+    private final ContentReleaseGateService releaseGate;
 
     public ContentReviewService(
             ContentItemRepository contentItemRepository,
             ContentReviewHistoryRepository contentReviewHistoryRepository,
             ContentSourceRepository contentSourceRepository,
-            ContentQualityAuditService qualityAudit
+            ContentQualityAuditService qualityAudit,
+            ContentReleaseGateService releaseGate
     ) {
         this.contentItemRepository = contentItemRepository;
         this.contentReviewHistoryRepository = contentReviewHistoryRepository;
         this.contentSourceRepository = contentSourceRepository;
         this.qualityAudit = qualityAudit;
+        this.releaseGate = releaseGate;
     }
 
     @Transactional(readOnly = true)
@@ -106,8 +109,10 @@ public class ContentReviewService {
         ContentItem item = contentItemRepository.findByIdAndPublishedFalse(contentId)
                 .orElseThrow(() -> new NoSuchElementException("Content not found: " + contentId));
         validateQualityForApproval(item);
-        item.publish();
-        contentReviewHistoryRepository.save(new ContentReviewHistory(item, ReviewStatus.APPROVED, "검토 완료 · 공개"));
+        ContentReleaseGateService.Result decision = releaseGate.evaluate(item);
+        item.approve(decision.releasable());
+        contentReviewHistoryRepository.save(new ContentReviewHistory(
+                item, ReviewStatus.APPROVED, reviewHistoryNote("검토 완료", decision)));
     }
 
     @Transactional
@@ -122,10 +127,14 @@ public class ContentReviewService {
                 continue;
             }
             validateQualityForApproval(item.get());
-            item.get().publish();
+            ContentReleaseGateService.Result decision = releaseGate.evaluate(item.get());
+            item.get().approve(decision.releasable());
             contentReviewHistoryRepository.save(
-                    new ContentReviewHistory(item.get(), ReviewStatus.APPROVED, "검토 완료 · 선택 공개"));
-            publishedCount++;
+                    new ContentReviewHistory(item.get(), ReviewStatus.APPROVED,
+                            reviewHistoryNote("검토 완료 · 선택 승인", decision)));
+            if (decision.releasable()) {
+                publishedCount++;
+            }
         }
         return publishedCount;
     }
@@ -143,11 +152,18 @@ public class ContentReviewService {
     }
 
     @Transactional
-    public void reset(Long contentId) {
+    public void reset(Long contentId, String reason) {
+        String normalizedReason = reason == null ? "" : reason.trim();
+        if (normalizedReason.isBlank()) {
+            throw new IllegalArgumentException("A reopen reason is required");
+        }
         ContentItem item = contentItemRepository.findByIdAndPublishedFalse(contentId)
                 .orElseThrow(() -> new NoSuchElementException("Content not found: " + contentId));
-        item.resetReview();
-        contentReviewHistoryRepository.save(new ContentReviewHistory(item, ReviewStatus.PENDING, "재검토 요청"));
+        ReviewStatus previous = item.getReviewStatus();
+        item.reopenReview();
+        contentReviewHistoryRepository.save(new ContentReviewHistory(
+                item, previous, ReviewStatus.PENDING, null,
+                "[REOPEN_REVIEW] published=false->false · " + normalizedReason));
     }
 
     private ContentReviewSummary toSummary(ContentItem item) {
@@ -224,6 +240,13 @@ public class ContentReviewService {
             throw new IllegalStateException("품질 오류가 있어 승인할 수 없습니다: "
                     + String.join(", ", errors.stream().map(Enum::name).toList()));
         }
+    }
+
+    private String reviewHistoryNote(String prefix, ContentReleaseGateService.Result decision) {
+        String value = decision.releasable()
+                ? "[APPROVE_AND_PUBLISH] published=false->true · " + prefix
+                : "[APPROVE_UNPUBLISHED] published=false->false · " + prefix + " · Release Gate: " + decision.reason();
+        return value.length() <= 1000 ? value : value.substring(0, 1000);
     }
 
     private SourceDetails toSourceDetails(String sourceRef) {

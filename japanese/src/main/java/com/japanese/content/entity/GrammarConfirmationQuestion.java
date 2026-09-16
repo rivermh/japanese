@@ -43,7 +43,8 @@ public class GrammarConfirmationQuestion {
         this.questionType=questionType; this.prompt=prompt; this.context=context; this.explanation=explanation;
         choices.clear();
     }
-    public void approveForPublication() { if (choices.stream().filter(GrammarConfirmationChoice::isCorrect).count()!=1) throw new IllegalStateException("A confirmation question must have exactly one correct choice"); reviewStatus=ReviewStatus.APPROVED; published=true; reviewedAt=Instant.now(); }
+    public void approve(boolean releaseAllowed) { if (choices.stream().filter(GrammarConfirmationChoice::isCorrect).count()!=1) throw new IllegalStateException("A confirmation question must have exactly one correct choice"); reviewStatus=ReviewStatus.APPROVED; published=releaseAllowed; reviewedAt=Instant.now(); }
+    public void approveForPublication() { approve(true); }
     public void reject(){reviewStatus=ReviewStatus.REJECTED;published=false;reviewedAt=Instant.now();}
     public void markPending(){reviewStatus=ReviewStatus.PENDING;published=false;reviewedAt=null;}
     public boolean isPubliclyVisible(){return published && reviewStatus==ReviewStatus.APPROVED && grammar.getContentItem().isPublished();}

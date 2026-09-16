@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface BookmarkRepository extends JpaRepository<Bookmark, Long> {
     Optional<Bookmark> findByUserAccountLoginIdAndContentItemSlug(String loginId, String slug);
     long countByUserAccountLoginId(String loginId);
+    long countByUserAccountLoginIdAndContentItemPublishedTrue(String loginId);
     @EntityGraph(attributePaths = {"contentItem", "contentItem.word", "contentItem.word.meanings", "contentItem.grammar", "contentItem.levels", "contentItem.categories"})
-    List<Bookmark> findByUserAccountLoginIdOrderByCreatedAtDesc(String loginId);
+    List<Bookmark> findByUserAccountLoginIdAndContentItemPublishedTrueOrderByCreatedAtDesc(String loginId);
 }

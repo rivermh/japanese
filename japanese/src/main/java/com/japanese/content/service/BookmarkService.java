@@ -31,11 +31,11 @@ public class BookmarkService {
     }
     @Transactional(readOnly = true)
     public long count(UserAccount account) {
-        return bookmarkRepository.countByUserAccountLoginId(account.getLoginId());
+        return bookmarkRepository.countByUserAccountLoginIdAndContentItemPublishedTrue(account.getLoginId());
     }
     @Transactional(readOnly = true)
     public List<ContentSummary> list(UserAccount account, ContentType type, String level) {
-        return bookmarkRepository.findByUserAccountLoginIdOrderByCreatedAtDesc(account.getLoginId()).stream()
+        return bookmarkRepository.findByUserAccountLoginIdAndContentItemPublishedTrueOrderByCreatedAtDesc(account.getLoginId()).stream()
                 .map(Bookmark::getContentItem).filter(item -> (type == null || item.getType() == type)
                         && (level == null || level.isBlank() || item.getLevels().stream().anyMatch(l -> level.equals(l.getCode()))))
                 .map(this::toSummary).toList();

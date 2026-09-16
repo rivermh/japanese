@@ -1,0 +1,21 @@
+.page-shell.release-shell { width: 100%; min-width: 0; max-width: 1120px; margin-inline: auto; }
+.release-shell > *, .release-shell section { min-width: 0; }
+.release-shell section { margin-block: 1.5rem; }
+.release-shell nav { margin-bottom: 1rem; }
+.release-shell label { display: block; }
+.release-shell input, .release-shell select, .release-shell textarea { max-width: 100%; }
+.release-shell textarea { display: block; width: 100%; min-height: 5rem; }
+.release-shell fieldset { min-width: 0; margin-block: 1rem; padding: 1rem; border: 1px solid #d8d5cc; }
+.release-shell .release-check { display: flex; gap: .6rem; align-items: baseline; margin-block: .75rem; }
+.release-shell .release-check input { width: auto; flex: none; }
+.release-shell [hidden] { display: none !important; }
+.release-shell .release-error { border-left: 4px solid #9b3730; padding: .75rem; color: #782e29; background: #fff2ed; }
+.release-digest, .release-shell code, .release-shell p, .release-shell li, .release-shell dd { overflow-wrap: anywhere; }
+.release-table { max-width: 100%; overflow-x: auto; margin-block: 1rem; }
+.release-table table { width: 100%; border-collapse: collapse; min-width: 720px; }
+.release-table td, .release-table th { padding: .65rem; text-align: left; vertical-align: top; border-bottom: 1px solid #d8d5cc; overflow-wrap: anywhere; max-width: 320px; }
+.release-shell button:disabled { opacity: .55; cursor: not-allowed; }
+.release-shell :focus-visible { outline: 3px solid #44618a; outline-offset: 3px; }
+.release-shell dl { display: grid; grid-template-columns: minmax(100px, 180px) minmax(0, 1fr); gap: .5rem 1rem; }
+.release-shell dd { margin: 0; }
+@media (max-width: 600px) { .release-shell .admin-filter { display: grid; grid-template-columns: 1fr; } .release-shell dl { grid-template-columns: 1fr; } }

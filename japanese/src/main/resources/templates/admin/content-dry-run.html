@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Batch Release · 공개 전 검토')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('admin')}"></header>
+<link rel="stylesheet" href="/css/admin-release.css">
+<main id="main-content" class="page-shell admin-shell release-shell" data-release-page>
+  <input type="hidden" id="release-csrf" th:value="${_csrf.token}" th:attr="data-header=${_csrf.headerName}">
+  <header class="page-heading"><div><p class="eyebrow">RELEASE DRY-RUN</p><h1>Batch Release</h1><p>대상을 먼저 검토하고 확인한 집합만 공개합니다. Dry-run은 데이터를 변경하지 않습니다.</p></div></header>
+  <nav aria-label="콘텐츠 관리"><a href="/admin/contents">콘텐츠 목록</a> · <a href="/admin/content-release/batches">Batch 실행 이력</a></nav>
+  <noscript>Dry-run 및 실행에는 JavaScript가 필요합니다. 실행 이력은 위 링크에서 확인할 수 있습니다.</noscript>
+  <section><h2>1. 대상 범위 선택</h2>
+    <form id="release-filter" class="admin-filter">
+      <label>콘텐츠 유형<select name="type" required><option value="">선택하세요</option><option value="WORD">WORD · 단어</option><option value="GRAMMAR">GRAMMAR · 문법</option></select></label>
+      <label>JLPT<select name="level" required><option value="">선택하세요</option><option>N5</option><option>N4</option><option>N3</option><option>N2</option><option>N1</option></select></label>
+      <label>검토 상태<select name="reviewStatus"><option value="PENDING">PENDING · 검토 대기</option><option value="APPROVED">APPROVED · 검수 통과</option><option value="REJECTED">REJECTED · 거절</option><option value="">전체 상태</option></select></label>
+      <label>공개 여부<select name="published"><option value="false">비공개</option><option value="true">공개</option><option value="">전체</option></select></label>
+      <label>출처<input name="source" placeholder="sourceRef로 검색"></label>
+      <label>출처 권리<select name="sourceRightsStatus"><option value="">전체 권리 상태</option><option>ALLOWED</option><option>UNKNOWN</option><option>MANUAL_REVIEW_REQUIRED</option><option>BLOCKED</option></select></label>
+      <button type="submit" id="preview-button">Dry-run 실행</button>
+    </form>
+  </section>
+  <p id="release-message" role="status" aria-live="polite" tabindex="-1"></p>
+  <a id="retry-preview" href="#release-filter" hidden>범위를 확인하고 새 Dry-run 실행</a>
+  <div id="release-preview" hidden>
+    <section><h2>2. Preview 검토</h2><div id="release-summary"></div>
+      <h3>Source rights 분포</h3><p>UNKNOWN / MANUAL_REVIEW_REQUIRED / BLOCKED / 미등록 출처는 공개 차단입니다.</p><ul id="rights-counts"></ul>
+      <h3>Issue 분포</h3><div id="issue-counts"></div>
+      <p>Duplicate candidate는 자동 공개 대상이 아닙니다. 표기·의미 차이를 개별 검토해야 합니다.</p>
+      <div id="release-samples"></div>
+    </section>
+    <section><h2>3. 실행 방식과 개별 검토</h2>
+      <label for="release-mode">실행 방식</label>
+      <select id="release-mode"><option value="RELEASABLE_ONLY">RELEASABLE_ONLY · 공개 가능 대상만</option><option value="ALLOW_EXPLICIT_MANUAL_OVERRIDES">고급: 개별 manual issue를 명시적으로 확인하여 공개</option></select>
+      <p id="execution-eligibility" role="status"></p>
+      <div id="manual-review" hidden><p>PUBLICATION_BLOCKER는 예외 처리할 수 없습니다. 각 콘텐츠의 모든 manual issue와 사유를 개별 확인하세요.</p><div id="manual-items"></div></div>
+    </section>
+    <section><h2>4. 공개 실행 확인</h2>
+      <p id="execution-identity"></p>
+      <details><summary>대상 digest 전체 보기</summary><code id="preview-digest" class="release-digest"></code></details>
+      <form id="release-execute">
+        <label for="execution-note">실행 사유 (필수)</label><textarea id="execution-note" required maxlength="1000"></textarea>
+        <label class="release-check"><input id="confirm-preview" type="checkbox" required>현재 preview 대상과 상태, 공개 예정 수를 확인했습니다.</label>
+        <label id="manual-confirm-label" class="release-check" hidden><input id="confirm-manual" type="checkbox">모든 manual issue를 개별 확인했습니다.</label>
+        <button id="execute-button" type="submit" disabled>확인한 대상 공개 실행</button>
+      </form>
+    </section>
+  </div>
+</main>
+<script src="/js/admin-release.js" defer></script>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

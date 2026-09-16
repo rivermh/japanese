@@ -58,7 +58,7 @@ public class TodayStudySessionService {
         return session.map(this::view).orElseGet(() -> startOrResume(account));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Optional<TodayStudySessionView> findCurrent(UserAccount account) {
         LearnerProfile profile = profile(account);
         return sessions.findByLearnerProfileIdAndSessionDate(profile.getId(), LocalDate.now(zone)).map(this::view);
@@ -71,16 +71,26 @@ public class TodayStudySessionService {
         if (sessions.findByLearnerProfileIdAndSessionDate(profile.getId(), date).isEmpty()) startOrResume(account);
         TodayStudySession session = sessions.findForUpdate(profile.getId(), date)
                 .orElseThrow(() -> new NoSuchElementException("Today session not found"));
+        withdrawUnavailable(session);
+        completeIfFinished(session);
         var target = items.findBySessionIdAndContentItemSlug(session.getId(), slug)
                 .orElseThrow(() -> new NoSuchElementException("Content is not in today session"));
         if (target.isCompleted() || session.getState() == TodayStudySessionState.COMPLETED) return view(session);
+        var lockedContent = contents.findByIdForReview(target.getContentItem().getId())
+                .orElseThrow(() -> new NoSuchElementException("Content not found"));
+        if (!lockedContent.isPublished()) {
+            target.withdraw();
+            completeIfFinished(session);
+            return view(session);
+        }
         TodayStudySessionItem current = items.findIncompleteItems(session.getId()).stream().findFirst()
                 .orElseThrow(() -> new IllegalStateException("Today session has no remaining item"));
         if (!current.getId().equals(target.getId())) throw new IllegalArgumentException("Complete the current card first");
 
         learningService.answer(account, slug, result, session.getSessionKey(), false);
         target.complete(result);
-        if (items.findIncompleteItems(session.getId()).isEmpty()) session.complete();
+        withdrawUnavailable(session);
+        completeIfFinished(session);
         return view(session);
     }
 
@@ -99,23 +109,44 @@ public class TodayStudySessionService {
     }
 
     private TodayStudySessionView view(TodayStudySession session) {
+        withdrawUnavailable(session);
+        completeIfFinished(session);
         List<TodayStudySessionItem> all = items.findItems(session.getId());
-        List<TodayStudySessionItem> incomplete = all.stream().filter(item -> !item.isCompleted()).toList();
-        int completed = all.size() - incomplete.size();
-        int total = all.size();
+        List<TodayStudySessionItem> active = all.stream().filter(item -> !item.isWithdrawn()).toList();
+        List<TodayStudySessionItem> incomplete = active.stream().filter(item -> !item.isCompleted()).toList();
+        int completed = active.size() - incomplete.size();
+        int total = active.size();
         TodayStudySessionItem current = incomplete.isEmpty() ? null : incomplete.get(0);
-        int completedReview = (int) all.stream().filter(TodayStudySessionItem::isCompleted)
+        int completedReview = (int) active.stream().filter(TodayStudySessionItem::isCompleted)
                 .filter(item -> item.getPlannedActivityType() == StudyActivityType.REVIEW).count();
-        int completedWords = (int) all.stream().filter(TodayStudySessionItem::isCompleted)
+        int completedWords = (int) active.stream().filter(TodayStudySessionItem::isCompleted)
                 .filter(item -> item.getPlannedActivityType() == StudyActivityType.NEW)
                 .filter(item -> item.getContentItem().getType() == ContentType.WORD).count();
-        int completedGrammar = (int) all.stream().filter(TodayStudySessionItem::isCompleted)
+        int completedGrammar = (int) active.stream().filter(TodayStudySessionItem::isCompleted)
                 .filter(item -> item.getPlannedActivityType() == StudyActivityType.NEW)
                 .filter(item -> item.getContentItem().getType() == ContentType.GRAMMAR).count();
+        int reviewTarget = (int) active.stream().filter(item -> item.getPlannedActivityType() == StudyActivityType.REVIEW).count();
+        int wordTarget = (int) active.stream().filter(item -> item.getPlannedActivityType() == StudyActivityType.NEW)
+                .filter(item -> item.getContentItem().getType() == ContentType.WORD).count();
+        int grammarTarget = (int) active.stream().filter(item -> item.getPlannedActivityType() == StudyActivityType.NEW)
+                .filter(item -> item.getContentItem().getType() == ContentType.GRAMMAR).count();
         return new TodayStudySessionView(session.getSessionKey(), session.getState(), total, completed,
-                session.getPlannedReviewCount(), session.getPlannedNewWordCount(), session.getPlannedNewGrammarCount(),
+                reviewTarget, wordTarget, grammarTarget,
                 current == null ? null : current.getContentItem().getSlug(), current == null ? null : current.getPlannedActivityType(),
                 completedReview, completedWords, completedGrammar);
+    }
+
+    private void withdrawUnavailable(TodayStudySession session) {
+        items.findIncompleteItems(session.getId()).stream()
+                .filter(item -> !item.getContentItem().isPublished())
+                .forEach(TodayStudySessionItem::withdraw);
+    }
+
+    private void completeIfFinished(TodayStudySession session) {
+        if (session.getState() != TodayStudySessionState.COMPLETED
+                && items.findIncompleteItems(session.getId()).isEmpty()) {
+            session.complete();
+        }
     }
 
     private LearnerProfile profile(UserAccount account) {

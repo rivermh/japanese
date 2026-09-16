@@ -25,9 +25,10 @@ class AdminContentReviewServiceTest {
  @Autowired GrammarConfirmationQuestionRepository questions; @Autowired CurationReviewHistoryRepository curationHistory;
  @Autowired StudyRecordRepository studyRecords; @Autowired LearningProgressRepository progress;
  @Autowired ContentReviewService legacyReviews;
+ @Autowired ContentSourceRepository sources; @Autowired ContentSourceRightsService sourceRights;
  UserAccount admin;
- @BeforeEach void setup() throws Exception {sample.run();admin=accounts.save(new UserAccount("admin-"+UUID.randomUUID(),null,"hash","검수자",UserRole.ADMIN));}
- private ContentItem word(String suffix,String expression,String level){var item=new ContentItem("admin-word-"+suffix,ContentType.WORD,"admin-source",false);var w=new Word(expression,"よみ","명사",null);w.addMeaning(new Meaning("ko",expression+" 뜻",0));item.attachWord(w);levels.findBySystemAndCode("JLPT",level).ifPresent(item::addLevel);return contents.save(item);}
+ @BeforeEach void setup() throws Exception {sample.run();admin=accounts.save(new UserAccount("admin-"+UUID.randomUUID(),null,"hash","검수자",UserRole.ADMIN));var source=sources.save(new ContentSource("admin-source","Admin test source","1",null,null,null,null));sourceRights.reviewRights(source.getId(),ContentSourceRightsStatus.MANUAL_REVIEW_REQUIRED,"테스트 권리 검토",false,null);sourceRights.reviewRights(source.getId(),ContentSourceRightsStatus.ALLOWED,"테스트 공개 허용",false,null);}
+ private ContentItem word(String suffix,String expression,String level){var item=new ContentItem("admin-word-"+suffix,ContentType.WORD,"admin-source",false);var w=new Word(expression,"よみ","명사",null);w.addMeaning(new Meaning("ko",expression+" 뜻",0));item.attachWord(w);item.addExample(new Example("예문",null,"예문 번역",0));levels.findBySystemAndCode("JLPT",level).ifPresent(item::addLevel);return contents.save(item);}
  private ContentItem grammar(String suffix,String pattern,String level){var item=new ContentItem("admin-grammar-"+suffix,ContentType.GRAMMAR,"admin-source",false);item.attachGrammar(new Grammar(pattern,"설명 "+pattern,"동사형"));levels.findBySystemAndCode("JLPT",level).ifPresent(item::addLevel);return contents.save(item);}
 
  @Test void filtersWithDatabasePaginationAndKeepsPublicPolicy(){for(int i=0;i<30;i++)word("page-"+i,"검수단어"+i,i%2==0?"N5":"N4");grammar("target","〜검수문법","N5");
@@ -43,6 +44,11 @@ class AdminContentReviewServiceTest {
    assertThatThrownBy(()->reviews.rejectContent(approved.getId(),admin,"전이 금지")).isInstanceOf(IllegalStateException.class);assertThat(studyRecords.count()).isEqualTo(records);assertThat(progress.count()).isEqualTo(states);
  }
 
+ @Test void approvalKeepsContentUnpublishedWhenSourceRightsAreNotAllowed(){String ref="unknown-admin-source-"+UUID.randomUUID();sources.save(new ContentSource(ref,"Unknown source","1",null,null,null,null));var item=new ContentItem("unknown-rights-content-"+UUID.randomUUID(),ContentType.WORD,ref,false);var w=new Word("권리미확인","けんり","명사",null);w.addMeaning(new Meaning("ko","권리 미확인",0));item.attachWord(w);item=contents.save(item);
+   var result=reviews.approveContent(item.getId(),admin,"내용 검수 완료");
+   assertThat(result.status()).isEqualTo(ReviewStatus.APPROVED);assertThat(result.published()).isFalse();assertThat(item.getReviewStatus()).isEqualTo(ReviewStatus.APPROVED);assertThat(item.isPublished()).isFalse();assertThat(histories.findByContentItemIdOrderByReviewedAtDesc(item.getId())).singleElement().satisfies(history->{assertThat(history.getStatus()).isEqualTo(ReviewStatus.APPROVED);assertThat(history.getNote()).contains("[APPROVE_UNPUBLISHED]");});
+ }
+
  @Test void reviewsEachCuratedTypeIndependentlyAndExposesCorrectAnswerOnlyToAdminModel(){
    var e=curation.saveEnrichment("temo-ii","admin:e","뉘앙스","용법","접속","실수","노트");
     var other=grammar("curated-other","〜別文法","N5");
@@ -53,20 +59,26 @@ class AdminContentReviewServiceTest {
      var result=reviews.reviewCuration((CurationRecordType)target[0],(Long)target[1],ReviewStatus.APPROVED,admin,"검수");assertThat(result.changed()).isTrue();assertThat(reviews.reviewCuration((CurationRecordType)target[0],(Long)target[1],ReviewStatus.APPROVED,admin,null).changed()).isFalse();assertThat(curationHistory.findByRecordTypeAndRecordIdOrderByReviewedAtDesc((CurationRecordType)target[0],(Long)target[1])).hasSize(1);
    }
    assertThat(reviews.curation(CurationRecordType.CONFIRMATION,q.getId()).choices()).anyMatch(AdminContentReviewModels.Choice::correct);
+   assertThat(List.of(e.isPublished(),r.isPublished(),c.isPublished(),q.isPublished())).containsOnly(false);
     var pending=curation.saveEnrichment(other.getSlug(),"admin:reject","x",null,null,null,null);reviews.reviewCuration(CurationRecordType.ENRICHMENT,pending.getId(),ReviewStatus.REJECTED,admin,"부족");assertThat(enrichments.findById(pending.getId()).orElseThrow().isPublished()).isFalse();
+ }
+
+ @Test void curationPublicationAlsoRequiresAllowedSource(){String ref="allowed-curation-"+UUID.randomUUID();var source=sources.save(new ContentSource(ref,"Allowed curation source","1",null,null,null,null));sourceRights.reviewRights(source.getId(),ContentSourceRightsStatus.MANUAL_REVIEW_REQUIRED,"검토",false,null);sourceRights.reviewRights(source.getId(),ContentSourceRightsStatus.ALLOWED,"허용",false,null);var item=curation.saveEnrichment("temo-ii",ref,"허용된 보강",null,null,null,null);
+   var result=reviews.reviewCuration(CurationRecordType.ENRICHMENT,item.getId(),ReviewStatus.APPROVED,admin,"내용 검수");
+   assertThat(result.published()).isTrue();assertThat(item.isPublished()).isTrue();
  }
 
  @Test void qualityErrorsBlockSingleAndBatchApprovalButWarningsRemainApprovable(){
    var missingMeaning=word("quality-missing-meaning","quality-missing","N5");missingMeaning.getWord().getMeanings().clear();contents.save(missingMeaning);
    var blankMeaning=word("quality-blank-meaning","quality-blank","N5");blankMeaning.getWord().getMeanings().clear();blankMeaning.getWord().addMeaning(new Meaning("ko"," ",0));contents.save(blankMeaning);
    var blankGrammar=new ContentItem("admin-grammar-quality-blank",ContentType.GRAMMAR,"admin-source",false);blankGrammar.attachGrammar(new Grammar("~quality-blank"," ","connection"));levels.findBySystemAndCode("JLPT","N5").ifPresent(blankGrammar::addLevel);contents.save(blankGrammar);
-   var warning=word("quality-warning","quality-warning","N5");
+   var warning=word("quality-warning","quality-warning","N5");warning.getExamples().clear();
    contents.flush();
 
    assertThatThrownBy(()->reviews.approveContent(missingMeaning.getId(),admin,null)).isInstanceOf(IllegalStateException.class).hasMessageContaining("MEANING_MISSING");
    assertThatThrownBy(()->reviews.approveContent(blankMeaning.getId(),admin,null)).isInstanceOf(IllegalStateException.class).hasMessageContaining("MEANING_BLANK");
    assertThatThrownBy(()->reviews.approveContent(blankGrammar.getId(),admin,null)).isInstanceOf(IllegalStateException.class).hasMessageContaining("GRAMMAR_DESCRIPTION_BLANK");
-   assertThat(reviews.approveContent(warning.getId(),admin,null).changed()).isTrue();
+   assertThat(reviews.approveContent(warning.getId(),admin,null).changed()).isTrue();assertThat(warning.getReviewStatus()).isEqualTo(ReviewStatus.APPROVED);assertThat(warning.isPublished()).isFalse();
 
    assertThat(missingMeaning.isPublished()).isFalse();assertThat(missingMeaning.getReviewStatus()).isEqualTo(ReviewStatus.PENDING);assertThat(histories.findByContentItemIdOrderByReviewedAtDesc(missingMeaning.getId())).isEmpty();
    assertThat(blankMeaning.isPublished()).isFalse();assertThat(blankMeaning.getReviewStatus()).isEqualTo(ReviewStatus.PENDING);assertThat(histories.findByContentItemIdOrderByReviewedAtDesc(blankMeaning.getId())).isEmpty();

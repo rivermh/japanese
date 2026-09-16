@@ -34,7 +34,7 @@ public class StudyCollectionService {
     public List<StudyCollectionSummary> list(UserAccount account) {
         return collectionRepository.findByUserAccountLoginIdOrderByUpdatedAtDesc(account.getLoginId()).stream()
                 .map(collection -> new StudyCollectionSummary(
-                        collection.getId(), collection.getName(), itemRepository.countByStudyCollectionId(collection.getId())))
+                        collection.getId(), collection.getName(), itemRepository.countByStudyCollectionIdAndContentItemPublishedTrue(collection.getId())))
                 .toList();
     }
 
@@ -47,9 +47,8 @@ public class StudyCollectionService {
     public StudyCollectionDetails details(UserAccount account, Long id) {
         StudyCollection collection = owned(account, id);
         return new StudyCollectionDetails(collection.getId(), collection.getName(),
-                itemRepository.findByStudyCollectionIdOrderByCreatedAtAsc(collection.getId()).stream()
+                itemRepository.findByStudyCollectionIdAndContentItemPublishedTrueOrderByCreatedAtAsc(collection.getId()).stream()
                         .map(StudyCollectionItem::getContentItem)
-                        .filter(ContentItem::isPublished)
                         .map(StudyQueueService::toSummary)
                         .toList());
     }
@@ -64,7 +63,7 @@ public class StudyCollectionService {
     public StudyCollectionSummary rename(UserAccount account, Long id, String name) {
         StudyCollection collection = owned(account, id);
         collection.rename(normalizeName(name));
-        return new StudyCollectionSummary(collection.getId(), collection.getName(), itemRepository.countByStudyCollectionId(id));
+        return new StudyCollectionSummary(collection.getId(), collection.getName(), itemRepository.countByStudyCollectionIdAndContentItemPublishedTrue(id));
     }
 
     @Transactional

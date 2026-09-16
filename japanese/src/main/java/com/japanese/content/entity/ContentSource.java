@@ -2,10 +2,13 @@ package com.japanese.content.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Instant;
 
 @Entity
 @Table(name = "content_sources")
@@ -32,6 +35,19 @@ public class ContentSource {
 
     @Column(length = 2000)
     private String attribution;
+
+    @Column(name = "attribution_required", nullable = false)
+    private boolean attributionRequired;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rights_status", nullable = false, length = 32)
+    private ContentSourceRightsStatus rightsStatus = ContentSourceRightsStatus.UNKNOWN;
+
+    @Column(name = "rights_reviewed_at")
+    private Instant rightsReviewedAt;
+
+    @Column(name = "rights_review_note", length = 2000)
+    private String rightsReviewNote;
 
     @Column(length = 1000)
     private String usageNote;
@@ -61,6 +77,10 @@ public class ContentSource {
         return sourceRef;
     }
 
+    public Long getId() {
+        return id;
+    }
+
     public String getDisplayName() {
         return displayName;
     }
@@ -81,7 +101,68 @@ public class ContentSource {
         return attribution;
     }
 
+    public boolean isAttributionRequired() {
+        return attributionRequired;
+    }
+
+    public ContentSourceRightsStatus getRightsStatus() {
+        return rightsStatus == null ? ContentSourceRightsStatus.UNKNOWN : rightsStatus;
+    }
+
+    public Instant getRightsReviewedAt() {
+        return rightsReviewedAt;
+    }
+
+    public String getRightsReviewNote() {
+        return rightsReviewNote;
+    }
+
     public String getUsageNote() {
         return usageNote;
+    }
+
+    public void reviewRights(ContentSourceRightsStatus target, String note,
+                             Boolean attributionRequired, String attributionText) {
+        if (target == null) {
+            throw new IllegalArgumentException("Source rights 상태가 필요합니다.");
+        }
+        String normalizedNote = clean(note);
+        if (normalizedNote == null) {
+            throw new IllegalArgumentException("Source rights 검토 메모가 필요합니다.");
+        }
+        ContentSourceRightsStatus current = getRightsStatus();
+        if (!canTransition(current, target)) {
+            throw new IllegalStateException("허용되지 않은 source rights 전환입니다: " + current + " -> " + target);
+        }
+
+        boolean nextAttributionRequired = attributionRequired == null
+                ? this.attributionRequired
+                : attributionRequired;
+        String nextAttribution = attributionText == null ? this.attribution : clean(attributionText);
+        if (target == ContentSourceRightsStatus.ALLOWED
+                && nextAttributionRequired
+                && nextAttribution == null) {
+            throw new IllegalStateException("Attribution이 필요한 source는 attribution 문구 없이 ALLOWED로 전환할 수 없습니다.");
+        }
+
+        this.attributionRequired = nextAttributionRequired;
+        this.attribution = nextAttribution;
+        this.rightsStatus = target;
+        this.rightsReviewNote = normalizedNote;
+        this.rightsReviewedAt = Instant.now();
+    }
+
+    private static boolean canTransition(ContentSourceRightsStatus current, ContentSourceRightsStatus target) {
+        return switch (current) {
+            case UNKNOWN -> target == ContentSourceRightsStatus.MANUAL_REVIEW_REQUIRED;
+            case MANUAL_REVIEW_REQUIRED -> target == ContentSourceRightsStatus.ALLOWED
+                    || target == ContentSourceRightsStatus.BLOCKED;
+            case ALLOWED -> target == ContentSourceRightsStatus.BLOCKED;
+            case BLOCKED -> target == ContentSourceRightsStatus.MANUAL_REVIEW_REQUIRED;
+        };
+    }
+
+    private static String clean(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

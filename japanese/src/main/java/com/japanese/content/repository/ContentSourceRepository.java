@@ -5,6 +5,10 @@ import java.util.List;
 import java.util.Collection;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface ContentSourceRepository extends JpaRepository<ContentSource, Long> {
 
@@ -12,5 +16,13 @@ public interface ContentSourceRepository extends JpaRepository<ContentSource, Lo
 
     List<ContentSource> findBySourceRefIn(Collection<String> sourceRefs);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select source from ContentSource source where source.sourceRef in :sourceRefs order by source.id")
+    List<ContentSource> findBySourceRefInForReleaseBatch(@Param("sourceRefs") Collection<String> sourceRefs);
+
     List<ContentSource> findAllByOrderByDisplayNameAsc();
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select source from ContentSource source where source.id = :id")
+    Optional<ContentSource> findByIdForRightsReview(@Param("id") Long id);
 }

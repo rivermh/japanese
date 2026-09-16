@@ -80,8 +80,8 @@ public class ContentReviewController {
             @RequestParam(required = false) String level,
             RedirectAttributes redirectAttributes
     ) {
-        int publishedCount = adminReviewService.approveContents(contentIds, currentUserService.currentAccount());
-        redirectAttributes.addFlashAttribute("reviewMessage", publishedCount + "개 콘텐츠를 공개했습니다.");
+        int reviewedCount = adminReviewService.approveContents(contentIds, currentUserService.currentAccount());
+        redirectAttributes.addFlashAttribute("reviewMessage", reviewedCount + "개 콘텐츠를 승인 처리했습니다.");
         addReviewFilters(redirectAttributes, status, type, level);
         return "redirect:/review";
     }
@@ -96,8 +96,8 @@ public class ContentReviewController {
     }
 
     @PostMapping("/review/{id}/reset")
-    public String reset(@PathVariable("id") Long contentId) {
-        contentReviewService.reset(contentId);
+    public String reset(@PathVariable("id") Long contentId, @RequestParam("reason") String reason) {
+        adminReviewService.reopenContent(contentId, currentUserService.currentAccount(), reason);
         return "redirect:/review";
     }
 
