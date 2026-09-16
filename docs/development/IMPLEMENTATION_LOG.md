@@ -362,3 +362,13 @@
 - 실제 batch 실행 여부: 테스트 H2 synthetic 콘텐츠와 브라우저 mock 응답만 사용했습니다. 실제 JLPT imported content approve/publish/rollback 및 source rights 변경은 수행하지 않았습니다.
 - 남은 위험/후속 작업: 실제 source license verification, actual N5 dry-run, duplicate adjudication, production-like rehearsal, N5 Word/Grammar pilot이 남아 있습니다. 아주 큰 manual 집합과 전체 상세 manifest 렌더링의 운영 규모 성능 검증도 필요합니다. 다음 Phase 1A 운영 검증 단계는 시작 가능하나 이 작업만으로 실제 공개가 승인된 것은 아닙니다.
 - commit/push: 수행하지 않았습니다. A~F 변경사항을 working tree에 유지했습니다.
+
+## 2026-09-16  JLPT-MAX Full Non-Audio Extraction / Staging
+
+- `collection.anki21`만 ZIP에서 임시 파일로 복사해 직접 inventory했습니다. 20,650 notes / 38,967 cards / note type 4종(어휘 9,160, 문법 3,605, 어휘문제 7,876, 참조표 9). card 없는 어휘 note 1개, 여러 card를 가진 note 9,159개. Basic 모델은 note 0개입니다.
+- V5 H2/MySQL additive `private_apkg_notes` 테이블: sourceRef+sourceNoteId unique, model ID/이름, GUID, 버전·파일, deck paths, card IDs/ord, tags, 순서 고정 raw field names/values, normalized JSON, audio reference count, 추출시각. ContentItem/기존 ImportedSourceRecord와 연결하지 않습니다. media/audio 전용 필드 값과 `[sound:...]`는 staging에 저장하지 않으며 binary를 읽지 않습니다.
+- 명시적 `PrivateApkgExtractor.extract(path, sourceRef)`만 제공하며 startup runner/admin 공개 동작은 추가하지 않았습니다. SQLite ordered cursor와 100건 JDBC transaction batch로 추출합니다. 기존 source identity는 재실행에서 skip, 충돌 GUID/model은 오류 처리합니다.
+- 실제 APKG 추출은 독립적인 in-memory H2(V1~V5)에서만 수행했습니다. 20,650 inserted, 0 malformed, raw fields 730,450, audio-reference-containing notes 17,036(메타데이터 수치만), 재실행 inserted 0 / skipped 20,650. category: vocabulary 9,160, grammar 1,078, practice 215, comprehensive 10,188(문법 model 2,527 + 어휘문제 model 7,661), reference 9, other 0. 종합 실전은 별도 model이 아닌 deck 경로로 구분합니다. local persistent DB와 production DB에는 추출하지 않았습니다.
+- 기존 production importer는 어휘 Word/Reading/Meaning/PartOfSpeech/PitchAccent/ExamplesRendered/WordJLPT, 문법 FrontHTML/BackHTML/Kind/UnitID/Level을 변환해 사용합니다. 신규 staging은 누락됐던 VocabularyContext, MeaningV2, ExamplesV2, KanjiDetails, UsageDetails, RelatedWords, 기타 어휘 비오디오 원본 필드와 QuestionType/Prompt/ChoicesHTML/ExplanationHTML/ruby 및 참조표 TableHTML, card/deck 관계를 보존합니다. audio 관련 필드 이름만 남기고 값은 비웁니다.
+- 기존 importer의 9,159 어휘 대상과 APKG 9,160 어휘 note의 차이는 card가 없고 `jlpt-max-vocabulary-retired` tag가 달린 note ID 1788408384419 1개입니다(기존 운영 DB row 수 및 실제 source ID 매칭은 별도 확인 필요). 문법 3,605 note 중 2,527은 종합 실전 deck에 배치되어 있으며 같은 model입니다. production content, source rights, review/published 및 학습 데이터는 이번 extraction 코드가 접근·수정하지 않습니다.
+- 검증: synthetic fixture와 V4→V5/repeated migration, 실제 APKG H2 extraction/re-run, 전체 Gradle test 및 git diff --check. 영구 DB 적용/원본 재가공 품질 심사/라이선스 확인은 후속 작업입니다. commit/push 하지 않습니다.

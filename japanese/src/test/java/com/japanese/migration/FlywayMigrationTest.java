@@ -25,9 +25,10 @@ class FlywayMigrationTest {
         MigrateResult first = flyway.migrate();
         MigrateResult second = flyway.migrate();
 
-        assertThat(first.migrationsExecuted).isEqualTo(4);
+        assertThat(first.migrationsExecuted).isEqualTo(5);
         assertThat(second.migrationsExecuted).isZero();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("4");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("5");
+        assertThat(tableExists(url, "private_apkg_notes")).isTrue();
         assertThat(tableExists(url, "content_items")).isTrue();
         assertThat(tableExists(url, "today_study_sessions")).isTrue();
         assertThat(columnExists(url, "quiz_attempts", "origin_type")).isTrue();
@@ -77,7 +78,7 @@ class FlywayMigrationTest {
 
         Flyway upgraded = Flyway.configure().dataSource(url, "sa", "")
                 .locations("classpath:db/migration/h2").cleanDisabled(true).load();
-        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(3);
+        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(4);
         assertThat(upgraded.migrate().migrationsExecuted).isZero();
 
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
@@ -121,7 +122,7 @@ class FlywayMigrationTest {
         }
 
         Flyway upgraded = flyway(url, false);
-        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(3);
         assertThat(upgraded.migrate().migrationsExecuted).isZero();
 
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
@@ -168,7 +169,7 @@ class FlywayMigrationTest {
             sql.executeUpdate("insert into learning_progress (id, consecutive_correct, lapse_count, review_count, content_item_id, learner_profile_id, last_studied_at, next_review_at, last_result, learning_state) values (1, 0, 0, 1, 1, 1, current_timestamp, current_timestamp, 'CORRECT', 'REVIEW')");
         }
         Flyway upgraded = flyway(url, false);
-        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(2);
         assertThat(upgraded.migrate().migrationsExecuted).isZero();
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
             assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'")).isEqualTo(1);
@@ -186,6 +187,37 @@ class FlywayMigrationTest {
                 .contains("create table content_release_batch_items")
                 .contains("uk_content_release_batch_preview")
                 .doesNotContain("drop ").doesNotContain("delete ").doesNotContain("update content_items");
+    }
+
+    @Test
+    void v5UpgradesV4WithoutTouchingContentOrRightsAndIsRepeatable() throws Exception {
+        String url = databaseUrl("private_staging_upgrade");
+        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration/h2")
+                .target("4").cleanDisabled(true).load().migrate();
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            sql.executeUpdate("insert into content_sources (id,source_ref,display_name,rights_status,attribution_required) "
+                    + "values (1,'private-source','Private','UNKNOWN',false)");
+            sql.executeUpdate("insert into content_items (id,published,slug,source_ref,type,review_status) "
+                    + "values (1,false,'existing-private','private-source','WORD','PENDING')");
+        }
+        Flyway upgrade = flyway(url, false);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(upgrade.migrate().migrationsExecuted).isZero();
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'"))
+                    .isEqualTo(1);
+            assertThat(singleText(sql, "select rights_status from content_sources where id=1")).isEqualTo("UNKNOWN");
+            assertThat(tableExists(url, "private_apkg_notes")).isTrue();
+        }
+    }
+
+    @Test
+    void mysqlV5IsPrivateAndAdditive() throws Exception {
+        String migration = new ClassPathResource("db/migration/mysql/V5__add_private_apkg_staging.sql")
+                .getContentAsString(StandardCharsets.UTF_8).toLowerCase();
+        assertThat(migration).contains("create table private_apkg_notes", "uk_private_apkg_note")
+                .doesNotContain("drop ").doesNotContain("delete ").doesNotContain("alter table content_items")
+                .doesNotContain("update content_sources");
     }
 
     private int singleInt(Statement sql, String query) throws Exception {

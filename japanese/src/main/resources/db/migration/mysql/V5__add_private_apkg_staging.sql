@@ -1,0 +1,21 @@
+create table private_apkg_notes (
+    id bigint not null auto_increment primary key,
+    source_ref varchar(160) not null,
+    source_file varchar(160) not null,
+    source_version varchar(40) not null,
+    source_note_id bigint not null,
+    model_id bigint not null,
+    note_type varchar(160) not null,
+    category varchar(40) not null,
+    anki_guid varchar(160) not null,
+    deck_paths longtext not null,
+    card_metadata longtext not null,
+    tags longtext not null,
+    field_names longtext not null,
+    field_values longtext not null,
+    normalized_values longtext not null,
+    audio_reference_count integer not null,
+    extracted_at datetime(6) not null,
+    constraint uk_private_apkg_note unique (source_ref, source_note_id),
+    index ix_private_apkg_category (source_ref, category)
+);
