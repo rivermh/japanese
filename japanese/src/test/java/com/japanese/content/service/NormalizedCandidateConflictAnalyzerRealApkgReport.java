@@ -126,8 +126,23 @@ class NormalizedCandidateConflictAnalyzerRealApkgReport {
         System.out.println("TICKET4B_ACTUAL_VOCAB_SUMMARY " + vocabularyFirstRun);
         System.out.println("TICKET4B_ACTUAL_GRAMMAR_SUMMARY " + grammarFirstRun);
 
+        // Independent-review follow-up (item 9): pin the full known-good v2.1.1 classification
+        // breakdown, not just candidateCount/idempotency - a regression that silently reclassifies a
+        // pair (e.g. the new partOfSpeech secondary comparison, item 7A) must fail this assertion
+        // loudly instead of only showing up as a diff buried in the printed report.
         assertThat(vocabularyFirstRun.candidateCount()).isEqualTo(9160);
+        assertThat(vocabularyFirstRun.uniqueCount()).isEqualTo(9158);
+        assertThat(vocabularyFirstRun.exactDuplicateCount()).isEqualTo(0);
+        assertThat(vocabularyFirstRun.possibleDuplicateCount()).isEqualTo(1);
+        assertThat(vocabularyFirstRun.conflictCount()).isEqualTo(0);
+        assertThat(vocabularyFirstRun.pairCount()).isEqualTo(1);
+
         assertThat(grammarFirstRun.candidateCount()).isEqualTo(1078);
+        assertThat(grammarFirstRun.uniqueCount()).isEqualTo(1052);
+        assertThat(grammarFirstRun.exactDuplicateCount()).isEqualTo(0);
+        assertThat(grammarFirstRun.possibleDuplicateCount()).isEqualTo(32);
+        assertThat(grammarFirstRun.conflictCount()).isEqualTo(0);
+        assertThat(grammarFirstRun.pairCount()).isEqualTo(32);
     }
 
     private List<PairRow> loadPairs(Connection db, NormalizedCandidateType type) throws Exception {

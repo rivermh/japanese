@@ -34,9 +34,11 @@ import java.util.Objects;
  * <p>{@code leftCandidate}/{@code rightCandidate} are always canonically ordered by ascending id
  * (enforced in the constructor, not left to callers) so a pair is never stored twice in opposite
  * orientations; a DB unique constraint on {@code (left_candidate_id, right_candidate_id)} backs this
- * up. The constructor also rejects a self-pair and a cross-{@code candidateType} pair outright -
- * both are analysis bugs, never legitimate data, so they fail fast as
- * {@link IllegalArgumentException} rather than being silently stored.
+ * up. The constructor also rejects a self-pair, a cross-{@code candidateType} pair, and a
+ * cross-{@code sourceRef} pair outright - all three are analysis bugs, never legitimate data (the
+ * analyzer only ever pools candidates that already share both {@code candidateType} and
+ * {@code sourceRef} before pairing them - see {@code NormalizedCandidateConflictAnalyzer}), so they
+ * fail fast as {@link IllegalArgumentException} rather than being silently stored.
  *
  * <p>Comparison logic itself lives in {@code NormalizedCandidateConflictAnalyzer}, not here - this
  * class (and {@link NormalizedCandidateMatchEvidence}) only hold state, per this ticket's
@@ -95,6 +97,11 @@ public class NormalizedCandidateMatchPair {
             throw new IllegalArgumentException(
                     "Cannot match across candidate types: " + candidateA.getCandidateType()
                             + " vs " + candidateB.getCandidateType());
+        }
+        if (!Objects.equals(candidateA.getSourceRef(), candidateB.getSourceRef())) {
+            throw new IllegalArgumentException(
+                    "Cannot match across source refs: " + candidateA.getSourceRef()
+                            + " vs " + candidateB.getSourceRef());
         }
         if (assessment == NormalizedCandidateMatchAssessment.UNIQUE) {
             throw new IllegalArgumentException("UNIQUE is never persisted as a match pair");

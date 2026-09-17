@@ -850,8 +850,26 @@
   보정), 신규 opt-in `NormalizedCandidateConflictProfilingReport`(actual
   raw profiling)/`NormalizedCandidateConflictAnalyzerRealApkgReport`(actual
   분석 + idempotency 검증). 전체 `./gradlew clean test` 311 tests, 0
-  failures, 0 errors, 10 skipped(기존 9건 opt-in + 이번 Ticket 신규 opt-in
-  profiling 1건 - RealApkgReport는 opt-in 플래그 없이 실행 시 스스로
-  skip되어 이 10건에 포함됨). opt-in 2건(profiling/actual analysis)은
+  failures, 0 errors, 10 skipped(기존 8건 opt-in + 이번 Ticket 신규 opt-in
+  2건 - profiling/RealApkgReport 둘 다 opt-in 플래그 없이 실행 시 스스로
+  skip되어 이 10건에 포함됨; 독립 리뷰에서 "9건+1건" 서술의 숫자 오류를
+  확인해 정정함). opt-in 2건(profiling/actual analysis)은
   실제 APKG로 별도 Gradle 실행으로 통과 확인(SHA-256 재검증 포함).
   `git diff --check` 통과, 신규 파일 trailing whitespace 없음.
+- **독립 리뷰 후속 하드닝(2026-09-17)**: MAJOR 1건(evidence.detail이
+  `varchar(2000)`인데 `diff()`가 원문 전체를 그대로 담아 LONGTEXT/집계
+  필드에서 실제로 컬럼 한도를 넘길 수 있었음)과 MINOR 다수를 수정했다 -
+  evidence 표시값을 편측 최대 900자 bounded excerpt(서로게이트 페어
+  안전 절단 + 명시적 truncation marker)로 제한하되 비교/판정 자체는
+  항상 원문 full value로 수행하도록 분리, `blockGrammar` null-safety,
+  EntryID/UnitID 둘 다 없는 경우 `DIFFERENT_*` identity evidence row
+  생략, `NormalizedCandidateMatchPair` 생성자에 cross-sourceRef guard
+  추가, Vocabulary EXACT 판정에 `partOfSpeech` 보조 필드 추가(pitch
+  accent/example/meaning 순서는 기존대로 제외 - 근거를 Javadoc/테스트로
+  명시), Grammar EXACT 제외 필드(frontExample/rawKind/confusablePatterns)
+  계약을 테스트로 고정. 실제 v2.1.1 분류 결과(Vocabulary 1
+  possible/Grammar 32 possible, 나머지 0)는 이번 하드닝으로 바뀌지
+  않음을 opt-in 실제 APKG 재실행으로 재확인했다. stale-pair 판정
+  (`normalizedAt` vs `generatedAt`)과 U+301C/U+FF5E/U+007E dash
+  codepoint 통합은 이번 범위에서 다루지 않았다 - 전자는 Ticket 4C
+  read-path 설계로, 후자는 실측 결과에 근거해 필요 시 별도로 검토한다.

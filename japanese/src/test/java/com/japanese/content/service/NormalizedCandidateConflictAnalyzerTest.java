@@ -3,11 +3,14 @@ package com.japanese.content.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.japanese.content.entity.NormalizedCandidateMatchAssessment;
+import com.japanese.content.entity.NormalizedCandidateMatchEvidence;
 import com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode;
 import com.japanese.content.entity.NormalizedCandidateMatchPair;
+import com.japanese.content.entity.NormalizedCandidateQualityState;
 import com.japanese.content.entity.NormalizedCandidateType;
 import com.japanese.content.entity.NormalizedContentCandidate;
 import com.japanese.content.importer.GrammarNormalizationResult;
+import com.japanese.content.importer.NormalizedConfusablePattern;
 import com.japanese.content.importer.NormalizedGrammarExample;
 import com.japanese.content.importer.NormalizedJlptLevel;
 import com.japanese.content.importer.NormalizedMeaning;
@@ -19,6 +22,7 @@ import com.japanese.content.repository.GrammarRelationRepository;
 import com.japanese.content.repository.ImportedSourceRecordRepository;
 import com.japanese.content.repository.NormalizedCandidateMatchPairRepository;
 import com.japanese.content.repository.NormalizedContentCandidateRepository;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -376,6 +380,198 @@ class NormalizedCandidateConflictAnalyzerTest {
     }
 
     // ===================================================================================
+    // Independent-review follow-up (Ticket 4B hardening)
+    // ===================================================================================
+
+    @Test
+    void r_grammarMeaningGlossOverflowIsBoundedAndPersistsSuccessfully() {
+        String ref = ref();
+        // Each side alone is well within meaningGloss's own varchar(2000) column limit, but the two
+        // sides concatenated by diff() are not - this is the MAJOR overflow scenario (independent
+        // review item 1/2), reproduced with a real DB round trip, not just an in-memory assertion.
+        String glossA = "😀".repeat(900) + "-A";
+        String glossB = "😀".repeat(900) + "-B";
+        assertThat(glossA.length()).isLessThan(2000);
+        store.saveGrammar(grammarWithGloss(ref, 1L, "U1", "で", "N5", glossA));
+        store.saveGrammar(grammarWithGloss(ref, 2L, "U2", "で", "N5", glossB));
+
+        var summary = analyzer.analyze(NormalizedCandidateType.GRAMMAR, ref);
+
+        assertThat(summary.pairCount()).isEqualTo(1);
+        NormalizedCandidateMatchPair pair = onlyPair(ref, NormalizedCandidateType.GRAMMAR);
+        assertThat(pair.getAssessment()).isEqualTo(NormalizedCandidateMatchAssessment.POSSIBLE_DUPLICATE);
+        NormalizedCandidateMatchEvidence glossEvidence = evidenceOf(pair, NormalizedCandidateMatchEvidenceCode.DIFFERENT_MEANING_GLOSS);
+        assertThat(glossEvidence.getDetail()).hasSizeLessThan(2000).contains("…[truncated]");
+        assertThat(containsUnpairedSurrogate(glossEvidence.getDetail())).isFalse();
+
+        // Cross-checked via plain SQL: proves the bounded value actually round-tripped through the
+        // real varchar(2000) column, not merely survived in the in-memory JPA entity.
+        String persistedDetail = jdbcClient.sql(
+                        "select detail from normalized_candidate_match_evidence e "
+                                + "join normalized_candidate_match_pairs p on p.id = e.pair_id "
+                                + "join normalized_content_candidates c on c.id = p.left_candidate_id "
+                                + "where c.source_ref = ? and e.evidence_code = 'DIFFERENT_MEANING_GLOSS'")
+                .param(ref).query(String.class).single();
+        assertThat(persistedDetail).hasSizeLessThan(2000);
+    }
+
+    @Test
+    void s_grammarNuanceOverflowIsBoundedAndPersistsSuccessfully() {
+        String ref = ref();
+        // nuance is longtext (unbounded at the source column) - a plausible normal-length nuance can
+        // exceed the excerpt cap far more easily than the varchar(2000) fields above.
+        String nuanceA = "あ".repeat(3000) + "-A";
+        String nuanceB = "い".repeat(3000) + "-B";
+        store.saveGrammar(grammarWithNuance(ref, 1L, "U1", "に", "N5", nuanceA));
+        store.saveGrammar(grammarWithNuance(ref, 2L, "U2", "に", "N5", nuanceB));
+
+        analyzer.analyze(NormalizedCandidateType.GRAMMAR, ref);
+
+        NormalizedCandidateMatchPair pair = onlyPair(ref, NormalizedCandidateType.GRAMMAR);
+        NormalizedCandidateMatchEvidence nuanceEvidence = evidenceOf(pair, NormalizedCandidateMatchEvidenceCode.DIFFERENT_NUANCE);
+        assertThat(nuanceEvidence.getDetail()).hasSizeLessThan(2000).contains("…[truncated]");
+    }
+
+    @Test
+    void t_vocabularyMeaningsAggregateOverflowIsBoundedAndPersistsSuccessfully() {
+        String ref = ref();
+        // No single meaning is unusually long, but several longtext meaning rows joined into one
+        // aggregate comparison key (meaningsKey()) can still exceed the excerpt cap in aggregate.
+        List<NormalizedMeaning> meaningsA = List.of(
+                new NormalizedMeaning(1, "め".repeat(700)), new NormalizedMeaning(2, "い".repeat(700)));
+        List<NormalizedMeaning> meaningsB = List.of(
+                new NormalizedMeaning(1, "め".repeat(700)), new NormalizedMeaning(2, "ろ".repeat(700)));
+        store.saveVocabulary(vocabWithMeaningList(ref, 1L, "E1", "語", "ご", "N5", meaningsA));
+        store.saveVocabulary(vocabWithMeaningList(ref, 2L, "E1", "語", "ご", "N5", meaningsB));
+
+        analyzer.analyze(NormalizedCandidateType.VOCABULARY, ref);
+
+        NormalizedCandidateMatchPair pair = onlyPair(ref, NormalizedCandidateType.VOCABULARY);
+        NormalizedCandidateMatchEvidence meaningEvidence = evidenceOf(pair, NormalizedCandidateMatchEvidenceCode.DIFFERENT_MEANING);
+        assertThat(meaningEvidence.getDetail()).hasSizeLessThan(2000).contains("…[truncated]");
+    }
+
+    @Test
+    void malformedGrammarCandidateMissingDetailDoesNotCrashAnalysis() {
+        String ref = ref();
+        store.saveGrammar(grammar(ref, 1L, "U1", "〜てみる", "N4", "try", "casual", "verb-て + みる"));
+        store.saveGrammar(grammar(ref, 2L, "U1", "〜てみる", "N4", "try", "casual", "verb-て + みる"));
+        // Simulates a malformed row that bypassed NormalizedCandidateStore entirely: an envelope with
+        // no attached grammarDetail at all. The DB has no reverse FK forcing a detail to exist, so
+        // blockGrammar() must tolerate this instead of throwing a NullPointerException that would
+        // abort analysis for the whole scope over one bad row.
+        candidateRepository.save(new NormalizedContentCandidate(
+                NormalizedCandidateType.GRAMMAR, ref, 99L, null, NormalizedCandidateQualityState.INFORMATIONAL,
+                Instant.now()));
+
+        var summary = analyzer.analyze(NormalizedCandidateType.GRAMMAR, ref);
+
+        assertThat(summary.candidateCount()).isEqualTo(3);
+        assertThat(summary.pairCount()).isEqualTo(1);
+        assertThat(onlyPair(ref, NormalizedCandidateType.GRAMMAR).getAssessment())
+                .isEqualTo(NormalizedCandidateMatchAssessment.EXACT_DUPLICATE);
+    }
+
+    @Test
+    void bothEntryIdsAbsentOmitsIdentityEvidenceRow() {
+        String ref = ref();
+        store.saveVocabulary(vocab(ref, 1L, null, "語", "ご", "N5", "word"));
+        store.saveVocabulary(vocab(ref, 2L, null, "語", "ご", "N5", "different-sense"));
+
+        analyzer.analyze(NormalizedCandidateType.VOCABULARY, ref);
+
+        NormalizedCandidateMatchPair pair = onlyPair(ref, NormalizedCandidateType.VOCABULARY);
+        assertThat(pair.getAssessment()).isEqualTo(NormalizedCandidateMatchAssessment.POSSIBLE_DUPLICATE);
+        assertThat(codes(pair)).doesNotContain(NormalizedCandidateMatchEvidenceCode.SAME_ENTRY_ID,
+                NormalizedCandidateMatchEvidenceCode.DIFFERENT_ENTRY_ID);
+    }
+
+    @Test
+    void bothUnitIdsAbsentOmitsIdentityEvidenceRow() {
+        String ref = ref();
+        store.saveGrammar(grammar(ref, 1L, null, "〜てみる", "N4", "try", "casual", "verb-て + みる"));
+        store.saveGrammar(grammar(ref, 2L, null, "〜てみる", "N4", "different", "casual", "verb-て + みる"));
+
+        analyzer.analyze(NormalizedCandidateType.GRAMMAR, ref);
+
+        NormalizedCandidateMatchPair pair = onlyPair(ref, NormalizedCandidateType.GRAMMAR);
+        assertThat(pair.getAssessment()).isEqualTo(NormalizedCandidateMatchAssessment.POSSIBLE_DUPLICATE);
+        assertThat(codes(pair)).doesNotContain(NormalizedCandidateMatchEvidenceCode.SAME_UNIT_ID,
+                NormalizedCandidateMatchEvidenceCode.DIFFERENT_UNIT_ID);
+    }
+
+    @Test
+    void differentPartOfSpeechPreventsExactDuplicate() {
+        String ref = ref();
+        store.saveVocabulary(vocabWithPartOfSpeech(ref, 1L, "E1", "語", "ご", "N5", "word", "noun"));
+        store.saveVocabulary(vocabWithPartOfSpeech(ref, 2L, "E1", "語", "ご", "N5", "word", "verb"));
+
+        analyzer.analyze(NormalizedCandidateType.VOCABULARY, ref);
+
+        NormalizedCandidateMatchPair pair = onlyPair(ref, NormalizedCandidateType.VOCABULARY);
+        assertThat(pair.getAssessment()).isEqualTo(NormalizedCandidateMatchAssessment.POSSIBLE_DUPLICATE);
+        assertThat(codes(pair)).contains(NormalizedCandidateMatchEvidenceCode.DIFFERENT_PART_OF_SPEECH);
+    }
+
+    @Test
+    void samePartOfSpeechIsStillExactDuplicate() {
+        String ref = ref();
+        store.saveVocabulary(vocabWithPartOfSpeech(ref, 1L, "E1", "語", "ご", "N5", "word", "noun"));
+        store.saveVocabulary(vocabWithPartOfSpeech(ref, 2L, "E1", "語", "ご", "N5", "word", "noun"));
+
+        analyzer.analyze(NormalizedCandidateType.VOCABULARY, ref);
+
+        NormalizedCandidateMatchPair pair = onlyPair(ref, NormalizedCandidateType.VOCABULARY);
+        assertThat(pair.getAssessment()).isEqualTo(NormalizedCandidateMatchAssessment.EXACT_DUPLICATE);
+        assertThat(codes(pair)).contains(NormalizedCandidateMatchEvidenceCode.SAME_PART_OF_SPEECH);
+    }
+
+    @Test
+    void meaningSenseOrderAloneDoesNotBreakExactDuplicate() {
+        String ref = ref();
+        store.saveVocabulary(vocabWithMeaningList(ref, 1L, "E1", "語", "ご", "N5",
+                List.of(new NormalizedMeaning(1, "word"), new NormalizedMeaning(2, "item"))));
+        store.saveVocabulary(vocabWithMeaningList(ref, 2L, "E1", "語", "ご", "N5",
+                List.of(new NormalizedMeaning(1, "item"), new NormalizedMeaning(2, "word"))));
+
+        analyzer.analyze(NormalizedCandidateType.VOCABULARY, ref);
+
+        assertThat(onlyPair(ref, NormalizedCandidateType.VOCABULARY).getAssessment())
+                .isEqualTo(NormalizedCandidateMatchAssessment.EXACT_DUPLICATE);
+    }
+
+    @Test
+    void duplicateMeaningTextMultiplicityIsNotCollapsed() {
+        String ref = ref();
+        store.saveVocabulary(vocabWithMeaningList(ref, 1L, "E1", "語", "ご", "N5",
+                List.of(new NormalizedMeaning(1, "word"), new NormalizedMeaning(2, "word"))));
+        store.saveVocabulary(vocabWithMeaningList(ref, 2L, "E1", "語", "ご", "N5",
+                List.of(new NormalizedMeaning(1, "word"))));
+
+        analyzer.analyze(NormalizedCandidateType.VOCABULARY, ref);
+
+        NormalizedCandidateMatchPair pair = onlyPair(ref, NormalizedCandidateType.VOCABULARY);
+        assertThat(pair.getAssessment()).isEqualTo(NormalizedCandidateMatchAssessment.POSSIBLE_DUPLICATE);
+        assertThat(codes(pair)).contains(NormalizedCandidateMatchEvidenceCode.DIFFERENT_MEANING);
+    }
+
+    @Test
+    void frontExampleRawKindAndConfusablePatternsDoNotAffectExactDuplicate() {
+        String ref = ref();
+        store.saveGrammar(grammarVaryingExcludedFields(ref, 1L,
+                new NormalizedGrammarExample(1, "食べてみる", null, "try eating"), "kind-a",
+                List.of(new NormalizedConfusablePattern(1, "pattern-a", "explain-a"))));
+        store.saveGrammar(grammarVaryingExcludedFields(ref, 2L,
+                new NormalizedGrammarExample(1, "飲んでみる", null, "try drinking"), "kind-b",
+                List.of(new NormalizedConfusablePattern(1, "pattern-b", "explain-b"))));
+
+        analyzer.analyze(NormalizedCandidateType.GRAMMAR, ref);
+
+        assertThat(onlyPair(ref, NormalizedCandidateType.GRAMMAR).getAssessment())
+                .isEqualTo(NormalizedCandidateMatchAssessment.EXACT_DUPLICATE);
+    }
+
+    // ===================================================================================
     // helpers
     // ===================================================================================
 
@@ -410,5 +606,70 @@ class NormalizedCandidateConflictAnalyzerTest {
                 new NormalizedGrammarExample(1, "example", null, "translation"),
                 meaningGloss, nuance, connection, List.of(),
                 new NormalizedJlptLevel(level, level, "Level"), "kind", Map.of(), List.of(), true);
+    }
+
+    private NormalizedCandidateMatchEvidence evidenceOf(NormalizedCandidateMatchPair pair,
+            NormalizedCandidateMatchEvidenceCode code) {
+        return pair.getEvidence().stream().filter(e -> e.getEvidenceCode() == code).findFirst()
+                .orElseThrow(() -> new AssertionError("no " + code + " evidence found on pair " + pair.getId()));
+    }
+
+    /** True if {@code s} contains a high surrogate with no following low surrogate, or vice versa. */
+    private static boolean containsUnpairedSurrogate(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (Character.isHighSurrogate(c)) {
+                if (i + 1 >= s.length() || !Character.isLowSurrogate(s.charAt(i + 1))) {
+                    return true;
+                }
+                i++;
+            } else if (Character.isLowSurrogate(c)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private VocabularyNormalizationResult vocabWithPartOfSpeech(String ref, long noteId, String entryId,
+            String expression, String reading, String level, String meaning, String partOfSpeech) {
+        return new VocabularyNormalizationResult(
+                ref, noteId, entryId, expression, reading, partOfSpeech, null,
+                List.of(new NormalizedMeaning(1, meaning)),
+                List.of(), new NormalizedJlptLevel(level, level, "WordJLPT"), expression, reading, Map.of(),
+                List.of(), true);
+    }
+
+    private VocabularyNormalizationResult vocabWithMeaningList(String ref, long noteId, String entryId,
+            String expression, String reading, String level, List<NormalizedMeaning> meanings) {
+        return new VocabularyNormalizationResult(
+                ref, noteId, entryId, expression, reading, "noun", null, meanings,
+                List.of(), new NormalizedJlptLevel(level, level, "WordJLPT"), expression, reading, Map.of(),
+                List.of(), true);
+    }
+
+    private GrammarNormalizationResult grammarWithGloss(String ref, long noteId, String unitId, String pattern,
+            String level, String meaningGloss) {
+        return new GrammarNormalizationResult(
+                ref, noteId, unitId, pattern,
+                new NormalizedGrammarExample(1, "example", null, "translation"),
+                meaningGloss, "nuance", "connection", List.of(),
+                new NormalizedJlptLevel(level, level, "Level"), "kind", Map.of(), List.of(), true);
+    }
+
+    private GrammarNormalizationResult grammarWithNuance(String ref, long noteId, String unitId, String pattern,
+            String level, String nuance) {
+        return new GrammarNormalizationResult(
+                ref, noteId, unitId, pattern,
+                new NormalizedGrammarExample(1, "example", null, "translation"),
+                "gloss", nuance, "connection", List.of(),
+                new NormalizedJlptLevel(level, level, "Level"), "kind", Map.of(), List.of(), true);
+    }
+
+    private GrammarNormalizationResult grammarVaryingExcludedFields(String ref, long noteId,
+            NormalizedGrammarExample frontExample, String rawKind, List<NormalizedConfusablePattern> confusablePatterns) {
+        return new GrammarNormalizationResult(
+                ref, noteId, "U1", "〜てみる", frontExample,
+                "try", "casual", "verb-て + みる", confusablePatterns,
+                new NormalizedJlptLevel("N4", "N4", "Level"), rawKind, Map.of(), List.of(), true);
     }
 }

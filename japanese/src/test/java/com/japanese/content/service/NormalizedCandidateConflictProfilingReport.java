@@ -1,5 +1,6 @@
 package com.japanese.content.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.japanese.content.importer.ExampleHtmlParser;
@@ -58,6 +59,9 @@ class NormalizedCandidateConflictProfilingReport {
         assumeTrue(source != null && Files.isRegularFile(Path.of(source)),
                 "japanese.actual-apkg system property must point at the real JLPT-MAX apkg file");
         String actualSha = sha256(Path.of(source));
+        // Independent-review follow-up (item 10): hard-fail instead of only printing a boolean - a
+        // wrong/other-version apkg file must never be silently accepted as canonical v2.1.1 data.
+        assertThat(actualSha).isEqualTo(EXPECTED_SHA_256);
 
         String url = "jdbc:h2:mem:ticket4b_conflict_profiling_" + UUID.randomUUID()
                 + ";MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1";
@@ -334,6 +338,67 @@ class NormalizedCandidateConflictProfilingReport {
                         + " gloss=" + excerpt(normalize(r.meaningGloss())));
             }
         });
+
+        reportDashCodepointUsage(rows, out);
+    }
+
+    /**
+     * JLPT-MAX Ticket 4B independent-review follow-up, item 12 (one-time verification): checks
+     * whether any real v2.1.1 Grammar patterns that are the same semantic form get split into
+     * different blocking keys purely because they use different "tilde/wave-dash" code points
+     * (U+301C WAVE DASH, U+FF5E FULLWIDTH TILDE, U+007E ASCII TILDE). NFKC (used by
+     * {@code comparisonKey} in {@code NormalizedCandidateConflictAnalyzer}) maps U+FF5E to U+007E
+     * but has no decomposition for U+301C, so a pattern written with U+301C never joins a blocking
+     * group with an otherwise-identical pattern written with U+FF5E/U+007E today. This only ever
+     * reports findings - it must never change {@code comparisonKey}/blocking without concrete
+     * evidence of real fragmentation on the actual deck.
+     */
+    private static void reportDashCodepointUsage(List<GrammarNormalizationResult> rows, PrintWriter out) {
+        long wave = rows.stream().filter(r -> r.pattern() != null && r.pattern().indexOf('〜') >= 0).count();
+        long fullwidth = rows.stream().filter(r -> r.pattern() != null && r.pattern().indexOf('～') >= 0).count();
+        long ascii = rows.stream().filter(r -> r.pattern() != null && r.pattern().indexOf('~') >= 0).count();
+
+        Map<String, List<GrammarNormalizationResult>> byDashUnifiedPattern = new LinkedHashMap<>();
+        for (var r : rows) {
+            String key = dashUnified(r.pattern());
+            if (key != null) byDashUnifiedPattern.computeIfAbsent(key, k -> new ArrayList<>()).add(r);
+        }
+
+        int fragmentedGroups = 0;
+        long fragmentedRows = 0;
+        List<String> samples = new ArrayList<>();
+        for (var group : byDashUnifiedPattern.values()) {
+            long distinctCurrentKeys = group.stream().map(r -> normalize(r.pattern())).distinct().count();
+            if (distinctCurrentKeys > 1) {
+                fragmentedGroups++;
+                fragmentedRows += group.size();
+                if (samples.size() < 10) {
+                    samples.add(group.stream()
+                            .map(r -> "unitId=" + r.unitId() + " pattern=" + normalize(r.pattern()))
+                            .distinct().reduce((x, y) -> x + " | " + y).orElse(""));
+                }
+            }
+        }
+
+        out.println();
+        out.println("--- dash codepoint usage (U+301C/U+FF5E/U+007E) ---");
+        out.println("patterns containing U+301C (WAVE DASH): " + wave);
+        out.println("patterns containing U+FF5E (FULLWIDTH TILDE): " + fullwidth);
+        out.println("patterns containing U+007E (ASCII TILDE): " + ascii);
+        out.println("blocking-fragmentation groups (same pattern except dash codepoint, currently split): "
+                + fragmentedGroups + "  rows: " + fragmentedRows);
+        if (fragmentedGroups == 0) {
+            out.println("NOTE: no blocking fragmentation found on this deck - comparisonKey left unchanged.");
+        } else {
+            out.println("NOTE: fragmentation found - comparisonKey NOT changed pending review; samples:");
+            samples.forEach(s -> out.println("  " + s));
+        }
+    }
+
+    private static String dashUnified(String v) {
+        String normalized = normalize(v);
+        if (normalized == null) return null;
+        return normalized.replace('〜', '~').replace('～', '~');
     }
 
     private static String excerpt(String v) {

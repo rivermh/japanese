@@ -11,6 +11,7 @@ import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.D
 import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.DIFFERENT_MEANING;
 import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.DIFFERENT_MEANING_GLOSS;
 import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.DIFFERENT_NUANCE;
+import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.DIFFERENT_PART_OF_SPEECH;
 import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.DIFFERENT_PATTERN;
 import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.DIFFERENT_READING;
 import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.DIFFERENT_UNIT_ID;
@@ -21,6 +22,7 @@ import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.S
 import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.SAME_MEANING;
 import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.SAME_MEANING_GLOSS;
 import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.SAME_NUANCE;
+import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.SAME_PART_OF_SPEECH;
 import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.SAME_PATTERN;
 import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.SAME_READING;
 import static com.japanese.content.entity.NormalizedCandidateMatchEvidenceCode.SAME_UNIT_ID;
@@ -198,8 +200,8 @@ public class NormalizedCandidateConflictAnalyzer {
 
     private Set<PairKey> blockGrammar(List<NormalizedContentCandidate> candidates) {
         Set<PairKey> keys = new LinkedHashSet<>();
-        addBlockingPairs(candidates, c -> comparisonKey(c.getGrammarDetail().getUnitId()), keys);
-        addBlockingPairs(candidates, c -> comparisonKey(c.getGrammarDetail().getPattern()), keys);
+        addBlockingPairs(candidates, c -> grammarUnitIdKey(c.getGrammarDetail()), keys);
+        addBlockingPairs(candidates, c -> grammarPatternKey(c.getGrammarDetail()), keys);
         return keys;
     }
 
@@ -228,6 +230,15 @@ public class NormalizedCandidateConflictAnalyzer {
     // Vocabulary comparison
     // ===================================================================================
 
+    /**
+     * Secondary EXACT fields are {@code meanings}, {@code level}, and {@code partOfSpeech} only.
+     * Deliberately excluded (independent-review follow-up, item 7): pitch accent
+     * ({@code pitchAccentTerminalStates}/{@code pitchAccentMora}) is pronunciation/source metadata,
+     * not a lexical-identity signal, so a pitch-accent difference alone never breaks EXACT; example
+     * sentences are illustrative, not identity, so an example difference alone never breaks EXACT
+     * either. See {@link #meaningsKey} for why meaning <em>order</em> specifically is ignored within
+     * the {@code meanings} comparison.
+     */
     private PairOutcome compareVocabulary(NormalizedContentCandidate a, NormalizedContentCandidate b) {
         NormalizedVocabularyCandidateDetail da = a.getVocabularyDetail();
         NormalizedVocabularyCandidateDetail db = b.getVocabularyDetail();
@@ -235,6 +246,7 @@ public class NormalizedCandidateConflictAnalyzer {
         String entryIdA = entryIdKey(da);
         String entryIdB = entryIdKey(db);
         boolean entryIdBothPresent = entryIdA != null && entryIdB != null;
+        boolean entryIdBothAbsent = entryIdA == null && entryIdB == null;
         boolean sameEntryId = entryIdBothPresent && entryIdA.equals(entryIdB);
         boolean entryIdDisagrees = entryIdBothPresent && !entryIdA.equals(entryIdB);
         String exprA = vocabExpressionKey(da);
@@ -260,9 +272,16 @@ public class NormalizedCandidateConflictAnalyzer {
         if (sameExpr && sameReading) {
             evidence.add(new EvidenceItem(SAME_EXPRESSION, "expression", exprA));
             evidence.add(new EvidenceItem(SAME_READING, "reading", readingA));
-            evidence.add(sameEntryId
-                    ? new EvidenceItem(SAME_ENTRY_ID, "entryId", entryIdA)
-                    : new EvidenceItem(DIFFERENT_ENTRY_ID, "entryId", diff(entryIdA, entryIdB)));
+            if (sameEntryId) {
+                evidence.add(new EvidenceItem(SAME_ENTRY_ID, "entryId", entryIdA));
+            } else if (!entryIdBothAbsent) {
+                // One EntryID present and the other absent still gets a DIFFERENT_ENTRY_ID row (the
+                // source only supplied identity information on one side); both absent means neither
+                // side made an identity claim at all, so no identity evidence row is emitted - a
+                // fabricated "DIFFERENT_ENTRY_ID a=∅ b=∅" would misleadingly read as a real
+                // disagreement to a future Ticket 4C human reviewer. Grammar's UnitID mirrors this.
+                evidence.add(new EvidenceItem(DIFFERENT_ENTRY_ID, "entryId", diff(entryIdA, entryIdB)));
+            }
 
             String meaningsA = meaningsKey(a);
             String meaningsB = meaningsKey(b);
@@ -270,6 +289,12 @@ public class NormalizedCandidateConflictAnalyzer {
             String levelA = comparisonKey(da.getLevelCode());
             String levelB = comparisonKey(db.getLevelCode());
             boolean sameLevel = Objects.equals(levelA, levelB);
+            // partOfSpeech is a secondary EXACT field, not a mere presentation detail: two entries
+            // sharing expression+reading+meaning+level but differing noun/verb/adjective etc. are a
+            // real lexical distinction, not a duplicate (independent-review follow-up, item 7A).
+            String partOfSpeechA = comparisonKey(da.getPartOfSpeech());
+            String partOfSpeechB = comparisonKey(db.getPartOfSpeech());
+            boolean samePartOfSpeech = Objects.equals(partOfSpeechA, partOfSpeechB);
 
             evidence.add(sameMeanings
                     ? new EvidenceItem(SAME_MEANING, "meanings", null)
@@ -277,8 +302,11 @@ public class NormalizedCandidateConflictAnalyzer {
             evidence.add(sameLevel
                     ? new EvidenceItem(SAME_LEVEL, "level", levelA)
                     : new EvidenceItem(DIFFERENT_LEVEL, "level", diff(levelA, levelB)));
+            evidence.add(samePartOfSpeech
+                    ? new EvidenceItem(SAME_PART_OF_SPEECH, "partOfSpeech", partOfSpeechA)
+                    : new EvidenceItem(DIFFERENT_PART_OF_SPEECH, "partOfSpeech", diff(partOfSpeechA, partOfSpeechB)));
 
-            boolean exact = !entryIdDisagrees && sameMeanings && sameLevel;
+            boolean exact = !entryIdDisagrees && sameMeanings && sameLevel && samePartOfSpeech;
             return new PairOutcome(exact ? EXACT_DUPLICATE : POSSIBLE_DUPLICATE, evidence);
         }
 
@@ -305,6 +333,14 @@ public class NormalizedCandidateConflictAnalyzer {
         return comparisonKey(preferred != null ? preferred : detail.getReading());
     }
 
+    /**
+     * Sense <em>order</em> is deliberately ignored - two candidates with the same set of meaning
+     * texts in a different sense order are still {@code sameMeanings} - because sense ordering is a
+     * presentation/authoring detail, not part of this ticket's identity signal (independent-review
+     * follow-up, item 7D). This is sorting a {@link List}'s elements, not deduplicating a
+     * {@link Set}: a meaning text repeated twice still appears twice in the sorted, joined key, so
+     * {@code ["word","word"]} and {@code ["word"]} still compare as different.
+     */
     private static String meaningsKey(NormalizedContentCandidate candidate) {
         return candidate.getVocabularyMeanings().stream()
                 .map(NormalizedVocabularyCandidateMeaning::getMeaningText)
@@ -318,6 +354,15 @@ public class NormalizedCandidateConflictAnalyzer {
     // Grammar comparison
     // ===================================================================================
 
+    /**
+     * Secondary EXACT fields are {@code level}, {@code meaningGloss}, {@code connection}, and
+     * {@code nuance} only. Deliberately excluded (independent-review follow-up, item 8):
+     * {@code frontExample}, {@code rawKind}, and {@code confusablePatterns} - excluding them is
+     * existing, unchanged behavior, kept as-is here. EXACT_DUPLICATE therefore means "semantic
+     * identity over this specific field set", not "byte-identical normalized snapshot" - two
+     * candidates can legitimately differ in front example, raw kind, or confusable-pattern list and
+     * still be EXACT_DUPLICATE.
+     */
     private PairOutcome compareGrammar(NormalizedContentCandidate a, NormalizedContentCandidate b) {
         NormalizedGrammarCandidateDetail da = a.getGrammarDetail();
         NormalizedGrammarCandidateDetail db = b.getGrammarDetail();
@@ -325,6 +370,7 @@ public class NormalizedCandidateConflictAnalyzer {
         String unitIdA = comparisonKey(da == null ? null : da.getUnitId());
         String unitIdB = comparisonKey(db == null ? null : db.getUnitId());
         boolean unitIdBothPresent = unitIdA != null && unitIdB != null;
+        boolean unitIdBothAbsent = unitIdA == null && unitIdB == null;
         boolean sameUnitId = unitIdBothPresent && unitIdA.equals(unitIdB);
         boolean unitIdDisagrees = unitIdBothPresent && !unitIdA.equals(unitIdB);
         String patternA = comparisonKey(da == null ? null : da.getPattern());
@@ -341,9 +387,14 @@ public class NormalizedCandidateConflictAnalyzer {
 
         if (samePattern) {
             evidence.add(new EvidenceItem(SAME_PATTERN, "pattern", patternA));
-            evidence.add(sameUnitId
-                    ? new EvidenceItem(SAME_UNIT_ID, "unitId", unitIdA)
-                    : new EvidenceItem(DIFFERENT_UNIT_ID, "unitId", diff(unitIdA, unitIdB)));
+            if (sameUnitId) {
+                evidence.add(new EvidenceItem(SAME_UNIT_ID, "unitId", unitIdA));
+            } else if (!unitIdBothAbsent) {
+                // Mirrors Vocabulary's EntryID handling above: both UnitIDs absent means neither side
+                // made an identity claim, so no identity evidence row is emitted rather than a
+                // misleading "DIFFERENT_UNIT_ID a=∅ b=∅".
+                evidence.add(new EvidenceItem(DIFFERENT_UNIT_ID, "unitId", diff(unitIdA, unitIdB)));
+            }
 
             String levelA = comparisonKey(da.getLevelCode());
             String levelB = comparisonKey(db.getLevelCode());
@@ -378,6 +429,22 @@ public class NormalizedCandidateConflictAnalyzer {
         return new PairOutcome(UNIQUE, List.of());
     }
 
+    /**
+     * Null-safe like {@link #entryIdKey}/{@link #vocabExpressionKey} above: a well-formed candidate
+     * always has a non-null {@code grammarDetail} (persisted by {@code NormalizedCandidateStore}),
+     * but the DB has no reverse FK forcing that, so a malformed/legacy candidate row could exist
+     * without one. Returning {@code null} here simply keeps such a candidate out of every blocking
+     * group (it ends up {@code UNIQUE}) instead of throwing a {@link NullPointerException} that
+     * would abort the whole scope's analysis over one bad row.
+     */
+    private static String grammarUnitIdKey(NormalizedGrammarCandidateDetail detail) {
+        return detail == null ? null : comparisonKey(detail.getUnitId());
+    }
+
+    private static String grammarPatternKey(NormalizedGrammarCandidateDetail detail) {
+        return detail == null ? null : comparisonKey(detail.getPattern());
+    }
+
     // ===================================================================================
     // Shared helpers
     // ===================================================================================
@@ -397,8 +464,44 @@ public class NormalizedCandidateConflictAnalyzer {
         return normalized.isEmpty() ? null : normalized;
     }
 
+    /**
+     * The max length of one side's rendered value inside {@link #diff}, chosen so the combined
+     * {@code "a=<side> b=<side>"} string can never reach the {@code normalized_candidate_match_evidence.detail}
+     * column's {@code varchar(2000)} limit (independent-review follow-up, item 1/2 - MAJOR): worst
+     * case is {@code 2 + 900 + 3 + 900 = 1805} chars, comfortably under 2000 even before accounting
+     * for the fact both sides being simultaneously at the cap is itself a rare edge case.
+     * {@code meaningGloss}/{@code connection} are {@code varchar(2000)} each and {@code meanings}
+     * (an aggregate join of {@code longtext} meaning rows) and {@code nuance} ({@code longtext}) are
+     * both unbounded at the source-column level, so without this cap a normal (non-adversarial)
+     * candidate pair can legitimately overflow the evidence column and fail to persist.
+     */
+    private static final int EVIDENCE_EXCERPT_MAX_LENGTH = 900;
+    private static final String EVIDENCE_TRUNCATION_MARKER = "…[truncated]";
+
+    /**
+     * Bounds one comparison value for human-readable evidence <em>display</em> only - never call
+     * this on a value used to decide {@code sameXxx}/{@code exact}, which must always compare the
+     * full, untruncated semantic value (see {@link #diff}'s callers). Truncation is safe against
+     * cutting a UTF-16 surrogate pair in half, and a truncated result always carries an explicit,
+     * human-visible marker so a Ticket 4C reviewer never mistakes a truncated excerpt for the whole
+     * value.
+     */
+    private static String excerpt(String value) {
+        if (value == null) {
+            return "∅";
+        }
+        if (value.length() <= EVIDENCE_EXCERPT_MAX_LENGTH) {
+            return value;
+        }
+        int cut = EVIDENCE_EXCERPT_MAX_LENGTH - EVIDENCE_TRUNCATION_MARKER.length();
+        if (cut > 0 && Character.isHighSurrogate(value.charAt(cut - 1))) {
+            cut--;
+        }
+        return value.substring(0, cut) + EVIDENCE_TRUNCATION_MARKER;
+    }
+
     private static String diff(String a, String b) {
-        return "a=" + (a == null ? "∅" : a) + " b=" + (b == null ? "∅" : b);
+        return "a=" + excerpt(a) + " b=" + excerpt(b);
     }
 
     private record PairKey(long lowerId, long higherId) {

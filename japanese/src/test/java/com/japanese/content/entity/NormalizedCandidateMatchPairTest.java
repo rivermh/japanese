@@ -10,8 +10,8 @@ import org.junit.jupiter.api.Test;
 /**
  * JLPT-MAX Ticket 4B step 14/15: pins the {@link NormalizedCandidateMatchPair} constructor
  * invariants that must never depend on the caller getting things right - self-match rejection,
- * cross-{@link NormalizedCandidateType} rejection, and canonical (ascending-id) left/right
- * ordering regardless of argument order.
+ * cross-{@link NormalizedCandidateType} rejection, cross-source-ref rejection (independent-review
+ * follow-up, item 6), and canonical (ascending-id) left/right ordering regardless of argument order.
  */
 class NormalizedCandidateMatchPairTest {
 
@@ -30,6 +30,15 @@ class NormalizedCandidateMatchPairTest {
 
         assertThatIllegalArgumentException().isThrownBy(() -> new NormalizedCandidateMatchPair(
                 vocabulary, grammar, NormalizedCandidateMatchAssessment.POSSIBLE_DUPLICATE, Instant.now()));
+    }
+
+    @Test
+    void crossSourceRefMatchIsRejected() {
+        NormalizedContentCandidate refA = candidate(NormalizedCandidateType.VOCABULARY, 1L, "source-a");
+        NormalizedContentCandidate refB = candidate(NormalizedCandidateType.VOCABULARY, 2L, "source-b");
+
+        assertThatIllegalArgumentException().isThrownBy(() -> new NormalizedCandidateMatchPair(
+                refA, refB, NormalizedCandidateMatchAssessment.POSSIBLE_DUPLICATE, Instant.now()));
     }
 
     @Test
@@ -79,7 +88,11 @@ class NormalizedCandidateMatchPairTest {
 
     /** Builds a candidate with a given id without persisting it (reflection sets the generated id). */
     private NormalizedContentCandidate candidate(NormalizedCandidateType type, long id) {
-        NormalizedContentCandidate candidate = new NormalizedContentCandidate(type, "ref", id,
+        return candidate(type, id, "ref");
+    }
+
+    private NormalizedContentCandidate candidate(NormalizedCandidateType type, long id, String sourceRef) {
+        NormalizedContentCandidate candidate = new NormalizedContentCandidate(type, sourceRef, id,
                 "identity-" + id, NormalizedCandidateQualityState.CLEAN, Instant.now());
         try {
             Field idField = NormalizedContentCandidate.class.getDeclaredField("id");
