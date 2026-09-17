@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('정규화 후보 페어 상세 검토')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('admin')}"></header>
+<main id="main-content" class="page-shell detail-shell admin-shell" th:with="d=${detail}">
+  <a th:href="@{/admin/normalized-candidates/reviews(candidateType=${d.candidateType},sourceRef=${d.sourceRef})}">목록</a>
+  <p class="admin-message" th:if="${adminMessage}" th:text="${adminMessage}"></p>
+  <p class="admin-error" th:if="${adminError}" th:text="${adminError}"></p>
+  <article class="admin-detail">
+    <header>
+      <div class="card-meta">
+        <span class="type-pill" th:text="${d.candidateType}"></span>
+        <span th:if="${d.analysisPresent}" class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(d.assessment.name())}" th:text="${d.assessment}"></span>
+        <span th:unless="${d.analysisPresent}" class="status-pill status-gone">ANALYSIS_NO_LONGER_PRESENT</span>
+        <span th:if="${d.analysisPresent}" class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(d.pairFreshness.name())}" th:text="${d.pairFreshness}"></span>
+      </div>
+      <h1 th:text="${'Candidate ' + d.leftCandidateId + ' vs ' + d.rightCandidateId}"></h1>
+      <p class="subtle" th:text="${'sourceRef: ' + d.sourceRef + (d.analysisPresent ? (' · generatedAt: ' + d.pairGeneratedAt) : '')}"></p>
+    </header>
+
+    <section th:if="${!d.evidence.empty}">
+      <h2>Evidence (Ticket 4B machine analysis)</h2>
+      <ul>
+        <li th:each="e:${d.evidence}">
+          <strong th:text="${e.evidenceCode}"></strong>
+          <span th:if="${e.fieldName}" th:text="${'(' + e.fieldName + ')'}"></span>
+          <span th:if="${e.detail}" th:text="${e.detail}"></span>
+        </li>
+      </ul>
+    </section>
+
+    <section class="candidate-compare">
+      <h2>Candidate 상세 (전체 persisted 필드 - evidence excerpt 아님)</h2>
+      <div class="candidate-card" th:each="side : ${ {d.left, d.right} }">
+        <h3 th:text="${'Candidate ' + side.candidateId}"></h3>
+        <dl class="admin-facts">
+          <div><dt>quality</dt><dd><span class="status-pill" th:classappend="${' status-' + #strings.toLowerCase(side.qualityState.name())}" th:text="${side.qualityState}"></span></dd></div>
+          <div><dt>normalizedAt</dt><dd th:text="${side.normalizedAt}"></dd></div>
+          <div><dt>sourceNoteId</dt><dd th:text="${side.sourceNoteId}"></dd></div>
+          <div th:if="${side.sourceIdentityKey}"><dt>sourceIdentityKey</dt><dd th:text="${side.sourceIdentityKey}"></dd></div>
+          <div th:if="${side.entryId}"><dt>EntryID</dt><dd th:text="${side.entryId}"></dd></div>
+          <div th:if="${side.expression}"><dt>expression</dt><dd th:text="${side.expression}"></dd></div>
+          <div th:if="${side.reading}"><dt>reading</dt><dd th:text="${side.reading}"></dd></div>
+          <div th:if="${side.partOfSpeech}"><dt>partOfSpeech</dt><dd th:text="${side.partOfSpeech}"></dd></div>
+          <div th:if="${side.pitchAccentTerminalStates}"><dt>pitchAccent</dt><dd th:text="${side.pitchAccentTerminalStates + ' / ' + side.pitchAccentMora}"></dd></div>
+          <div th:if="${side.levelCode}"><dt>JLPT</dt><dd th:text="${side.levelCode}"></dd></div>
+          <div th:if="${side.unitId}"><dt>UnitID</dt><dd th:text="${side.unitId}"></dd></div>
+          <div th:if="${side.pattern}"><dt>pattern</dt><dd th:text="${side.pattern}"></dd></div>
+          <div th:if="${side.meaningGloss}"><dt>meaningGloss</dt><dd th:text="${side.meaningGloss}"></dd></div>
+          <div th:if="${side.nuance}"><dt>nuance</dt><dd th:text="${side.nuance}"></dd></div>
+          <div th:if="${side.connectionForm}"><dt>connection</dt><dd th:text="${side.connectionForm}"></dd></div>
+          <div th:if="${side.rawKind}"><dt>rawKind</dt><dd th:text="${side.rawKind}"></dd></div>
+        </dl>
+        <section th:if="${!side.meanings.empty}"><h4>Meanings</h4><ol><li th:each="m:${side.meanings}" th:text="${m}"></li></ol></section>
+        <section th:if="${!side.examples.empty}"><h4>Examples</h4><article th:each="ex:${side.examples}"><strong th:text="${ex.japaneseText}"></strong> <span th:if="${ex.reading}" th:text="${ex.reading}"></span> <span th:if="${ex.translation}" th:text="${ex.translation}"></span></article></section>
+        <section th:if="${side.frontExampleJapaneseText}"><h4>Front example</h4><p th:text="${side.frontExampleJapaneseText}"></p><p th:if="${side.frontExampleReading}" th:text="${side.frontExampleReading}"></p><p th:if="${side.frontExampleTranslation}" th:text="${side.frontExampleTranslation}"></p></section>
+        <section th:if="${!side.confusablePatterns.empty}"><h4>Confusable patterns</h4><ul><li th:each="c:${side.confusablePatterns}"><strong th:text="${c.pattern}"></strong> <span th:if="${c.explanation}" th:text="${c.explanation}"></span></li></ul></section>
+        <section th:if="${!side.warnings.empty}"><h4>Warnings</h4><ul><li th:each="w:${side.warnings}"><span class="status-pill" th:classappend="${' status-' + #strings.toLowerCase(w.severity)}" th:text="${w.severity}"></span> <strong th:text="${w.issueCode}"></strong> <span th:text="${w.message}"></span></li></ul></section>
+      </div>
+    </section>
+
+    <section>
+      <h2>현재 검토</h2>
+      <p th:if="${d.currentReview == null}">아직 검토되지 않았습니다 (UNREVIEWED).</p>
+      <div th:if="${d.currentReview != null}">
+        <p><span class="status-pill" th:text="${d.currentReview.decision}"></span>
+           <span class="status-pill" th:classappend="${' status-' + #strings.toLowerCase(d.currentReview.freshness.name())}" th:text="${d.currentReview.freshness}"></span></p>
+        <p th:text="${'검토자: ' + d.currentReview.reviewerDisplayName + ' · ' + d.currentReview.reviewedAt}"></p>
+        <p th:if="${d.currentReview.note}" th:text="${d.currentReview.note}"></p>
+      </div>
+    </section>
+
+    <section>
+      <h2>판단 기록</h2>
+      <p th:unless="${d.decisionAllowed()}" class="admin-error">
+        <span th:unless="${d.analysisPresent}">현재 분석된 pair가 없습니다 - 재분석이 필요할 수 있습니다.</span>
+        <span th:if="${d.analysisPresent and d.pairFreshness.name() == 'STALE'}">candidate가 재정규화되어 이 분석은 최신 상태가 아닙니다 - 재분석 후 다시 검토하세요.</span>
+      </p>
+      <form th:if="${d.decisionAllowed()}" method="post"
+            th:action="@{/admin/normalized-candidates/reviews/{type}/{l}/{r}/decision(type=${d.candidateType},l=${d.leftCandidateId},r=${d.rightCandidateId})}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <input type="hidden" name="expectedPairGeneratedAt" th:value="${d.pairGeneratedAt}">
+        <input type="hidden" name="expectedAssessment" th:value="${d.assessment}">
+        <input type="hidden" name="expectedReviewVersion" th:if="${d.currentReview != null}" th:value="${d.currentReview.version}">
+        <label><input type="radio" name="decision" value="SAME_CONTENT" required> SAME_CONTENT - 같은 content</label>
+        <label><input type="radio" name="decision" value="DISTINCT_CONTENT"> DISTINCT_CONTENT - 다른 content</label>
+        <label><input type="radio" name="decision" value="NEEDS_FOLLOWUP"> NEEDS_FOLLOWUP - 추가 확인 필요</label>
+        <label>메모<textarea name="note" maxlength="2000" placeholder="검토 메모 (선택)"></textarea></label>
+        <button>판단 저장</button>
+      </form>
+    </section>
+
+    <section>
+      <h2>검토 이력</h2>
+      <ol class="review-history">
+        <li th:each="h:${d.history}">
+          <strong th:text="${(h.previousDecision != null ? h.previousDecision : '없음') + ' → ' + h.newDecision}"></strong>
+          <span th:text="${h.reviewerDisplayName}"></span>
+          <span th:if="${h.note}" th:text="${h.note}"></span>
+          <time th:text="${h.reviewedAt}"></time>
+        </li>
+      </ol>
+      <p th:if="${d.history.empty}">아직 이력이 없습니다.</p>
+    </section>
+  </article>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

@@ -873,3 +873,127 @@
   (`normalizedAt` vs `generatedAt`)과 U+301C/U+FF5E/U+007E dash
   codepoint 통합은 이번 범위에서 다루지 않았다 - 전자는 Ticket 4C
   read-path 설계로, 후자는 실측 결과에 근거해 필요 시 별도로 검토한다.
+
+## 2026-09-17  JLPT-MAX Ticket 4C — Normalized Candidate Pair 사람 검토(Human Review) 워크플로
+
+- **목표**: Ticket 4B가 저장한 private `NormalizedCandidateMatchPair`/`NormalizedCandidateMatchEvidence`
+  분석 결과를 사람이 안전하게 검토하고 판단(같은 content / 다른 content / 추가 확인 필요)만
+  기록하는 admin 전용 워크플로. **자동 merge, candidate 삭제, canonical winner 선택, production
+  승격/생성은 전부 범위 밖**이며 이번 Ticket에서 구현하지 않았다.
+- **private review domain 경계**: 새 엔티티(`NormalizedCandidatePairReview`/
+  `NormalizedCandidatePairReviewHistory`)는 production 검수 도메인(`ContentItem.reviewStatus`,
+  `ContentReviewHistory`, `CurationReviewHistory`, `GrammarRelation`, `GrammarComparison`)을
+  전혀 재사용하지 않는다 - 이름이 비슷한 `GrammarRelation`/`GrammarComparison`은 여전히 curated
+  production 도메인이라 이번에도 손대지 않았다. 다만 기존 `AdminContentReviewService`/
+  `AdminContentReviewController`/`AdminContentReviewExceptionHandler`의 **패턴**(PRG,
+  reviewer-from-principal, append-only history, exception→HTTP status 매핑)은 그대로 재사용했다.
+- **human decision 모델**(`HumanReviewDecision`): `SAME_CONTENT`/`DISTINCT_CONTENT`/
+  `NEEDS_FOLLOWUP` 3값 - Ticket 4B의 machine `NormalizedCandidateMatchAssessment`(`EXACT_DUPLICATE`/
+  `POSSIBLE_DUPLICATE`/`CONFLICT`)와는 완전히 분리된 축이다. `SAME_CONTENT`로 판단해도 merge·
+  candidate 삭제·canonical winner 선택·production 승격은 절대 트리거하지 않으며,
+  `NormalizedCandidateMatchPair.assessment`도 human decision으로 절대 덮어쓰지 않는다
+  (machine/human 두 축을 항상 동시에 보존 - `NormalizedCandidatePairReviewService` 서비스
+  javadoc/테스트로 고정).
+- **왜 `NormalizedCandidateMatchPair.id`를 review의 FK로 쓰지 않는가**: Ticket 4B의
+  `analyze(type, sourceRef)`는 재실행마다 그 scope의 기존 pair(+evidence)를 delete하고 새로
+  insert한다 - candidate/assessment가 전혀 안 변해도 pair row `id`/`generatedAt`은 매번 바뀐다
+  (Ticket 4B 자체의 idempotency 테스트가 이를 허용/전제). 따라서 review를 pair id에 FK로
+  묶으면 (a) 4B rerun이 FK 제약으로 막히거나 (b) rerun 후 review가 고아가 되는 문제가 생긴다.
+  대신 review의 안정적인 identity는 **두 `NormalizedContentCandidate`의 id 쌍**
+  (`left_candidate_id < right_candidate_id`, `NormalizedCandidateMatchPair`와 동일한 canonical
+  ordering을 생성자에서 직접 강제)이며, 현재 4B pair/evidence는 read-time에
+  `NormalizedCandidateMatchPairRepository.findByLeftCandidateIdAndRightCandidateId(...)`로
+  join해서 조회한다 - review 테이블에는 pair 테이블로의 FK가 전혀 없다.
+- **current state + append-only history**: `NormalizedCandidatePairReview`(pair identity당 1행,
+  `(left_candidate_id, right_candidate_id)` unique)는 재검토 시 in-place로 갱신되고,
+  `NormalizedCandidatePairReviewHistory`(append-only, update/delete 경로 없음 - 생성자+getter만)는
+  매 결정마다 새 행을 추가한다. History 행은 `previousDecision`/`newDecision`/reviewer/note/
+  reviewedAt/snapshot을 모두 담아 그 자체로 감사 기록이 완결되도록 했다. **동일 decision+note를
+  그대로 재제출하면 no-op**(history 미추가, current 미변경) - `AdminContentReviewService`의
+  "이미 승인됨" idempotent short-circuit 관행을 그대로 따른 것이며
+  `d_resubmittingTheSameDecisionAndNoteIsANoOp` 테스트로 고정했다.
+- **reviewer identity**: `ContentReviewHistory`/`CurationReviewHistory`와 동일하게
+  `UserAccount`로의 `@ManyToOne(reviewer_id)`. 컨트롤러는 client가 보낸 어떤 reviewer 필드도
+  절대 신뢰하지 않고 `CurrentUserService.currentAccount()`(= 인증된 `SecurityContextHolder`
+  principal)만 서비스에 넘긴다 - request body/param에 reviewer 이름을 넣을 수 있는 지점 자체가
+  없다.
+- **freshness - 이번 Ticket의 핵심 설계**: 두 개의 독립된 freshness 개념을 구현했다.
+  1. **pair freshness**(`leftCandidate.normalizedAt <= pair.generatedAt AND
+     rightCandidate.normalizedAt <= pair.generatedAt`) - 지금 이 순간 새 decision을 제출해도
+     되는지를 결정한다. STALE이면 decision 제출 자체를 거부한다(`h_staleCandidateAfterPairGeneratedRejectsNewDecision`).
+  2. **review freshness**(저장된 `leftNormalizedAtSnapshot`/`rightNormalizedAtSnapshot`/
+     `assessmentSnapshot`이 현재 값과 정확히 일치하는지, 그리고 현재 pair가 아예 존재하는지) -
+     이미 기록된 human decision이 지금도 유효한지를 결정한다. Ticket 4B `analyze`를 candidate
+     변경 없이 재실행하면(pair id/generatedAt만 바뀜) review는 계속 FRESH로 남고
+     (`j_unchangedReanalysisKeepsAnExistingReviewFreshDespitePairIdChanging`), candidate가
+     refresh되면(정상 재실행 없이도) 즉시 STALE이 되며(`i_candidateRefreshMakesAnExistingReviewStale`),
+     candidate 변경 없이 assessment만 달라지는 합성 시나리오에서도 STALE이 된다 - 두 개념
+     모두 GET 요청이 어떤 DB write도 유발하지 않는 순수 계산값이며, 재분석은 항상 명시적
+     `POST .../reanalyze` 액션(`NormalizedCandidateConflictAnalyzer.analyze`를 그대로 호출)으로만
+     수행된다.
+  3. **pair가 사라지는 경우**: candidate refresh 후 재분석으로 더 이상 어떤 관계도 없다고
+     판정되면 4B pair row 자체가 사라진다. 이 경우도 review/history는 삭제하지 않고, 계산값
+     `ReviewFreshness.ANALYSIS_NO_LONGER_PRESENT`로 명확히 구분해 표시한다 - 별도의 archive
+     테이블/soft-delete 플래그를 새로 만들지 않았다(`l_pairDisappearingPreservesReviewAndHistoryWithoutCrashing`).
+- **review action 낙관적 동시성**: 재검토 시 폼이 `expectedPairGeneratedAt`/`expectedAssessment`
+  (4B 분석이 화면을 그린 이후 바뀌었는지)와, 기존 review가 있다면 `expectedReviewVersion`
+  (다른 admin이 먼저 재검토했는지)을 hidden field로 실어 보낸다. 서비스는 제출 시 이 값들을
+  현재 DB 상태와 다시 비교해 하나라도 어긋나면 `NormalizedCandidatePairReviewConflictException`
+  (409)으로 거부한다 - 조용히 덮어쓰지 않는다. `NormalizedCandidatePairReview.version`에
+  `@Version`(이 코드베이스 최초의 optimistic-locking 사용)을 추가해 두 admin의 동시 재검토도
+  방어했다(`n_concurrentReReviewWithAStaleVersionIsRejected`).
+- **query 설계 / N+1 회피**: admin list는 33건(현재 실측) 규모이지만 향후 커질 수 있어
+  `NormalizedCandidateMatchPairRepository`에 후보 타입별 `JOIN FETCH`
+  (`findVocabularyPairsForReview`/`findGrammarPairsForReview` - candidate와 그 vocabulary/grammar
+  detail까지 한 번에) 쿼리를 추가하고, review 쪽도 `findForReviewList`로 한 번에 읽어 메모리에서
+  `(leftId,rightId)` 키로 join한다 - 목록 렌더링이 pair 수만큼 추가 쿼리를 내지 않는다. 필터(사람
+  판단/freshness는 저장된 컬럼이 아니라 계산값이므로) 및 페이지네이션은 이 in-memory 리스트
+  위에서 수행했다 - 현재 규모에서 별도 dynamic query/Specification 엔진을 새로 만드는 것은
+  overengineering이라 판단했다.
+- **admin UI**: `admin/normalized-candidate-review-list.html`/`-detail.html`을 기존
+  `admin/content-list.html`/`content-detail.html`과 동일한 스타일(`page-shell admin-shell`,
+  `status-pill`, `admin-table`, `admin-facts`, `review-history`, PRG 플래시 메시지)로 새로
+  추가했다. Detail 화면은 evidence(Ticket 4B, truncated 가능)뿐 아니라 candidate의 **전체
+  persisted 필드**(entryId/expression/reading/meanings/examples 또는 unitId/pattern/
+  meaningGloss/nuance/connection/frontExample/confusablePatterns, warnings, qualityState 포함)를
+  나란히 보여준다 - evidence.detail만 보고 판단하지 않도록. FATAL candidate는 강하게 표시하되
+  자동 제외/숨김은 하지 않는다. Ticket 4B pair 존재 여부와 무관하게 review/history는 항상 조회
+  가능하다(pair 사라진 경우도 크래시 없이 렌더링).
+- **web-only, API 없음**: `AdminContentReviewController`+`AdminContentReviewApiController`
+  쌍과 달리 이번 Ticket은 `AdminNormalizedCandidateReviewController`(web) 하나만 추가했다 -
+  이 admin UI를 소비하는 기존 JS 클라이언트가 없고, 서버 렌더 폼만으로 모든 액션(목록/상세/
+  판단 제출/재분석)이 충분하며, 짝을 맞추기 위해서만 API 컨트롤러를 만드는 것은 이번 Ticket이
+  명시적으로 경계한 overengineering이라 판단했다. 두 경로 모두 `/admin/**` 아래에 있어
+  기존 `SecurityConfig`의 `hasRole("ADMIN")` 매처가 그대로 적용된다 - 보안 설정 변경은 전혀
+  없었다.
+- **UNREVIEWED 비저장**: review row가 없는 pair는 계산상 `UNREVIEWED`로 취급될 뿐 빈 row를
+  미리 만들어 두지 않는다 - 실측 33건이든 향후 수천 건이든 review 테이블에는 실제로 검토된
+  pair만 존재한다.
+- **Migration**: `V8__add_normalized_candidate_pair_review.sql`(H2/MySQL 동일 의미, V1-V7
+  무수정)로 `normalized_candidate_pair_reviews`(+ `(left_candidate_id, right_candidate_id)`
+  unique)와 `normalized_candidate_pair_review_history`(+ pair 조회용 index) 2개 테이블을
+  추가했다. 두 테이블 모두 `normalized_content_candidates(id)`에 직접 FK를 걸었을 뿐
+  `normalized_candidate_match_pairs`로의 FK는 전혀 없다. `FlywayMigrationTest`에 V8 fresh-DB
+  기대값(8개 마이그레이션, 신규 테이블 2개) 갱신, V7→V8 upgrade 테스트(기존 candidate/pair/
+  evidence 보존 + 신규 테이블 insert 가능 + unique 제약 동작 확인) 및 MySQL-additive 테스트를
+  추가했고, 기존 V1-V7 upgrade 테스트들의 `migrationsExecuted` 기대값을 전부 +1 갱신했다(Ticket
+  4B가 V7 추가 때 했던 것과 동일한 패턴).
+- **production isolation**: `content_items`/`GrammarEnrichment`/`GrammarRelation`/
+  `GrammarComparison`/`ImportedSourceRecord` row 수가 review 판단 저장/재검토/재분석 전후로
+  불변임을 `m_reviewOperationsNeverChangeProductionOrImportedSourceRowCounts` 테스트로 확인했다.
+  source rights/publication/Release Gate 관련 엔티티는 이번 Ticket에서 전혀 참조하지 않았다.
+- **테스트**: `NormalizedCandidatePairReviewTest`(5건, entity invariant - self/cross-type/
+  cross-sourceRef 거부 + canonical ordering이 candidate와 snapshot 모두에 적용됨),
+  `NormalizedCandidatePairReviewServiceTest`(12건, A-N 시나리오 - 최초 결정/history append/
+  재검토/no-op 재제출/존재하지 않는 pair 거부/cross-sourceRef 거부/stale pair 거부/candidate
+  refresh 후 stale/unchanged reanalysis 후에도 fresh 유지/pair 소멸 후 history 보존/동시
+  재검토 optimistic lock 거부/production isolation), `AdminNormalizedCandidateReviewControllerTest`
+  (6건, ADMIN-only 웹 라우트 + CSRF + PRG + 404/409 처리), `FlywayMigrationTest`(V8 관련 2건
+  신규 + 기존 7건 기대값 보정). 전체 `./gradlew clean test` 349 tests, 0 failures, 0 errors,
+  10 skipped(기존 opt-in 그대로 - 이번 Ticket은 opt-in 테스트를 추가하지 않았다). `git diff
+  --check` 통과.
+- **이번 Ticket에서 하지 않은 것(명시적 비범위)**: automatic merge, candidate 삭제, canonical
+  winner 선택, production `Word`/`Grammar`/`ContentItem` 생성, `ImportedSourceRecord` 연결,
+  production 승격, source rights 승인, publication, Release Gate 연동, batch release,
+  production `reviewStatus` 변경, COMPREHENSIVE parser 변경, cluster/union-find review 엔진,
+  UNIQUE candidate 10k건 개별 review UI. 전부 4C 이후 과제로 남는다.

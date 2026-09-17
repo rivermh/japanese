@@ -25,9 +25,9 @@ class FlywayMigrationTest {
         MigrateResult first = flyway.migrate();
         MigrateResult second = flyway.migrate();
 
-        assertThat(first.migrationsExecuted).isEqualTo(7);
+        assertThat(first.migrationsExecuted).isEqualTo(8);
         assertThat(second.migrationsExecuted).isZero();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("7");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("8");
         assertThat(tableExists(url, "private_apkg_notes")).isTrue();
         assertThat(tableExists(url, "content_items")).isTrue();
         assertThat(tableExists(url, "today_study_sessions")).isTrue();
@@ -45,6 +45,8 @@ class FlywayMigrationTest {
         assertThat(tableExists(url, "normalized_grammar_candidate_confusable_patterns")).isTrue();
         assertThat(tableExists(url, "normalized_candidate_match_pairs")).isTrue();
         assertThat(tableExists(url, "normalized_candidate_match_evidence")).isTrue();
+        assertThat(tableExists(url, "normalized_candidate_pair_reviews")).isTrue();
+        assertThat(tableExists(url, "normalized_candidate_pair_review_history")).isTrue();
     }
 
     @Test
@@ -88,7 +90,7 @@ class FlywayMigrationTest {
 
         Flyway upgraded = Flyway.configure().dataSource(url, "sa", "")
                 .locations("classpath:db/migration/h2").cleanDisabled(true).load();
-        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(6);
+        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(7);
         assertThat(upgraded.migrate().migrationsExecuted).isZero();
 
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
@@ -132,7 +134,7 @@ class FlywayMigrationTest {
         }
 
         Flyway upgraded = flyway(url, false);
-        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(5);
+        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(6);
         assertThat(upgraded.migrate().migrationsExecuted).isZero();
 
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
@@ -179,7 +181,7 @@ class FlywayMigrationTest {
             sql.executeUpdate("insert into learning_progress (id, consecutive_correct, lapse_count, review_count, content_item_id, learner_profile_id, last_studied_at, next_review_at, last_result, learning_state) values (1, 0, 0, 1, 1, 1, current_timestamp, current_timestamp, 'CORRECT', 'REVIEW')");
         }
         Flyway upgraded = flyway(url, false);
-        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(4);
+        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(5);
         assertThat(upgraded.migrate().migrationsExecuted).isZero();
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
             assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'")).isEqualTo(1);
@@ -211,7 +213,7 @@ class FlywayMigrationTest {
                     + "values (1,false,'existing-private','private-source','WORD','PENDING')");
         }
         Flyway upgrade = flyway(url, false);
-        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(3);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(4);
         assertThat(upgrade.migrate().migrationsExecuted).isZero();
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
             assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'"))
@@ -246,7 +248,7 @@ class FlywayMigrationTest {
                     + "1,1,'note','VOCABULARY','guid-1','[]','[]','','[]','[]','{}',0,current_timestamp)");
         }
         Flyway upgrade = flyway(url, false);
-        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(3);
         assertThat(upgrade.migrate().migrationsExecuted).isZero();
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
             assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'"))
@@ -290,7 +292,7 @@ class FlywayMigrationTest {
                     + "(2,'VOCABULARY','private-source',2,'E-2','CLEAN',current_timestamp)");
         }
         Flyway upgrade = flyway(url, false);
-        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(2);
         assertThat(upgrade.migrate().migrationsExecuted).isZero();
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
             assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'"))
@@ -323,6 +325,74 @@ class FlywayMigrationTest {
                 .doesNotContain("alter table normalized_content_candidates")
                 .doesNotContain("update content_sources").doesNotContain("update content_items")
                 .doesNotContain("update normalized_content_candidates");
+    }
+
+    @Test
+    void v8UpgradesV7WithoutTouchingExistingCandidatesOrPairsAndIsRepeatable() throws Exception {
+        String url = databaseUrl("normalized_candidate_pair_review_upgrade");
+        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration/h2")
+                .target("7").cleanDisabled(true).load().migrate();
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            sql.executeUpdate("insert into user_accounts (id, joined_at, display_name, login_id, password_hash, role) "
+                    + "values (1, current_timestamp, 'Admin', 'review-admin', 'hash', 'ADMIN')");
+            sql.executeUpdate("insert into content_sources (id,source_ref,display_name,rights_status,attribution_required) "
+                    + "values (1,'private-source','Private','UNKNOWN',false)");
+            sql.executeUpdate("insert into content_items (id,published,slug,source_ref,type,review_status) "
+                    + "values (1,false,'existing-private','private-source','WORD','PENDING')");
+            sql.executeUpdate("insert into normalized_content_candidates (id,candidate_type,source_ref,source_note_id,"
+                    + "source_identity_key,quality_state,normalized_at) values "
+                    + "(1,'VOCABULARY','private-source',1,'E-1','CLEAN',current_timestamp),"
+                    + "(2,'VOCABULARY','private-source',2,'E-2','CLEAN',current_timestamp)");
+            sql.executeUpdate("insert into normalized_candidate_match_pairs (id,left_candidate_id,right_candidate_id,"
+                    + "assessment,generated_at) values (1,1,2,'POSSIBLE_DUPLICATE',current_timestamp)");
+            sql.executeUpdate("insert into normalized_candidate_match_evidence (id,pair_id,position,evidence_code,"
+                    + "field_name,detail) values (1,1,1,'SAME_EXPRESSION','expression','だぶる')");
+        }
+        Flyway upgrade = flyway(url, false);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(upgrade.migrate().migrationsExecuted).isZero();
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'"))
+                    .isEqualTo(1);
+            assertThat(singleInt(sql, "select count(*) from normalized_content_candidates")).isEqualTo(2);
+            assertThat(singleInt(sql, "select count(*) from normalized_candidate_match_pairs where id=1")).isEqualTo(1);
+            assertThat(singleInt(sql, "select count(*) from normalized_candidate_match_evidence where pair_id=1")).isEqualTo(1);
+            assertThat(tableExists(url, "normalized_candidate_pair_reviews")).isTrue();
+            assertThat(tableExists(url, "normalized_candidate_pair_review_history")).isTrue();
+            sql.executeUpdate("insert into normalized_candidate_pair_reviews (id,left_candidate_id,right_candidate_id,"
+                    + "decision,reviewer_id,note,reviewed_at,left_normalized_at_snapshot,right_normalized_at_snapshot,"
+                    + "assessment_snapshot,version) values (1,1,2,'SAME_CONTENT',1,'looks right',current_timestamp,"
+                    + "current_timestamp,current_timestamp,'POSSIBLE_DUPLICATE',0)");
+            sql.executeUpdate("insert into normalized_candidate_pair_review_history (id,left_candidate_id,"
+                    + "right_candidate_id,previous_decision,new_decision,reviewer_id,note,reviewed_at,"
+                    + "left_normalized_at_snapshot,right_normalized_at_snapshot,assessment_snapshot) values "
+                    + "(1,1,2,null,'SAME_CONTENT',1,'looks right',current_timestamp,current_timestamp,"
+                    + "current_timestamp,'POSSIBLE_DUPLICATE')");
+            assertThat(singleInt(sql, "select count(*) from normalized_candidate_pair_reviews where id=1")).isEqualTo(1);
+            assertThat(singleInt(sql, "select count(*) from normalized_candidate_pair_review_history where id=1")).isEqualTo(1);
+            assertThatThrownBy(() -> sql.executeUpdate(
+                    "insert into normalized_candidate_pair_reviews (id,left_candidate_id,right_candidate_id,"
+                            + "decision,reviewer_id,reviewed_at,left_normalized_at_snapshot,right_normalized_at_snapshot,"
+                            + "assessment_snapshot,version) values (2,1,2,'DISTINCT_CONTENT',1,current_timestamp,"
+                            + "current_timestamp,current_timestamp,'POSSIBLE_DUPLICATE',0)"))
+                    .as("duplicate (left,right) review must be rejected by the unique constraint")
+                    .isInstanceOf(java.sql.SQLException.class);
+        }
+    }
+
+    @Test
+    void mysqlV8IsAdditiveAndDoesNotTouchProductionOrCandidates() throws Exception {
+        String migration = new ClassPathResource("db/migration/mysql/V8__add_normalized_candidate_pair_review.sql")
+                .getContentAsString(StandardCharsets.UTF_8).toLowerCase();
+        assertThat(migration).contains("create table normalized_candidate_pair_reviews", "uk_normalized_candidate_pair_review",
+                        "create table normalized_candidate_pair_review_history")
+                .doesNotContain("drop ").doesNotContain("delete ")
+                .doesNotContain("alter table content_items").doesNotContain("alter table private_apkg_notes")
+                .doesNotContain("alter table normalized_content_candidates")
+                .doesNotContain("alter table normalized_candidate_match_pairs")
+                .doesNotContain("update content_sources").doesNotContain("update content_items")
+                .doesNotContain("update normalized_content_candidates")
+                .doesNotContain("update normalized_candidate_match_pairs");
     }
 
     private int singleInt(Statement sql, String query) throws Exception {

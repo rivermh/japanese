@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('정규화 후보 페어 검토')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('admin')}"></header>
+<main id="main-content" class="page-shell admin-shell">
+  <header class="page-heading"><div><p class="eyebrow">NORMALIZED CANDIDATE REVIEW</p><h1>정규화 후보 페어 검토</h1><p class="subtle">Ticket 4B dedup/conflict 분석 결과에 대한 사람의 판단만 기록합니다. merge·삭제·canonical 선택·production 승격은 없습니다.</p></div><a href="/admin">관리자 홈</a></header>
+  <p class="admin-message" th:if="${adminMessage}" th:text="${adminMessage}"></p>
+  <p class="admin-error" th:if="${adminError}" th:text="${adminError}"></p>
+  <form class="admin-filter" method="get">
+    <label>유형<select name="candidateType"><option th:each="v:${T(com.japanese.content.entity.NormalizedCandidateType).values()}" th:value="${v}" th:text="${v}" th:selected="${v==candidateType}"></option></select></label>
+    <label>출처<input name="sourceRef" th:value="${sourceRef}" placeholder="sourceRef (비우면 전체)"></label>
+    <label>기계 판정<select name="assessment"><option value="">전체</option><option th:each="v:${T(com.japanese.content.entity.NormalizedCandidateMatchAssessment).values()}" th:if="${v.name()!='UNIQUE'}" th:value="${v}" th:text="${v}" th:selected="${v==assessment}"></option></select></label>
+    <label>사람 판단<select name="decision"><option value="">전체</option><option value="UNREVIEWED" th:selected="${decision=='UNREVIEWED'}">UNREVIEWED</option><option th:each="v:${T(com.japanese.content.entity.HumanReviewDecision).values()}" th:value="${v}" th:text="${v}" th:selected="${v.name()==decision}"></option></select></label>
+    <label>Freshness<select name="freshness"><option value="">전체</option><option value="FRESH" th:selected="${freshness=='FRESH'}">FRESH</option><option value="STALE" th:selected="${freshness=='STALE'}">STALE</option></select></label>
+    <button>조회</button>
+  </form>
+  <form class="admin-filter" th:action="@{/admin/normalized-candidates/reviews/{type}/reanalyze(type=${candidateType})}" method="post">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+    <label>재분석할 sourceRef<input name="sourceRef" th:value="${sourceRef}" placeholder="sourceRef" required></label>
+    <button>재분석 실행</button>
+  </form>
+  <p class="admin-result-count" th:text="${result.totalElements+'건 · '+(result.page+1)+' / '+(result.totalPages==0?1:result.totalPages)+' 페이지'}"></p>
+  <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>기계 판정</th><th>Freshness</th><th>좌측</th><th>우측</th><th>사람 판단</th><th>검토자</th><th></th></tr></thead><tbody>
+    <tr th:each="row:${result.rows}">
+      <td><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(row.assessment.name())}" th:text="${row.assessment}"></span>
+          <span th:if="${row.worstQualityState.name()=='FATAL'}" class="status-pill status-fatal">FATAL</span></td>
+      <td><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(row.pairFreshness.name())}" th:text="${row.pairFreshness}"></span></td>
+      <td><code th:text="${row.leftCandidateId}"></code> <span th:text="${row.leftPreview}"></span></td>
+      <td><code th:text="${row.rightCandidateId}"></code> <span th:text="${row.rightPreview}"></span></td>
+      <td><span class="status-pill" th:text="${row.decision != null ? row.decision : 'UNREVIEWED'}"></span>
+          <small th:if="${row.decision != null}" th:text="${row.reviewFreshness}"></small></td>
+      <td th:text="${row.reviewerDisplayName}"></td>
+      <td><a th:href="@{/admin/normalized-candidates/reviews/{type}/{l}/{r}(type=${row.candidateType},l=${row.leftCandidateId},r=${row.rightCandidateId})}">검토</a></td>
+    </tr>
+  </tbody></table></div>
+  <p class="empty-state" th:if="${result.empty}">조건에 맞는 pair가 없습니다.</p>
+  <nav class="pagination">
+    <a th:if="${result.hasPrevious()}" th:href="@{/admin/normalized-candidates/reviews(candidateType=${candidateType},sourceRef=${sourceRef},assessment=${assessment},decision=${decision},freshness=${freshness},page=${result.page-1})}">이전</a>
+    <a th:if="${result.hasNext()}" th:href="@{/admin/normalized-candidates/reviews(candidateType=${candidateType},sourceRef=${sourceRef},assessment=${assessment},decision=${decision},freshness=${freshness},page=${result.page+1})}">다음</a>
+  </nav>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>
