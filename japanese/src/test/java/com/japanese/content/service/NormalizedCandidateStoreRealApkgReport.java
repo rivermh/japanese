@@ -150,6 +150,15 @@ class NormalizedCandidateStoreRealApkgReport {
         assertThat(grammarTotal).isEqualTo(summary.categories().getOrDefault("GRAMMAR", 0L));
         assertThat(persistedVocabulary).isEqualTo(vocabularyTotal);
         assertThat(persistedGrammar).isEqualTo(grammarTotal);
+
+        // Known-good absolute counts for JLPT-MAX-Deck v2.1.1 (pinned to EXPECTED_SHA_256 above);
+        // this test is an opt-in regression check against that exact deck, not a generic contract.
+        assertThat(vocabularyTotal).isEqualTo(9160L);
+        assertThat(grammarTotal).isEqualTo(1078L);
+        assertThat(vocabularyTotal + grammarTotal).isEqualTo(10238L);
+        assertThat(vocabularyQuality.getOrDefault(NormalizedCandidateQualityState.FATAL, 0L)).isEqualTo(1L);
+        assertThat(grammarQuality.getOrDefault(NormalizedCandidateQualityState.FATAL, 0L)).isEqualTo(0L);
+        assertThat(grammarQuality.getOrDefault(NormalizedCandidateQualityState.REVIEW_REQUIRED, 0L)).isEqualTo(0L);
     }
 
     @SuppressWarnings("unchecked")

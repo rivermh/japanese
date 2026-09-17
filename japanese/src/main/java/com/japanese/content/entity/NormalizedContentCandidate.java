@@ -114,6 +114,10 @@ public class NormalizedContentCandidate {
     }
 
     public void attachVocabularyDetail(NormalizedVocabularyCandidateDetail detail) {
+        if (candidateType != NormalizedCandidateType.VOCABULARY) {
+            throw new IllegalStateException(
+                    "Cannot attach a vocabulary detail to a " + candidateType + " candidate");
+        }
         this.vocabularyDetail = detail;
         detail.attach(this);
     }
@@ -129,6 +133,10 @@ public class NormalizedContentCandidate {
     }
 
     public void attachGrammarDetail(NormalizedGrammarCandidateDetail detail) {
+        if (candidateType != NormalizedCandidateType.GRAMMAR) {
+            throw new IllegalStateException(
+                    "Cannot attach a grammar detail to a " + candidateType + " candidate");
+        }
         this.grammarDetail = detail;
         detail.attach(this);
     }

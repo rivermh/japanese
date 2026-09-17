@@ -661,3 +661,12 @@
   따라서 1.1GB 실제 APKG 전체 재검증은 다시 수행하지 않았다 — 이전 턴에
   VOCABULARY 9,160(FATAL 1건 포함)+GRAMMAR 1,078=10,238건 검증 결과가 그대로
   유효하다. commit/push는 이 리뷰 직후 별도로 수행한다.
+
+### 2026-09-17 Ticket 4A independent review MINOR 2건 follow-up
+
+- `NormalizedContentCandidate.attachVocabularyDetail`/`attachGrammarDetail`에
+  candidateType guard(불일치 시 `IllegalStateException`)를 추가하고
+  `NormalizedCandidateStoreRealApkgReport`의 known-good v2.1.1 absolute 수치
+  (VOCABULARY 9,160/GRAMMAR 1,078/합계 10,238/Vocabulary FATAL 1/Grammar
+  FATAL·REVIEW_REQUIRED 0)를 assertion으로 고정했다 — 둘 다 실제 APKG opt-in
+  재실행으로 확인 후 고정.
