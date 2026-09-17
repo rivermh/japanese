@@ -1120,6 +1120,13 @@
     길이 초과(TOO_LONG)는 실측 0건. `PRODUCTION_IDENTITY_POLICY_UNRESOLVED` 1,078건(전부).
   - 두 도메인 모두 `summary()`를 동일 스냅샷에서 두 번 호출해 완전히 동일한 결과(불변 필드
     단위 `equals`)를 확인했다(deterministic/idempotent 요구사항).
+  - **"actual APKG profiling" ≠ "운영 DB 상태 검증"**: 실제인 것은 v2.1.1 APKG 파일의
+    bytes/SHA-256과 그 안의 실제 note data뿐이다. DB는 매 실행마다 새로 만들어지는 isolated
+    in-memory H2(fresh)이고, sourceRef("ticket4d-promotion-readiness")도 profiling 전용
+    synthetic scope다 - 운영에서 쓰는 실제 sourceRef가 아니다. 운영 DB의 실제 ContentSource
+    rights 상태, 운영 DB의 실제 N1-N5 `Level` row 완결성은 이번 프로파일링이 검증한 적이 없다.
+    Ticket 4E 전에는 운영과 동일한 상태 기준의 재프로파일링이 필요하다(아래 "Ticket 4E로
+    넘기는 결정사항" (7)).
 - **source rights actual 상태**: 실측 scope("ticket4d-promotion-readiness")에는 `ContentSource`
   row를 전혀 등록하지 않았다 - 실제 canonical `JLPT-MAX-Deck-2.1.1.apkg` sourceRef의
   `ContentSourceRightsStatus`를 이번 Ticket이 조회/변경한 적은 없다(이 코드베이스에 아직

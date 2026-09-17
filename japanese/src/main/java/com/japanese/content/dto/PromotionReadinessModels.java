@@ -173,7 +173,7 @@ public final class PromotionReadinessModels {
 
     /**
      * {@code blockedByIssueCode} counts can sum to more than {@code blocked} - one candidate can
-     * carry several issue codes at once (JLPT-MAX Ticket 4D step 27).
+     * carry several issue codes at once.
      */
     public record ReadinessSummary(
             NormalizedCandidateType candidateType,

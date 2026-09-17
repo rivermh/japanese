@@ -71,6 +71,7 @@ import com.japanese.content.repository.NormalizedContentCandidateRepository;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -268,9 +269,12 @@ public class NormalizedCandidatePromotionReadinessService {
         Map<String, Long> candidatesByBlockerCount = new TreeMap<>(Comparator.comparingInt(Integer::parseInt));
         all.forEach(r -> candidatesByBlockerCount.merge(String.valueOf(r.issues().size()), 1L, Long::sum));
 
+        // Map.copyOf(...) does not guarantee it preserves the source map's iteration order, so the
+        // enum-declaration order built above is preserved explicitly via an unmodifiable view instead.
         return new ReadinessSummary(candidateType, scope, all.size(), ready, blocked, already,
-                Map.copyOf(blockedByIssueCode), Map.copyOf(qualityBreakdown), Map.copyOf(pairResolutionBreakdown),
-                Map.copyOf(mappingBreakdown), Map.copyOf(sourceRightsBreakdown), Map.copyOf(candidatesByBlockerCount));
+                Collections.unmodifiableMap(blockedByIssueCode), Collections.unmodifiableMap(qualityBreakdown),
+                Collections.unmodifiableMap(pairResolutionBreakdown), Collections.unmodifiableMap(mappingBreakdown),
+                Collections.unmodifiableMap(sourceRightsBreakdown), Collections.unmodifiableMap(candidatesByBlockerCount));
     }
 
     // ===================================================================================
@@ -296,7 +300,7 @@ public class NormalizedCandidatePromotionReadinessService {
                             new PairKey(pair.getLeftCandidate().getId(), pair.getRightCandidate().getId()), r));
         }
 
-        Set<String> jlptLevelCodes = jlptLevelCodes();
+        Map<String, Long> jlptLevelCodeCounts = jlptLevelCodeCounts();
         ContentSourceRightsService.ReleaseEligibility eligibility = sourceRights.releaseEligibility(candidate.getSourceRef());
         boolean alreadyPromoted = importedSourceRecordRepository.findBySourceRefAndNoteTypeAndSourceNoteIdIn(
                         candidate.getSourceRef(), productionNoteType(candidateType), List.of(candidate.getSourceNoteId()))
@@ -304,7 +308,7 @@ public class NormalizedCandidatePromotionReadinessService {
                 .anyMatch(record -> record.getContentItem() != null);
 
         PromotionReadinessResult result = evaluate(candidate, candidate.getVocabularyMeanings(),
-                candidate.getVocabularyExamples(), pairs, reviewsByPairKey, candidatesById, jlptLevelCodes,
+                candidate.getVocabularyExamples(), pairs, reviewsByPairKey, candidatesById, jlptLevelCodeCounts,
                 eligibility, alreadyPromoted);
 
         CandidateFieldsView fields = candidateFields(candidate);
@@ -347,7 +351,7 @@ public class NormalizedCandidatePromotionReadinessService {
                 .collect(Collectors.toMap(
                         r -> new PairKey(r.getLeftCandidate().getId(), r.getRightCandidate().getId()), r -> r));
 
-        Set<String> jlptLevelCodes = jlptLevelCodes();
+        Map<String, Long> jlptLevelCodeCounts = jlptLevelCodeCounts();
 
         Map<String, List<NormalizedContentCandidate>> candidatesBySourceRef = candidates.stream()
                 .collect(Collectors.groupingBy(NormalizedContentCandidate::getSourceRef));
@@ -379,7 +383,7 @@ public class NormalizedCandidatePromotionReadinessService {
                     .getOrDefault(candidate.getSourceRef(), Set.of())
                     .contains(candidate.getSourceNoteId());
             results.add(evaluate(candidate, meanings, examples, candidatePairs, reviewsByPairKey, candidatesById,
-                    jlptLevelCodes, eligibility, alreadyPromoted));
+                    jlptLevelCodeCounts, eligibility, alreadyPromoted));
         }
         return results;
     }
@@ -395,7 +399,7 @@ public class NormalizedCandidatePromotionReadinessService {
             List<NormalizedCandidateMatchPair> candidatePairs,
             Map<PairKey, NormalizedCandidatePairReview> reviewsByPairKey,
             Map<Long, NormalizedContentCandidate> candidatesById,
-            Set<String> jlptLevelCodes,
+            Map<String, Long> jlptLevelCodeCounts,
             ContentSourceRightsService.ReleaseEligibility sourceEligibility,
             boolean alreadyPromoted) {
 
@@ -454,10 +458,22 @@ public class NormalizedCandidatePromotionReadinessService {
         String levelCode = candidate.getCandidateType() == NormalizedCandidateType.VOCABULARY
                 ? candidate.getVocabularyDetail().getLevelCode()
                 : candidate.getGrammarDetail().getLevelCode();
-        if (levelCode == null || !jlptLevelCodes.contains(levelCode)) {
+        long matchingLevelCount = levelCode == null ? 0L : jlptLevelCodeCounts.getOrDefault(levelCode, 0L);
+        if (matchingLevelCount != 1L) {
+            String reason;
+            if (levelCode == null) {
+                reason = "candidate에 levelCode가 없습니다.";
+            } else if (matchingLevelCount == 0L) {
+                reason = "일치하는 production Level(system=JLPT, code=" + levelCode + ") row가 없습니다.";
+            } else {
+                // (system, code)에 database-level uniqueness constraint가 없어 동일 code row가 둘 이상 존재할 수
+                // 있다 - 그중 하나를 임의로 골라 매핑하지 않고 unmappable로 처리한다.
+                reason = "production Level(system=JLPT, code=" + levelCode + ") row가 " + matchingLevelCount
+                        + "개 존재하여 candidate를 정확히 하나의 Level에 매핑할 수 없습니다 (중복).";
+            }
             addIssue(issuesByCode, JLPT_LEVEL_UNMAPPABLE,
                     "JLPT 레벨을 기존 production Level(system=JLPT) row에 매핑할 수 없습니다 (levelCode="
-                            + levelCode + ").");
+                            + levelCode + "): " + reason);
         }
 
         // D. source rights / future release eligibility (reuses ContentSourceRightsService as-is)
@@ -610,11 +626,16 @@ public class NormalizedCandidatePromotionReadinessService {
         return all.stream().collect(Collectors.groupingBy(e -> e.getCandidate().getId()));
     }
 
-    private Set<String> jlptLevelCodes() {
+    /**
+     * Counts production {@code Level} rows per {@code code} within {@code system == "JLPT"}. There is
+     * no {@code (system, code)} uniqueness constraint on this table, so a code can legitimately have
+     * zero, one, or more than one matching row; callers must require exactly one match before treating
+     * a candidate's {@code levelCode} as mappable (see {@link #evaluate}).
+     */
+    private Map<String, Long> jlptLevelCodeCounts() {
         return levelRepository.findAllByOrderBySystemAscCodeAsc().stream()
                 .filter(l -> JLPT_LEVEL_SYSTEM.equals(l.getSystem()))
-                .map(Level::getCode)
-                .collect(Collectors.toSet());
+                .collect(Collectors.groupingBy(Level::getCode, Collectors.counting()));
     }
 
     private static String productionNoteType(NormalizedCandidateType candidateType) {

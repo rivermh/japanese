@@ -31,7 +31,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * JLPT-MAX Ticket 4D step 30: opt-in verification tool (test/dev scope only) that runs the full real
+ * JLPT-MAX Ticket 4D: opt-in verification tool (test/dev scope only) that runs the full real
  * chain - extract -&gt; normalize -&gt; {@link NormalizedCandidateStore} (4A) -&gt;
  * {@link NormalizedCandidateConflictAnalyzer} (4B) -&gt;
  * {@link NormalizedCandidatePromotionReadinessService} (this ticket) - against the actual v2.1.1

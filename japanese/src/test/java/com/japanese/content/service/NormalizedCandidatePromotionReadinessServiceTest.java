@@ -32,6 +32,9 @@ import com.japanese.content.importer.VocabularyNormalizationIssue;
 import com.japanese.content.importer.VocabularyNormalizationResult;
 import com.japanese.content.importer.VocabularyNormalizationWarning;
 import com.japanese.content.repository.ContentItemRepository;
+import com.japanese.content.repository.ContentReleaseBatchItemRepository;
+import com.japanese.content.repository.ContentReleaseBatchRepository;
+import com.japanese.content.repository.ContentReviewHistoryRepository;
 import com.japanese.content.repository.ContentSourceRepository;
 import com.japanese.content.repository.GrammarComparisonRepository;
 import com.japanese.content.repository.GrammarEnrichmentRepository;
@@ -42,6 +45,9 @@ import com.japanese.content.repository.NormalizedCandidateMatchPairRepository;
 import com.japanese.content.repository.NormalizedCandidatePairReviewHistoryRepository;
 import com.japanese.content.repository.NormalizedCandidatePairReviewRepository;
 import com.japanese.content.repository.NormalizedContentCandidateRepository;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -81,6 +87,9 @@ class NormalizedCandidatePromotionReadinessServiceTest {
     @Autowired GrammarEnrichmentRepository grammarEnrichments;
     @Autowired GrammarRelationRepository grammarRelations;
     @Autowired GrammarComparisonRepository grammarComparisons;
+    @Autowired ContentReviewHistoryRepository contentReviewHistory;
+    @Autowired ContentReleaseBatchRepository releaseBatches;
+    @Autowired ContentReleaseBatchItemRepository releaseBatchItems;
     @Autowired JdbcClient jdbcClient;
 
     private String ref() {
@@ -92,8 +101,15 @@ class NormalizedCandidatePromotionReadinessServiceTest {
                 "Admin " + suffix, UserRole.ADMIN));
     }
 
+    /**
+     * Idempotent by design: {@code SampleContentDataLoader} ("sample" profile) already commits a
+     * single {@code Level(JLPT, N5)} row once at application startup, shared across this whole test
+     * JVM run. An unconditional {@code levels.save(new Level(...))} here would insert a second N5 row
+     * inside every test's own transaction - exactly the (system, code) duplicate scenario Level
+     * mapping must treat as unmappable, which would make every "clean" test in this class fail.
+     */
     private void seedN5Level() {
-        levels.save(new Level("JLPT", "N5", "JLPT N5"));
+        levels.findBySystemAndCode("JLPT", "N5").orElseGet(() -> levels.save(new Level("JLPT", "N5", "JLPT N5")));
     }
 
     // ===================================================================================
@@ -381,6 +397,29 @@ class NormalizedCandidatePromotionReadinessServiceTest {
     }
 
     @Test
+    void r2_exactlyOneMatchingProductionLevelRowMakesTheLevelMappable() {
+        String ref = ref();
+        seedN5Level();
+        store.saveVocabulary(vocab(ref, 1L, "E1", "語", "ご", "noun", "N5", "meaning"));
+        var result = readiness.detail(NormalizedCandidateType.VOCABULARY, onlyCandidate(ref).getId()).result();
+        assertThat(codesOf(result)).doesNotContain(PromotionReadinessIssueCode.JLPT_LEVEL_UNMAPPABLE);
+    }
+
+    @Test
+    void r3_duplicateProductionLevelRowsForTheSameCodeMakeTheLevelUnmappable() {
+        String ref = ref();
+        // levels 테이블에는 (system, code) unique constraint가 없다 - 두 row가 동시에 존재하는 상태를
+        // 직접 재현해, 어느 한쪽을 임의로 골라 매핑하지 않고 unmappable로 처리되는지 검증한다. N4는
+        // SampleContentDataLoader가 seed하지 않는 code라서 이 테스트 트랜잭션 안에서 정확히 두 개의
+        // row만 존재함이 보장된다.
+        levels.save(new Level("JLPT", "N4", "JLPT N4"));
+        levels.save(new Level("JLPT", "N4", "JLPT N4 (duplicate)"));
+        store.saveVocabulary(vocab(ref, 1L, "E1", "語", "ご", "noun", "N4", "meaning"));
+        var result = readiness.detail(NormalizedCandidateType.VOCABULARY, onlyCandidate(ref).getId()).result();
+        assertThat(codesOf(result)).contains(PromotionReadinessIssueCode.JLPT_LEVEL_UNMAPPABLE);
+    }
+
+    @Test
     void s_pitchAccentSerializationOverflowIsBlocked() {
         String ref = ref();
         seedN5Level();
@@ -629,6 +668,38 @@ class NormalizedCandidatePromotionReadinessServiceTest {
     }
 
     @Test
+    void summaryBreakdownMapsPreserveDeclaredEnumOrderAcrossRepeatedCalls() {
+        String ref = ref();
+        seedN5Level();
+        store.saveVocabulary(vocab(ref, 1L, "E1", "語", "ご", "noun", "N5", "meaning"));
+        store.saveVocabulary(new VocabularyNormalizationResult(ref, 2L, "E2", "語2", "ご2", "noun", null,
+                List.of(), List.of(), new NormalizedJlptLevel("N9", "N9", "WordJLPT"), "語2", "ご2", Map.of(),
+                List.of(), true));
+
+        List<String> expectedIssueOrder = Arrays.stream(PromotionReadinessIssueCode.values()).map(Enum::name).toList();
+        List<String> expectedQualityOrder = Arrays.stream(
+                com.japanese.content.entity.NormalizedCandidateQualityState.values()).map(Enum::name).toList();
+        List<String> expectedPairOrder = Arrays.stream(PairResolutionStatus.values()).map(Enum::name).toList();
+        List<String> expectedMappingOrder = Arrays.stream(MappingStatus.values()).map(Enum::name).toList();
+        List<String> expectedRightsOrder = new ArrayList<>(
+                Arrays.stream(ContentSourceRightsStatus.values()).map(Enum::name).toList());
+        expectedRightsOrder.add("NOT_REGISTERED");
+
+        // 두 번 반복 호출해도 순서가 매번 동일한지 함께 검증한다 (Map.copyOf(...)의 iteration order는
+        // 보장되지 않으므로 여기서 회귀를 잡는다).
+        for (int i = 0; i < 2; i++) {
+            ReadinessSummary summary = readiness.summary(NormalizedCandidateType.VOCABULARY, ref);
+            assertThat(summary.blockedByIssueCode().keySet()).containsExactlyElementsOf(expectedIssueOrder);
+            assertThat(summary.qualityBreakdown().keySet()).containsExactlyElementsOf(expectedQualityOrder);
+            assertThat(summary.pairResolutionBreakdown().keySet()).containsExactlyElementsOf(expectedPairOrder);
+            assertThat(summary.mappingBreakdown().keySet()).containsExactlyElementsOf(expectedMappingOrder);
+            assertThat(summary.sourceRightsBreakdown().keySet()).containsExactlyElementsOf(expectedRightsOrder);
+            assertThat(List.copyOf(summary.candidatesByBlockerCountBreakdown().keySet()))
+                    .isSortedAccordingTo(Comparator.comparingInt(Integer::parseInt));
+        }
+    }
+
+    @Test
     void issueOrderWithinACandidateIsDeterministicByDeclaredEnumOrder() {
         String ref = ref();
         // No Level seeded (JLPT_LEVEL_UNMAPPABLE) and no ContentSource registered (SOURCE_NOT_REGISTERED),
@@ -696,21 +767,37 @@ class NormalizedCandidatePromotionReadinessServiceTest {
 
     private Map<String, Long> allCounts() {
         return Map.ofEntries(
+                // private candidate pipeline (Tickets 4A-4C)
                 Map.entry("candidates", candidateRepository.count()),
+                Map.entry("normalizedVocabularyCandidates",
+                        jdbcClient.sql("select count(*) from normalized_vocabulary_candidates").query(Long.class).single()),
+                Map.entry("normalizedGrammarCandidates",
+                        jdbcClient.sql("select count(*) from normalized_grammar_candidates").query(Long.class).single()),
+                Map.entry("normalizedVocabularyCandidateMeanings",
+                        jdbcClient.sql("select count(*) from normalized_vocabulary_candidate_meanings").query(Long.class).single()),
+                Map.entry("normalizedVocabularyCandidateExamples",
+                        jdbcClient.sql("select count(*) from normalized_vocabulary_candidate_examples").query(Long.class).single()),
                 Map.entry("pairs", pairRepository.count()),
+                Map.entry("matchEvidence", jdbcClient.sql("select count(*) from normalized_candidate_match_evidence")
+                        .query(Long.class).single()),
                 Map.entry("reviews", reviewRepository.count()),
                 Map.entry("history", jdbcClient.sql("select count(*) from normalized_candidate_pair_review_history")
                         .query(Long.class).single()),
+                // production
                 Map.entry("contentItems", contentItems.count()),
                 Map.entry("words", jdbcClient.sql("select count(*) from words").query(Long.class).single()),
+                Map.entry("meanings", jdbcClient.sql("select count(*) from meanings").query(Long.class).single()),
                 Map.entry("grammars", jdbcClient.sql("select count(*) from grammars").query(Long.class).single()),
                 Map.entry("examples", jdbcClient.sql("select count(*) from examples").query(Long.class).single()),
                 Map.entry("importedSourceRecords", importedSourceRecords.count()),
                 Map.entry("contentSources", contentSources.count()),
                 Map.entry("levels", levels.count()),
+                Map.entry("contentReviewHistory", contentReviewHistory.count()),
                 Map.entry("grammarEnrichments", grammarEnrichments.count()),
                 Map.entry("grammarRelations", grammarRelations.count()),
-                Map.entry("grammarComparisons", grammarComparisons.count()));
+                Map.entry("grammarComparisons", grammarComparisons.count()),
+                Map.entry("releaseBatches", releaseBatches.count()),
+                Map.entry("releaseBatchItems", releaseBatchItems.count()));
     }
 
     private VocabularyNormalizationResult vocab(String ref, long noteId, String entryId, String expression,

@@ -21,8 +21,7 @@ row 변경이 없음을 코드 검토 + 전용 테스트로 확인. commit 완�
 ====================================================================
 3. Final HEAD
 ====================================================================
-아래 "31. 커밋 SHA" 참조 (본 보고서 작성 시점에는 커밋 전 상태를 기준으로 작성되었으며,
-커밋 직후 실제 SHA로 갱신됨).
+527f751271fbc74f9e4a4c2173bc9e00d3c48434 (feat(content): add candidate promotion readiness)
 
 ====================================================================
 4. Changed files
@@ -51,8 +50,8 @@ row 변경이 없음을 코드 검토 + 전용 테스트로 확인. commit 완�
 - japanese/src/main/resources/templates/admin/dashboard.html (+ 1개 shortcut 링크)
 
 [Migration] 없음. V1-V8 전부 무수정.
-[건드리지 않음] AGENTS.md.md, CLAUDE.md.md, docs/design/**, 기존 JLPT_MAX_TICKET{1.5,2,3A,4B,4C}*
-문서 - 전부 이번 세션 이전부터 존재하던 무관 변경이며 stage하지 않음.
+[건드리지 않음] 기존 unrelated local 파일(문서/설정 포함) - 전부 이번 세션 이전부터 존재하던
+무관 변경이며 stage하지 않음.
 
 ====================================================================
 5. Production schema 분석 (구현 전 필수 조사)
@@ -71,8 +70,12 @@ explanation mapping이 왜 미정인지의 직접 근거), 관련 repository 전
 관례(AdminNormalizedCandidateReviewController 등), SecurityConfig.
 
 주요 발견:
-- production Word: expression/reading/partOfSpeech 120자, pitchAccent 500자 - 전부 nullable
-  컬럼(파티션 오브 스피치 없어도 draft 자체는 가능; release 시점에만 MANUAL_REVIEW 대상).
+- production Word: expression 120자 NOT NULL, reading 120자 NOT NULL, partOfSpeech 120자
+  nullable, pitchAccent 500자 nullable (Word.java @Column 선언 기준 실측 - "전부 nullable"이
+  아니다). partOfSpeech/pitchAccent가 없어도 draft 자체는 가능; release 시점에만 MANUAL_REVIEW
+  대상. expression/reading 누락은 이 서비스가 이미 VOCAB_EXPRESSION_MISSING/VOCAB_READING_MISSING
+  blocker로 막고 있으므로, 이번 nullable 표기 정정은 문서 서술만 바로잡을 뿐 코드 동작은
+  바꾸지 않는다.
 - production Meaning: text 500자 NOT NULL, languageTag 10자 NOT NULL, senseOrder.
 - production Example: japaneseText/reading/translation 각 1000자.
 - production Grammar: pattern 200자 NOT NULL, explanation 2000자 NOT NULL, connection 500자
@@ -343,13 +346,29 @@ PRODUCTION_IDENTITY_POLICY_UNRESOLVED 1,078(전부). blocker 개수별 분포: 3
 5개 8건(N5가 아니면서 pair에도 관련된 candidate).
 
 ====================================================================
-28. Source rights actual 상태
+28. Source rights actual 상태 / "actual APKG profiling" ≠ "운영 DB 상태 검증"
 ====================================================================
 이번 profiling scope("ticket4d-promotion-readiness")에는 ContentSource row를 등록하지 않았다 -
 실제 canonical sourceRef("JLPT-MAX-Deck-2.1.1.apkg")의 ContentSourceRightsStatus를 조회/변경한
 적이 없다. 이 코드베이스에 현재 그 sourceRef의 ContentSource row가 등록돼 있는지 여부는 이번
 Ticket 범위 밖(운영 DB 조회가 필요하며, 조회하더라도 상태를 바꾸지 않는다). JLPT-MAX composite
 source를 자동 ALLOWED로 만든 적 없음.
+
+26번/27번 "실제 v2.1.1 profiling"이 의미하는 바를 명확히 구분한다 - "실제 APKG content
+profiling"과 "실제 운영(production) DB 상태 검증"은 서로 다른 것이며, 이번 Ticket이 한 것은
+전자뿐이다:
+ - 실제인 것: v2.1.1 APKG 파일의 bytes/SHA-256(9d8be3ff6b23e11ef890a146dffec7ec4649de4bcbd
+   491be439a11b991fd154d 검증 통과)과 그 안의 실제 note data(Vocabulary 9,160건 + Grammar
+   1,078건) - 이 부분은 synthetic/mock이 아니다.
+ - 실제가 아닌 것: DB는 이 테스트 실행마다 새로 생성되는 isolated in-memory H2(fresh, 격리됨)이며
+   운영 DB가 아니다. sourceRef("ticket4d-promotion-readiness")도 profiling 전용 synthetic scope로,
+   실제 운영에서 쓰는 sourceRef("JLPT-MAX-Deck-2.1.1.apkg")가 아니다.
+ - 검증하지 않은 것: 운영 DB의 실제 ContentSource rights 상태(위 문단), 운영 DB의 실제 N1-N5
+   Level row 존재/완결성(26/27번의 JLPT_LEVEL_UNMAPPABLE 다수는 이 fresh DB에 Level(JLPT,N5)
+   1행만 있기 때문이고, 운영 DB의 실제 Level 커버리지는 이번 Ticket이 조회하지 않았다).
+ - 결론: Ticket 4E 진행 전에는 운영 DB(또는 운영과 동일한 상태의) 환경 기준 재profiling이
+   필요하다(36번 항목). 코드 결과를 좋게 보이도록 위 수치를 임의로 바꾸지 않았다 - 26/27번은
+   fresh H2 seed 상태에서 실측된 그대로의 수치다.
 
 ====================================================================
 29. 전체 suite 결과
@@ -368,25 +387,28 @@ opt-in report(`NormalizedCandidatePromotionReadinessRealApkgReport`)는 기본 s
 ====================================================================
 31. Commit SHA
 ====================================================================
-(커밋 직후 실제 SHA로 대화 응답에 기록됨 - 본 파일은 커밋 대상에 포함되므로 self-reference는
-생략)
+527f751271fbc74f9e4a4c2173bc9e00d3c48434 (parent: 62d5d6a0b4f049ca6b6fa6f9e8b2729c709ace14).
+Attribution/서명 라인 없음 - 사용자 명시 지시에 따름. amend 없음(새 커밋).
 
 ====================================================================
 32. Push 결과
 ====================================================================
-사용자 확인 하에 일반 push(force 아님) 진행 - 대화 응답 참조.
+일반 push(force 아님) 성공: `62d5d6a..527f751  ui/japanese-ui-consolidation ->
+ui/japanese-ui-consolidation`.
 
 ====================================================================
 33. Remote HEAD
 ====================================================================
-push 성공 시 origin/ui/japanese-ui-consolidation == 로컬 HEAD (대화 응답 참조).
+origin/ui/japanese-ui-consolidation = 527f751271fbc74f9e4a4c2173bc9e00d3c48434 (로컬 HEAD와 일치,
+push 직후 `git rev-parse origin/...`로 확인).
 
 ====================================================================
 34. Final git status
 ====================================================================
-이번 Ticket 관련 파일만 staged/committed. AGENTS.md.md/CLAUDE.md.md/docs/design/**/기존
-JLPT_MAX_TICKET{1.5,2,3A,4B,4C}* 문서는 여전히 untracked/modified 상태로 그대로 남음(건드리지
-않음) - 대화 응답의 git status 참조.
+커밋 후 `git status`: "Your branch is up to date with 'origin/ui/japanese-ui-consolidation'."
+staged/committed 파일은 이번 Ticket 4D 관련 16개 파일뿐. 기존 unrelated local 파일(이번 세션
+이전부터 modified/untracked 상태였던 문서/설정)은 여전히 그대로 남아 있으며 이번 커밋에
+전혀 포함되지 않았다.
 
 ====================================================================
 35. BLOCKER / MAJOR / MINOR / NOTE
@@ -435,5 +457,4 @@ NOTE:
 - COMPREHENSIVE parser 변경 없음
 - V1-V8 migration 수정 없음
 - force push 없음
-- commit message에 Co-Authored-By/Claude-Session 등 attribution metadata 추가 없음(사용자 명시
-  지시에 따름)
+- commit message에 추가 attribution metadata 없음(사용자 명시 지시에 따름)

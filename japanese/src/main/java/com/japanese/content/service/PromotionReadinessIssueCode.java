@@ -77,7 +77,13 @@ public enum PromotionReadinessIssueCode {
      */
     GRAMMAR_MAPPING_POLICY_UNRESOLVED,
 
-    /** No JLPT level code, or no matching {@code Level(system="JLPT", code=...)} row exists yet. */
+    /**
+     * No JLPT level code, no matching {@code Level(system="JLPT", code=...)} row exists yet, or more
+     * than one such row exists for the same {@code code} (the {@code (system, code)} pair has no
+     * database-level uniqueness constraint today). In the duplicate case the candidate is unmappable
+     * because it cannot be resolved to a single production {@code Level} - this ticket never guesses
+     * which duplicate row is the "real" one.
+     */
     JLPT_LEVEL_UNMAPPABLE,
 
     /** No {@code ContentSource} row exists for this candidate's {@code sourceRef}. */
