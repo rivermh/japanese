@@ -997,3 +997,160 @@
   production 승격, source rights 승인, publication, Release Gate 연동, batch release,
   production `reviewStatus` 변경, COMPREHENSIVE parser 변경, cluster/union-find review 엔진,
   UNIQUE candidate 10k건 개별 review UI. 전부 4C 이후 과제로 남는다.
+
+## 2026-09-17  JLPT-MAX Ticket 4D — Normalized Candidate Promotion Readiness / Dry-run Planner
+
+- **왜 실제 promotion이 아니라 dry-run/readiness인가**: 이번 Ticket은 "이 candidate를 production
+  draft로 승격할 수 있는가? 안 된다면 정확히 무엇이 막고 있는가?"를 deterministic하게 계산하는
+  **read-only planner**만 추가한다. `ContentItem`/`Word`/`Grammar`/`Meaning`/`Example` 생성,
+  `ImportedSourceRecord.linkContentItem`, candidate merge/삭제, canonical winner 선택, production
+  전역 identity/slug 확정, source rights 변경은 전부 이번 Ticket의 범위 밖이며 코드 어디에도
+  없다 - Ticket 4A~4C가 "직접 production에 쓰지 않고 private staging/dedup/review 계층을 먼저
+  만든" 것과 같은 이유로, 승격 여부 판단 로직도 실제 승격 실행보다 먼저, 별도로 검증 가능해야
+  한다고 판단했다.
+- **private→production field mismatch**: `NormalizedVocabularyCandidateDetail`은 일부 필드를
+  production `Word`(expression/reading/partOfSpeech 120자, pitchAccent 500자)보다 넉넉하게
+  (500자) 보존한다 - 손실 없이 원본을 유지하기 위한 의도적 설계(Ticket 4A)이므로, 이번 Ticket은
+  candidate 필드 값을 **자르지 않고** production 한도를 초과하면 명시적 blocker
+  (`VOCAB_EXPRESSION_TOO_LONG` 등)로 막는다. Vocabulary 매핑은 실제로 해소 가능했다 -
+  expression/reading/partOfSpeech는 `ApkgVocabularyImporter`(현재 유일한 production `Word`
+  writer)가 쓰는 것과 동일한 `AnkiFieldTextNormalizer.text(...)` 결과이고, pitchAccent는 그
+  importer의 유일한 `Word.pitchAccent` 직렬화 포맷(`"terminal="+t+";mora="+m`)을 그대로
+  재사용했으며, meaning은 그 importer가 쓰는 유일한 언어 태그("ko")와 동일하고, Vocabulary
+  example은 `VocabularyNormalizationParser`가 production과 **동일한** `ExampleHtmlParser`로
+  파싱한 결과라 무손실이다.
+- **Grammar explanation mapping unresolved policy**: production `Grammar.explanation`은
+  NOT NULL(2000자)이지만, `GrammarNormalizationResult`(Ticket 3B-1)에는 이에 직접 대응하는
+  generic explanation 필드가 없다 - `meaningGloss`(짧은 한국어 gloss)와
+  `frontExample.translation`(예문 번역)은 서로 다른 값이고, 어느 것을(혹은 nuance와 결합해)
+  explanation으로 쓸지 이 코드베이스에 ratified contract가 전혀 없다(`GrammarNormalizationResult`
+  자체 class javadoc이 "이것은 promotion-time decision, 여기서 결정하지 않는다"고 명시).
+  임의로 결정하지 않고 **모든 Grammar candidate**에 무조건 `GRAMMAR_MAPPING_POLICY_UNRESOLVED`
+  blocker를 부여했다 - 실측 결과 Grammar 1,078건 전부가 이 코드로 막힌다(아래 프로파일링).
+  `frontExample`/`confusablePatterns`을 production `Example`/`GrammarRelation`/
+  `GrammarComparison`으로 자동 매핑하는 것도 동일한 이유로 하지 않았고 같은 blocker 코드 아래
+  묶었다. 유일하게 해소된 Grammar 필드는 `pattern`(→`Grammar.pattern`, 200자 한도)과
+  `connectionForm`(→`Grammar.connection`, "접속" 카드가 명확히 label-identified되어 있어
+  ambiguity 없음, 500자 한도)뿐이다.
+- **global production identity/slug unresolved**: `sourceNoteId`/`EntryID`/`UnitID`/정규화된
+  expression+reading/pattern 중 어느 것도 production `ContentItem.slug`(unique, 120자) 전역
+  identity로 자동 확정하지 않았다. `ApkgVocabularyImporter`(레거시, private candidate 파이프라인
+  전체를 우회하는 별도 경로)가 `"jlpt-max-"+entryId`/`"jlpt-max-grammar-"+noteId` 식 slug를
+  이미 쓰고 있지만, 이는 Ticket 4A~4D가 만든 dedup/review 계층을 거치지 않는 구식 관행이라
+  ratified policy로 채택하지 않았다 - 대신 **모든 candidate**에 무조건
+  `PRODUCTION_IDENTITY_POLICY_UNRESOLVED`를 부여했다. 그 결과 실측 데이터에서
+  `READY_FOR_DRAFT_PROMOTION`은 정확히 0건이다 - 이는 버그가 아니라 이번 Ticket이 의도적으로
+  아직 내리지 않은 결정을 정직하게 드러낸 것이다.
+- **pair review semantics / SAME_CONTENT가 canonical winner를 의미하지 않는 이유**: Ticket 4B
+  pair(`NormalizedCandidateMatchPair`)와 Ticket 4C human review(`NormalizedCandidatePairReview`)
+  는 그대로 재사용(read-only)했을 뿐 어느 쪽도 변경하지 않았다. candidate별로 참여 중인 **현재**
+  pair를 전부 확인해, pair 자체가 stale(`PAIR_ANALYSIS_STALE`), review 없음(`PAIR_UNREVIEWED`),
+  review가 stale(`PAIR_REVIEW_STALE`), `NEEDS_FOLLOWUP`, `SAME_CONTENT`(→
+  `SAME_CONTENT_CANONICAL_SELECTION_REQUIRED`) 중 하나라도 해당하면 pair 축을 BLOCKED로
+  표시한다. `SAME_CONTENT`는 "두 candidate가 같은 content"라는 사람의 판단만 기록할 뿐 어느
+  쪽이 canonical인지, merge 전략이 무엇인지는 4C가 전혀 정하지 않았으므로 이번 Ticket도 정하지
+  않았다 - 그래서 `SAME_CONTENT` pair에 속한 candidate는 양쪽 모두 승격 준비 완료로 만들지
+  않는다. pair가 없는 candidate는 그 자체로 pair 축 통과(누락이 아니라 "현재 dedup/conflict
+  관계 없음"이라는 의미)이며, 과거 pair가 재분석으로 사라지고 review/history만 남은 경우도
+  **현재** pair가 기준이므로 과거 관계로 blocker를 만들지 않는다.
+- **quality blocker policy**: `NormalizedCandidateQualityState.FATAL`/`REVIEW_REQUIRED`는
+  무조건 BLOCK(`NORMALIZATION_FATAL`/`NORMALIZATION_REVIEW_REQUIRED`), `CLEAN`/`INFORMATIONAL`은
+  quality 축 자체로는 통과다 - Ticket 4C human pair review는 관계 review이지 normalization
+  warning 자체를 승인하는 워크플로가 아니므로, pair review를 했다고 `REVIEW_REQUIRED`/`FATAL`이
+  사라지지 않는다(두 축은 완전히 독립).
+- **rights와 draft mapping readiness 분리**: `mappingStatus`(candidate 필드가 production 스키마에
+  기술적으로 맞는가)와 `sourceRightsStatus`(향후 공개 가능한 rights 상태인가)를 별도 필드로
+  분리해 DTO/화면에 노출한다 - `mappingReady=true`이면서 `rights=BLOCKED`인 조합이 실제로
+  가능하고 의미가 다르기 때문이다. `ContentSourceRightsService.releaseEligibility(sourceRef)`를
+  그대로 재사용했을 뿐(read-only) 어떤 `ContentSource.rightsStatus`도 변경하지 않았고, JLPT-MAX
+  composite source를 자동 `ALLOWED`로 만들지도 않았다(실측 시나리오에서는 `ContentSource` row
+  자체가 없어 전부 `SOURCE_NOT_REGISTERED`).
+- **existing production provenance 감지**: `ImportedSourceRecord`의 `(source_ref, note_type,
+  source_note_id)` unique identity로 이미 production `ContentItem`에 연결된 candidate를
+  read-only로 감지한다(`ALREADY_PROMOTED`). `candidateType → noteType` 대응은 추측이 아니라
+  이 코드베이스가 이미 두 곳에서 독립적으로 인코딩한 사실이다: `PrivateApkgExtractor.category()`
+  가 정확히 `"JLPT MAX덱 어휘"`/`"JLPT MAX덱 문법"` 문자열을 VOCABULARY/GRAMMAR로 인식하고,
+  `ImportedSourceRecord`의 유일한 writer인 `ApkgVocabularyImporter`가 그 두 문자열을 그대로
+  `noteType`으로 쓴다. `getContentItem() != null`까지 확인해 "record가 있다"가 아니라 "실제로
+  ContentItem에 연결됐다"만 `ALREADY_PROMOTED`로 센다. Write는 전혀 없다.
+- **zero-write guarantee**: `NormalizedCandidatePromotionReadinessService`의 모든 public
+  method는 `@Transactional(readOnly = true)`이고, repository `save`/`delete` 호출이 단 한 줄도
+  없다(entity setter 호출도 없음 - 전부 getter만 사용). `readinessComputationNeverWritesAnyRowAnywhere`
+  테스트로 candidate/pair/review/history/contentItem/word/grammar/example/
+  importedSourceRecord/contentSource/level/grammarEnrichment/grammarRelation/grammarComparison
+  13개 테이블 row count가 `list`/`summary`/`detail` 반복 호출 전후 불변임을 확인했다.
+- **batch/N+1 회피**: candidate 최대 ~10k건 규모(실측 Vocabulary 9,160 + Grammar 1,078)를
+  대상으로, candidate당 반복 쿼리를 절대 내지 않도록 (1) candidate + vocabularyDetail/
+  grammarDetail을 한 번에 fetch-join하는 새 쿼리
+  (`findByCandidateTypeAndSourceRefWithDetailForReadiness`), (2) Vocabulary meanings/examples는
+  candidate id `IN` 절 두 번의 별도 batch 쿼리로 로드(List 연관을 두 개 이상 fetch-join하면
+  Hibernate `MultipleBagFetchException` 위험이 있어 분리), (3) 현재 Ticket 4B pair는 scope
+  전체를 한 번에 읽어(`findByCandidateTypeAndOptionalSourceRef`) candidate id별
+  `Map<Long,List<Pair>>`로 메모리에서 구성, (4) Ticket 4C review는 기존
+  `findForReviewList`로 scope 전체를 한 번에 읽어 `(leftId,rightId)` 키 맵으로 구성, (5) JLPT
+  `Level`은 전체를 한 번만 읽어 `Set<String>`으로, (6) source rights/existing-provenance는
+  scope 내 **distinct sourceRef별로만**(보통 1개) 조회한다. 실측 결과 Vocabulary 9,160건 +
+  Grammar 1,078건 전체 스캔이 각각 수 초 내로 끝났다(opt-in report 기준).
+- **admin UI**: `/admin/normalized-candidates/promotion-readiness`(list, 유형/sourceRef/전체
+  상태/blocker code/quality 필터 + scope 요약 패널) +
+  `/admin/normalized-candidates/promotion-readiness/{candidateType}/{candidateId}`(detail, 축별
+  상태 + blocker 전체 목록 + candidate 전체 필드 + mapping preview + 현재 pair 목록)를
+  기존 `admin/normalized-candidate-review-*` 스타일 그대로 추가했다. **POST 매핑이 전혀 없다**
+  - 100% 조회 전용이며, `/admin/**`이 이미 `ROLE_ADMIN`으로 제한돼 있어 `SecurityConfig` 변경도
+    없었다(`AdminNormalizedCandidatePromotionReadinessControllerTest`로 확인).
+- **actual v2.1.1 profiling** (opt-in, `NormalizedCandidatePromotionReadinessRealApkgReport`,
+  SHA-256 `9d8be3ff6b23e11ef890a146dffec7ec4649de4bcbd491be439a11b991fd154d` 검증 후 실행,
+  scope별 fresh in-memory H2):
+  - **Vocabulary (9,160건)**: READY_FOR_DRAFT_PROMOTION 0 · BLOCKED 9,160. quality CLEAN 9,159/
+    FATAL 1(entryId/expression/reading/meaning이 모두 없는 손상 note 1건). pair 축 BLOCKED 2건
+    (Ticket 4B 실측 POSSIBLE_DUPLICATE pair 1개의 양쪽, 아직 미검토=`PAIR_UNREVIEWED`) /
+    RESOLVED 9,158건. mapping 축 BLOCKED 8,381 / READY 779 - 전부 `JLPT_LEVEL_UNMAPPABLE`이
+    원인이며, 이는 필드 길이 문제가 아니라 이번 profiling을 "sample" 프로파일의 fresh DB(오직
+    `Level(JLPT,N5)` 1행만 시드됨)에서 실행했기 때문 - 실제 운영 DB처럼 N1~N5 `Level` row가
+    전부 존재하면 이 축의 결과는 달라진다(별도 명시). 필드 길이 blocker(expression/reading/
+    partOfSpeech/pitchAccent/meaning/example TOO_LONG)는 실측 0건 - v2.1.1 실제 데이터는 현재
+    production 컬럼 한도를 초과하지 않는다. source rights는 전부 `SOURCE_NOT_REGISTERED`(의도적
+    미등록). `PRODUCTION_IDENTITY_POLICY_UNRESOLVED` 9,160건(전부).
+  - **Grammar (1,078건)**: READY_FOR_DRAFT_PROMOTION 0 · BLOCKED 1,078(전부).
+    quality CLEAN 1,078(전부 - Ticket 3B-1 scope가 이미 IsBasic-only로 필터링됨). pair 축
+    BLOCKED 26 / RESOLVED 1,052(Ticket 4B 실측 POSSIBLE_DUPLICATE pair 32개에 관련된
+    candidate 중 아직 미검토인 26건). mapping 축은 1,078건 전부 BLOCKED -
+    `GRAMMAR_MAPPING_POLICY_UNRESOLVED`(전부, 의도된 결과) + `JLPT_LEVEL_UNMAPPABLE` 979건
+    (Vocabulary와 동일한 이유 - fresh sample DB에 N5 Level만 존재). pattern/connection
+    길이 초과(TOO_LONG)는 실측 0건. `PRODUCTION_IDENTITY_POLICY_UNRESOLVED` 1,078건(전부).
+  - 두 도메인 모두 `summary()`를 동일 스냅샷에서 두 번 호출해 완전히 동일한 결과(불변 필드
+    단위 `equals`)를 확인했다(deterministic/idempotent 요구사항).
+- **source rights actual 상태**: 실측 scope("ticket4d-promotion-readiness")에는 `ContentSource`
+  row를 전혀 등록하지 않았다 - 실제 canonical `JLPT-MAX-Deck-2.1.1.apkg` sourceRef의
+  `ContentSourceRightsStatus`를 이번 Ticket이 조회/변경한 적은 없다(이 코드베이스에 아직
+  등록되지 않았을 가능성이 높다는 것만 확인). 등록/전환은 여전히 `ContentSourceRightsService`의
+  기존 admin 절차를 통해서만 이뤄져야 한다.
+- **query/repository 추가**: `NormalizedContentCandidateRepository.
+  findByCandidateTypeAndSourceRefWithDetailForReadiness`, `NormalizedCandidateMatchPairRepository.
+  findByCandidateTypeAndOptionalSourceRef`/`findByEitherCandidateIdWithEvidence`,
+  `ImportedSourceRecordRepository.findBySourceRefAndNoteTypeAndSourceNoteIdIn` - 전부 추가만
+  했을 뿐 기존 쿼리 메서드는 하나도 수정하지 않았다. **Migration 없음** - 이번 Ticket은 어떤
+  스키마도 추가/변경하지 않는다(V8까지 그대로).
+- **테스트**: `NormalizedCandidatePromotionReadinessServiceTest`(quality A-D, pair E-L(+pair
+  자체 stale 케이스 별도 1건), Vocabulary mapping M-S, Grammar mapping T-W, production identity
+  X-Z, source rights 4건, already-promoted 2건, zero-write 1건, determinism 2건 = 총 27건),
+  `AdminNormalizedCandidatePromotionReadinessControllerTest`(ADMIN-only list/detail, 404,
+  잘못된 enum 필터 값 400 = 4건), `NormalizedCandidatePromotionReadinessRealApkgReport`(opt-in,
+  SHA-256 게이팅, 실제 deck 대상 summary 산출 + idempotency + 구조적 회귀 가드). 전체
+  `./gradlew clean test` 405 tests, 0 failures, 0 errors. `git diff --check` 통과(trailing
+  whitespace 없음, 기존 LF/CRLF 경고만).
+- **Ticket 4E로 넘기는 결정사항**: (1) Grammar `explanation` 매핑 정책(meaningGloss/nuance/
+  frontExample 중 무엇을, 어떻게 결합할지) 확정, (2) `frontExample`/`confusablePatterns`을
+  production `Example`/`GrammarRelation`/`GrammarComparison`으로 옮길지/어떻게 옮길지 결정,
+  (3) production 전역 identity/slug 정책 확정(EntryID/UnitID/sourceNoteId 중 무엇을 기반으로
+  할지, 충돌 시 처리), (4) `SAME_CONTENT` pair의 canonical winner 선택 및 merge 전략, (5)
+  실제 draft 생성(ContentItem/Word/Grammar/Meaning/Example insert, `ImportedSourceRecord.
+  linkContentItem`) 및 그 원자성/재시도 정책, (6) unpublished/PENDING draft에 한해 rights
+  미결정 상태에서도 draft 생성을 허용할지 여부, (7) 운영 DB 기준(모든 N1-N5 `Level` row가 이미
+  존재하는 상태) 재프로파일링.
+- **이번 Ticket에서 하지 않은 것(명시적 비범위)**: `ContentItem`/`Word`/`Grammar`/`Meaning`/
+  `Example` insert/update, `ImportedSourceRecord.linkContentItem`, automatic merge, candidate
+  삭제, canonical winner 선택, slug assignment 정책 확정, source rights 변경, publication,
+  Release Gate 변경, production `reviewStatus` 변경, `GrammarEnrichment`/`GrammarRelation`/
+  `GrammarComparison` 자동 생성, COMPREHENSIVE parser, V1-V8 migration 수정. 전부 4D 이후
+  과제로 남는다.

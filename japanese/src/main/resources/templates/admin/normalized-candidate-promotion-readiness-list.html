@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Promotion Readiness')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('admin')}"></header>
+<main id="main-content" class="page-shell admin-shell">
+  <header class="page-heading"><div><p class="eyebrow">PROMOTION READINESS (DRY-RUN)</p><h1>후보 승격 준비 상태</h1><p class="subtle">읽기 전용 dry-run입니다. 어떤 production 승격/게시/merge/canonical 선택도 이 화면에서 일어나지 않습니다.</p></div><a href="/admin">관리자 홈</a></header>
+
+  <form class="admin-filter" method="get">
+    <label>유형<select name="candidateType"><option th:each="v:${T(com.japanese.content.entity.NormalizedCandidateType).values()}" th:value="${v}" th:text="${v}" th:selected="${v==candidateType}"></option></select></label>
+    <label>출처<input name="sourceRef" th:value="${sourceRef}" placeholder="sourceRef (비우면 전체)"></label>
+    <label>전체 상태<select name="overallStatus"><option value="">전체</option><option th:each="v:${T(com.japanese.content.dto.PromotionReadinessModels.OverallStatus).values()}" th:value="${v}" th:text="${v}" th:selected="${v==overallStatus}"></option></select></label>
+    <label>Blocker<select name="issueCode"><option value="">전체</option><option th:each="v:${T(com.japanese.content.service.PromotionReadinessIssueCode).values()}" th:value="${v}" th:text="${v}" th:selected="${v==issueCode}"></option></select></label>
+    <label>Quality<select name="quality"><option value="">전체</option><option th:each="v:${T(com.japanese.content.entity.NormalizedCandidateQualityState).values()}" th:value="${v}" th:text="${v}" th:selected="${v==quality}"></option></select></label>
+    <button>조회</button>
+  </form>
+
+  <section class="admin-summary">
+    <h2>요약 (scope 전체)</h2>
+    <p th:text="${'총 '+summary.totalCandidates+'건 · READY '+summary.readyForDraftPromotion+' · BLOCKED '+summary.blocked+' · ALREADY_PROMOTED '+summary.alreadyPromoted}"></p>
+    <details>
+      <summary>blocker code별 건수</summary>
+      <ul>
+        <li th:each="entry:${summary.blockedByIssueCode}" th:if="${entry.value > 0}" th:text="${entry.key + ': ' + entry.value}"></li>
+      </ul>
+    </details>
+  </section>
+
+  <p class="admin-result-count" th:text="${result.totalElements+'건 · '+(result.page+1)+' / '+(result.totalPages==0?1:result.totalPages)+' 페이지'}"></p>
+  <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>id</th><th>미리보기</th><th>quality</th><th>pair</th><th>mapping</th><th>rights</th><th>identity</th><th>overall</th><th>주요 blocker</th><th></th></tr></thead><tbody>
+    <tr th:each="row:${result.rows}">
+      <td><code th:text="${row.candidateId}"></code><br><small th:text="${'note '+row.sourceNoteId}"></small></td>
+      <td th:text="${row.shortPreview}"></td>
+      <td><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(row.qualityState.name())}" th:text="${row.qualityState}"></span></td>
+      <td><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(row.pairResolutionStatus.name())}" th:text="${row.pairResolutionStatus}"></span></td>
+      <td><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(row.mappingStatus.name())}" th:text="${row.mappingStatus}"></span></td>
+      <td><span class="status-pill" th:text="${row.sourceRightsStatus != null ? row.sourceRightsStatus : 'NOT_REGISTERED'}"></span></td>
+      <td><span class="status-pill" th:text="${row.productionIdentityStatus}"></span></td>
+      <td><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(row.overallStatus.name())}" th:text="${row.overallStatus}"></span></td>
+      <td><span th:if="${row.primaryIssueCode != null}" th:text="${row.primaryIssueCode + (row.issueCount > 1 ? (' 외 '+(row.issueCount-1)+'건') : '')}"></span></td>
+      <td><a th:href="@{/admin/normalized-candidates/promotion-readiness/{type}/{id}(type=${row.candidateType},id=${row.candidateId})}">상세</a></td>
+    </tr>
+  </tbody></table></div>
+  <p class="empty-state" th:if="${result.empty}">조건에 맞는 candidate가 없습니다.</p>
+  <nav class="pagination">
+    <a th:if="${result.hasPrevious()}" th:href="@{/admin/normalized-candidates/promotion-readiness(candidateType=${candidateType},sourceRef=${sourceRef},overallStatus=${overallStatus},issueCode=${issueCode},quality=${quality},page=${result.page-1})}">이전</a>
+    <a th:if="${result.hasNext()}" th:href="@{/admin/normalized-candidates/promotion-readiness(candidateType=${candidateType},sourceRef=${sourceRef},overallStatus=${overallStatus},issueCode=${issueCode},quality=${quality},page=${result.page+1})}">다음</a>
+  </nav>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Promotion Readiness 상세')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('admin')}"></header>
+<main id="main-content" class="page-shell detail-shell admin-shell" th:with="r=${detail.result}, f=${detail.candidateFields}, mp=${detail.mappingPreview}">
+  <a th:href="@{/admin/normalized-candidates/promotion-readiness(candidateType=${r.candidateType},sourceRef=${r.sourceRef})}">목록</a>
+  <article class="admin-detail">
+    <header>
+      <div class="card-meta">
+        <span class="type-pill" th:text="${r.candidateType}"></span>
+        <span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(r.overallStatus.name())}" th:text="${r.overallStatus}"></span>
+      </div>
+      <h1 th:text="${'Candidate ' + r.candidateId}"></h1>
+      <p class="subtle" th:text="${'sourceRef: ' + r.sourceRef + ' · sourceNoteId: ' + r.sourceNoteId}"></p>
+      <p class="subtle">읽기 전용 dry-run 결과입니다. 이 화면에서 production 승격/게시는 일어나지 않습니다.</p>
+    </header>
+
+    <section>
+      <h2>축(axis)별 상태</h2>
+      <dl class="admin-facts">
+        <div><dt>normalization quality</dt><dd><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(r.qualityState.name())}" th:text="${r.qualityState}"></span></dd></div>
+        <div><dt>pair/dedup review</dt><dd><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(r.pairResolutionStatus.name())}" th:text="${r.pairResolutionStatus}"></span></dd></div>
+        <div><dt>production mapping</dt><dd><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(r.mappingStatus.name())}" th:text="${r.mappingStatus}"></span></dd></div>
+        <div><dt>source rights</dt><dd><span class="status-pill" th:text="${r.sourceRightsStatus != null ? r.sourceRightsStatus : 'NOT_REGISTERED'}"></span></dd></div>
+        <div><dt>production identity/slug</dt><dd><span class="status-pill" th:text="${r.productionIdentityStatus}"></span></dd></div>
+        <div><dt>existing production link</dt><dd><span class="status-pill" th:text="${r.existingProductionLinkStatus}"></span></dd></div>
+      </dl>
+    </section>
+
+    <section>
+      <h2 th:text="${'Blocker ('+#lists.size(r.issues)+'건)'}"></h2>
+      <ul>
+        <li th:each="i:${r.issues}"><strong th:text="${i.code}"></strong> - <span th:text="${i.message}"></span></li>
+      </ul>
+      <p th:if="${r.issues.empty}">현재 확인된 blocker가 없습니다.</p>
+    </section>
+
+    <section class="candidate-compare">
+      <h2>Candidate 상세 (전체 persisted 필드)</h2>
+      <div class="candidate-card">
+        <dl class="admin-facts">
+          <div><dt>normalizedAt</dt><dd th:text="${f.normalizedAt}"></dd></div>
+          <div th:if="${f.sourceIdentityKey}"><dt>sourceIdentityKey</dt><dd th:text="${f.sourceIdentityKey}"></dd></div>
+          <div th:if="${f.entryId}"><dt>EntryID</dt><dd th:text="${f.entryId}"></dd></div>
+          <div th:if="${f.expression}"><dt>expression</dt><dd th:text="${f.expression}"></dd></div>
+          <div th:if="${f.reading}"><dt>reading</dt><dd th:text="${f.reading}"></dd></div>
+          <div th:if="${f.partOfSpeech}"><dt>partOfSpeech</dt><dd th:text="${f.partOfSpeech}"></dd></div>
+          <div th:if="${f.pitchAccentTerminalStates}"><dt>pitchAccent</dt><dd th:text="${f.pitchAccentTerminalStates + ' / ' + f.pitchAccentMora}"></dd></div>
+          <div th:if="${f.levelCode}"><dt>JLPT (raw)</dt><dd th:text="${f.levelCode}"></dd></div>
+          <div th:if="${f.unitId}"><dt>UnitID</dt><dd th:text="${f.unitId}"></dd></div>
+          <div th:if="${f.pattern}"><dt>pattern</dt><dd th:text="${f.pattern}"></dd></div>
+          <div th:if="${f.meaningGloss}"><dt>meaningGloss</dt><dd th:text="${f.meaningGloss}"></dd></div>
+          <div th:if="${f.nuance}"><dt>nuance</dt><dd th:text="${f.nuance}"></dd></div>
+          <div th:if="${f.connectionForm}"><dt>connection</dt><dd th:text="${f.connectionForm}"></dd></div>
+          <div th:if="${f.rawKind}"><dt>rawKind</dt><dd th:text="${f.rawKind}"></dd></div>
+        </dl>
+        <section th:if="${!f.meanings.empty}"><h4>Meanings</h4><ol><li th:each="m:${f.meanings}" th:text="${m}"></li></ol></section>
+        <section th:if="${!f.examples.empty}"><h4>Examples</h4><article th:each="ex:${f.examples}"><strong th:text="${ex.japaneseText}"></strong> <span th:if="${ex.reading}" th:text="${ex.reading}"></span> <span th:if="${ex.translation}" th:text="${ex.translation}"></span></article></section>
+        <section th:if="${f.frontExampleJapaneseText}"><h4>Front example</h4><p th:text="${f.frontExampleJapaneseText}"></p><p th:if="${f.frontExampleReading}" th:text="${f.frontExampleReading}"></p><p th:if="${f.frontExampleTranslation}" th:text="${f.frontExampleTranslation}"></p></section>
+        <section th:if="${!f.confusablePatterns.empty}"><h4>Confusable patterns</h4><ul><li th:each="c:${f.confusablePatterns}"><strong th:text="${c.pattern}"></strong> <span th:if="${c.explanation}" th:text="${c.explanation}"></span></li></ul></section>
+        <section th:if="${!f.warnings.empty}"><h4>Warnings</h4><ul><li th:each="w:${f.warnings}"><span class="status-pill" th:classappend="${' status-' + #strings.toLowerCase(w.severity)}" th:text="${w.severity}"></span> <strong th:text="${w.issueCode}"></strong> <span th:text="${w.message}"></span></li></ul></section>
+      </div>
+    </section>
+
+    <section>
+      <h2>Production mapping preview (제안이지, production entity 아님)</h2>
+      <dl class="admin-facts" th:if="${mp.vocabulary != null}" th:with="v=${mp.vocabulary}">
+        <div><dt>Word.expression</dt><dd th:text="${v.expression}"></dd></div>
+        <div><dt>Word.reading</dt><dd th:text="${v.reading}"></dd></div>
+        <div th:if="${v.partOfSpeech}"><dt>Word.partOfSpeech</dt><dd th:text="${v.partOfSpeech}"></dd></div>
+        <div th:if="${v.pitchAccentPreview}"><dt>Word.pitchAccent</dt><dd th:text="${v.pitchAccentPreview}"></dd></div>
+        <div th:if="${v.levelCode}"><dt>Level.code (JLPT)</dt><dd th:text="${v.levelCode}"></dd></div>
+      </dl>
+      <section th:if="${mp.vocabulary != null and !mp.vocabulary.meanings.empty}"><h4>Meaning(ko) preview</h4><ol><li th:each="m:${mp.vocabulary.meanings}" th:text="${m}"></li></ol></section>
+      <dl class="admin-facts" th:if="${mp.grammar != null}" th:with="g=${mp.grammar}">
+        <div><dt>Grammar.pattern</dt><dd th:text="${g.pattern}"></dd></div>
+        <div th:if="${g.connectionPreview}"><dt>Grammar.connection</dt><dd th:text="${g.connectionPreview}"></dd></div>
+        <div><dt>Grammar.explanation</dt><dd>UNRESOLVED - meaningGloss/nuance/frontExample 중 ratified 매핑 없음</dd></div>
+        <div th:if="${g.levelCode}"><dt>Level.code (JLPT)</dt><dd th:text="${g.levelCode}"></dd></div>
+      </dl>
+      <p th:if="${mp.grammar != null}" class="subtle">meaningGloss/nuance/frontExample/confusablePatterns는 참고용으로만 표시되며, GrammarEnrichment/GrammarRelation/GrammarComparison으로 자동 매핑되지 않습니다.</p>
+    </section>
+
+    <section>
+      <h2 th:text="${'현재 pair ('+#lists.size(detail.pairs)+'건)'}"></h2>
+      <div class="admin-table-wrap" th:if="${!detail.pairs.empty}">
+        <table class="admin-table"><thead><tr><th>상대 candidate</th><th>기계 판정</th><th>pair freshness</th><th>human 판단</th><th>review freshness</th><th>이 pair의 blocker</th></tr></thead><tbody>
+          <tr th:each="p:${detail.pairs}">
+            <td><a th:href="@{/admin/normalized-candidates/promotion-readiness/{type}/{id}(type=${r.candidateType},id=${p.partnerCandidateId})}" th:text="${p.partnerCandidateId + ' ' + (p.partnerPreview ?: '')}"></a></td>
+            <td><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(p.assessment.name())}" th:text="${p.assessment}"></span></td>
+            <td><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(p.pairFreshness.name())}" th:text="${p.pairFreshness}"></span></td>
+            <td th:text="${p.decision != null ? p.decision : 'UNREVIEWED'}"></td>
+            <td><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(p.reviewFreshness.name())}" th:text="${p.reviewFreshness}"></span></td>
+            <td><span th:each="c:${p.issuesFromThisPair}" th:text="${c}"></span></td>
+          </tr>
+        </tbody></table>
+      </div>
+      <p th:if="${detail.pairs.empty}">현재 pair가 없습니다 (dedup/conflict 관계 없음 - pair 축은 통과).</p>
+    </section>
+  </article>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

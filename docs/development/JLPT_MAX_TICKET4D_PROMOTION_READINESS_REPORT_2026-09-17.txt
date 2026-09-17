@@ -1,0 +1,439 @@
+JLPT-MAX Ticket 4D — Normalized Candidate Promotion Readiness / Dry-run Planner
+Report date: 2026-09-17
+Repository: rivermh/japanese
+Branch: ui/japanese-ui-consolidation
+
+====================================================================
+1. Verdict
+====================================================================
+BLOCKER/MAJOR 없음. 전체 targeted 테스트 + `./gradlew clean test` 405 tests 전부 green.
+`git diff --check` 통과. 100% read-only 기능 추가 - production/private 어떤 테이블에도
+row 변경이 없음을 코드 검토 + 전용 테스트로 확인. commit 완료 (attribution/서명 라인 없음,
+사용자 명시 지시), push는 사용자 확인 후 진행.
+
+====================================================================
+2. Baseline HEAD
+====================================================================
+62d5d6a0b4f049ca6b6fa6f9e8b2729c709ace14 (fix(content): harden normalized candidate human review)
+브랜치: ui/japanese-ui-consolidation. 시작 시 git status: AGENTS.md.md 수정 + 여러 untracked
+문서/이미지 - 전부 기존 무관 변경(이번 세션 이전부터 존재), 이번 Ticket에서 건드리지 않음.
+
+====================================================================
+3. Final HEAD
+====================================================================
+아래 "31. 커밋 SHA" 참조 (본 보고서 작성 시점에는 커밋 전 상태를 기준으로 작성되었으며,
+커밋 직후 실제 SHA로 갱신됨).
+
+====================================================================
+4. Changed files
+====================================================================
+[추가]
+- japanese/src/main/java/com/japanese/content/service/PromotionReadinessIssueCode.java
+- japanese/src/main/java/com/japanese/content/service/NormalizedCandidatePromotionReadinessService.java
+- japanese/src/main/java/com/japanese/content/dto/PromotionReadinessModels.java
+- japanese/src/main/java/com/japanese/content/controller/AdminNormalizedCandidatePromotionReadinessController.java
+- japanese/src/main/java/com/japanese/content/controller/AdminNormalizedCandidatePromotionReadinessExceptionHandler.java
+- japanese/src/main/resources/templates/admin/normalized-candidate-promotion-readiness-list.html
+- japanese/src/main/resources/templates/admin/normalized-candidate-promotion-readiness-detail.html
+- japanese/src/test/java/com/japanese/content/service/NormalizedCandidatePromotionReadinessServiceTest.java
+- japanese/src/test/java/com/japanese/content/controller/AdminNormalizedCandidatePromotionReadinessControllerTest.java
+- japanese/src/test/java/com/japanese/content/service/NormalizedCandidatePromotionReadinessRealApkgReport.java
+- docs/development/IMPLEMENTATION_LOG.md (Ticket 4D 섹션 추가)
+- docs/development/JLPT_MAX_TICKET4D_PROMOTION_READINESS_REPORT_2026-09-17.txt (본 문서)
+
+[수정 - 추가 전용, 기존 메서드 변경 없음]
+- japanese/src/main/java/com/japanese/content/repository/NormalizedContentCandidateRepository.java
+  (+ findByCandidateTypeAndSourceRefWithDetailForReadiness)
+- japanese/src/main/java/com/japanese/content/repository/NormalizedCandidateMatchPairRepository.java
+  (+ findByCandidateTypeAndOptionalSourceRef, + findByEitherCandidateIdWithEvidence)
+- japanese/src/main/java/com/japanese/content/repository/ImportedSourceRecordRepository.java
+  (+ findBySourceRefAndNoteTypeAndSourceNoteIdIn)
+- japanese/src/main/resources/templates/admin/dashboard.html (+ 1개 shortcut 링크)
+
+[Migration] 없음. V1-V8 전부 무수정.
+[건드리지 않음] AGENTS.md.md, CLAUDE.md.md, docs/design/**, 기존 JLPT_MAX_TICKET{1.5,2,3A,4B,4C}*
+문서 - 전부 이번 세션 이전부터 존재하던 무관 변경이며 stage하지 않음.
+
+====================================================================
+5. Production schema 분석 (구현 전 필수 조사)
+====================================================================
+직접 읽은 파일: ContentItem/Word/Meaning/Grammar/Example/Level/Category/ImportedSourceRecord/
+ContentSource/ContentSourceRightsStatus entity 전체, ContentSourceRightsService/
+ContentReleaseGateService/ContentQualityAuditService(부분)/ContentReleaseDryRunService,
+NormalizedContentCandidate 계열 전체 entity(Ticket 4A), NormalizedCandidateMatchPair/
+MatchAssessment/MatchEvidence(Ticket 4B) + NormalizedCandidateConflictAnalyzer 전체 로직,
+NormalizedCandidatePairReview/PairReviewHistory/HumanReviewDecision(Ticket 4C) +
+NormalizedCandidatePairReviewService 전체 로직(freshness 계산 포함), ApkgVocabularyImporter(레거시
+직접 import 경로 - pitchAccent 직렬화/Meaning 언어태그/slug 관행의 유일한 실제 증거),
+PrivateApkgExtractor(noteType→category 대응의 실제 증거), VocabularyNormalizationParser/
+GrammarNormalizationParser/GrammarHtmlParser(및 그 결과 record들의 class javadoc - Grammar
+explanation mapping이 왜 미정인지의 직접 근거), 관련 repository 전부, admin controller/template
+관례(AdminNormalizedCandidateReviewController 등), SecurityConfig.
+
+주요 발견:
+- production Word: expression/reading/partOfSpeech 120자, pitchAccent 500자 - 전부 nullable
+  컬럼(파티션 오브 스피치 없어도 draft 자체는 가능; release 시점에만 MANUAL_REVIEW 대상).
+- production Meaning: text 500자 NOT NULL, languageTag 10자 NOT NULL, senseOrder.
+- production Example: japaneseText/reading/translation 각 1000자.
+- production Grammar: pattern 200자 NOT NULL, explanation 2000자 NOT NULL, connection 500자
+  nullable.
+- Level: (system, code, name) 단순 테이블, seed migration 없음 - 실제 서비스에서는 import 시점에
+  동적으로 생성됨(`ApkgVocabularyImporter.level(...)`). 즉 "N5 Level row가 이미 존재"는 코드가
+  보장하는 게 아니라 과거 import 이력에 의존한다.
+- ImportedSourceRecord: (source_ref, note_type, source_note_id) unique, contentItem으로의
+  nullable FK. VOCABULARY/GRAMMAR의 note_type 문자열("JLPT MAX덱 어휘"/"JLPT MAX덱 문법")은
+  ApkgVocabularyImporter의 상수이자 PrivateApkgExtractor.category()가 동일 문자열을 인식하는
+  근거이기도 하다 - 두 곳에서 독립적으로 인코딩된 사실이므로 candidateType→noteType 대응을
+  확신을 갖고 사용할 수 있었다.
+- NormalizedVocabularyCandidateDetail: expression/reading/partOfSpeech/pitchAccent 필드를
+  최대 500자까지 보존(의도적으로 production보다 넉넉함) - 손실 없는 저장이 우선이었기 때문.
+- NormalizedGrammarCandidateDetail: pattern/meaningGloss/connectionForm/nuance/frontExample*
+  필드가 있지만 명시적으로 "explanation" 필드가 없다 - class javadoc이 "이건 나중에 결정할
+  promotion-time 문제"라고 직접 명시.
+
+====================================================================
+6. 왜 4D가 dry-run only인가
+====================================================================
+Ticket 4A~4C가 "private staging → 정규화 → dedup 분석 → 사람 검토"까지를 실제 production에
+전혀 쓰지 않고 독립적으로 검증 가능하게 만든 것과 동일한 이유. 실제 promotion(ContentItem 등
+생성)은 (a) Grammar explanation 매핑 정책, (b) 전역 identity/slug 정책, (c) SAME_CONTENT
+canonical winner/merge 전략이라는 최소 3가지 아직 내려지지 않은 결정에 의존한다. 이 결정들을
+내리지 않은 채 실제로 쓰기 시작하면 나중에 되돌리기 어려운 production row(그리고 unique
+slug 같은 전역 자원)를 만들게 된다. 그래서 이번 Ticket은 "무엇이 막고 있는가"를 구조적으로
+계산해서 보여주는 것까지만 하고, 실제 실행은 그 결정들이 명시적으로 내려진 뒤(Ticket 4E+)로
+미룬다.
+
+====================================================================
+7. Readiness 결과 모델
+====================================================================
+`PromotionReadinessModels.PromotionReadinessResult`:
+candidateId, candidateType, sourceRef, sourceNoteId, shortPreview, qualityState,
+pairResolutionStatus(RESOLVED/BLOCKED), mappingStatus(READY/BLOCKED),
+sourceRightsStatus(ContentSourceRightsStatus, null=미등록), productionIdentityStatus(UNRESOLVED
+고정), existingProductionLinkStatus(NOT_LINKED/LINKED), overallStatus, issues(구조화된 코드
+리스트, 항상 severity/enum 선언 순서로 정렬).
+`PromotionReadinessDetailView` = result + candidateFields(Ticket 4C의 CandidateFieldsView 재사용
+형태) + pairs(현재 pair별 상대/기계판정/freshness/사람판단/이 pair가 만든 blocker) +
+mappingPreview(Vocabulary 또는 Grammar 전용, 실제 entity 아닌 DTO).
+`ReadinessSummary` = scope 전체 총계 + overall 3분류 + blocker code별 건수(중복 가능, 명시)
++ quality/pair/mapping/rights breakdown + blocker 개수별 candidate 분포.
+
+====================================================================
+8. Blocker codes
+====================================================================
+`PromotionReadinessIssueCode`(선언 순서 = 정렬/표시 순서):
+NORMALIZATION_FATAL, NORMALIZATION_REVIEW_REQUIRED, PAIR_ANALYSIS_STALE(*), PAIR_UNREVIEWED,
+PAIR_REVIEW_STALE, PAIR_NEEDS_FOLLOWUP, SAME_CONTENT_CANONICAL_SELECTION_REQUIRED,
+VOCAB_EXPRESSION_MISSING, VOCAB_EXPRESSION_TOO_LONG, VOCAB_READING_MISSING,
+VOCAB_READING_TOO_LONG, VOCAB_PART_OF_SPEECH_TOO_LONG, VOCAB_PITCH_ACCENT_TOO_LONG,
+VOCAB_MEANING_MISSING, VOCAB_MEANING_TOO_LONG(*), VOCAB_EXAMPLE_TEXT_TOO_LONG(*),
+GRAMMAR_PATTERN_MISSING, GRAMMAR_PATTERN_TOO_LONG, GRAMMAR_CONNECTION_TOO_LONG,
+GRAMMAR_MAPPING_POLICY_UNRESOLVED, JLPT_LEVEL_UNMAPPABLE, SOURCE_NOT_REGISTERED,
+SOURCE_RIGHTS_NOT_ALLOWED, SOURCE_RIGHTS_MANUAL_REVIEW, PRODUCTION_IDENTITY_POLICY_UNRESOLVED,
+ALREADY_PROMOTED.
+(*) 표시 3개는 ticket 초안 예시 목록에 없던 것을 실제 코드 분석 후 추가: PAIR_ANALYSIS_STALE
+(pair 자체 staleness와 review staleness는 서로 다른 조건이라 분리 필요), VOCAB_MEANING_TOO_LONG/
+VOCAB_EXAMPLE_TEXT_TOO_LONG(길이 제한 축이 meaning/example 값 자체에도 실제로 존재).
+VOCAB_MEANING_NOT_MAPPABLE, PRODUCTION_IDENTITY 세부코드 등 초안에 있었지만 불필요했던 항목은
+만들지 않았다(문자열 검색이 아니라 enum 기반 구조적 체크만 사용).
+
+====================================================================
+9. Quality policy
+====================================================================
+FATAL/REVIEW_REQUIRED → 무조건 BLOCK. CLEAN/INFORMATIONAL → quality 축 통과. Ticket 4C human
+pair review는 관계 판단이지 normalization warning 승인이 아니므로, pair를 검토했다고 quality
+축의 FATAL/REVIEW_REQUIRED가 사라지지 않는다(완전히 독립된 축).
+
+====================================================================
+10. Pair review policy
+====================================================================
+candidate가 참여하는 모든 **현재** Ticket 4B pair를 확인(과거 pair/review-history만 남은 관계는
+current blocker로 쓰지 않음). pair별로: (A) pair 자체 stale → PAIR_ANALYSIS_STALE, 이후 검사
+중단. (B) review 없음 → PAIR_UNREVIEWED. (C) review는 있으나 stale → PAIR_REVIEW_STALE.
+(D) NEEDS_FOLLOWUP → PAIR_NEEDS_FOLLOWUP. (E) DISTINCT_CONTENT + fresh → 이 관계는 resolved.
+(F) SAME_CONTENT + fresh → SAME_CONTENT_CANONICAL_SELECTION_REQUIRED. candidate가 여러 pair에
+참여하면 그중 하나라도 미해결이면 pair 축 전체가 BLOCKED(같은 코드가 여러 pair에서 나와도
+issue는 코드당 1개로 dedupe). pair가 하나도 없으면 pair 축은 RESOLVED(누락이 아니라 "현재
+dedup/conflict 관계 없음"이라는 뜻).
+
+====================================================================
+11. SAME_CONTENT 처리
+====================================================================
+SAME_CONTENT는 "두 candidate가 같은 content"라는 사람의 판단만 기록한 것이며 canonical winner
+선택도 merge 전략도 전혀 정하지 않는다(Ticket 4C 자체가 그렇게 설계됨). 따라서 SAME_CONTENT
+pair에 속한 candidate는 **양쪽 모두** SAME_CONTENT_CANONICAL_SELECTION_REQUIRED로 BLOCK되며,
+이번 Ticket은 어느 쪽도 canonical로 선택하지 않는다.
+
+====================================================================
+12. DISTINCT_CONTENT 처리
+====================================================================
+DISTINCT_CONTENT + fresh review는 그 pair 관계에 대해서는 완전히 resolved로 취급된다(다른
+pair나 다른 축의 blocker와는 무관하게 이 관계 자체는 더 이상 pair 축 blocker를 만들지 않음).
+
+====================================================================
+13. Vocabulary mapping 분석
+====================================================================
+expression/reading: 없으면 MISSING, 있으면 120자 초과 시 TOO_LONG. partOfSpeech: 120자 초과만
+체크(없어도 draft 생성 자체엔 무해 - nullable). pitchAccent: terminalStates+mora가 둘 다 있을
+때만 `"terminal="+t+";mora="+m` 미리보기를 만들고 500자 초과 시 TOO_LONG(이 직렬화 포맷은
+ApkgVocabularyImporter의 유일한 실제 Word.pitchAccent 작성 로직을 그대로 재사용 - 근거 있는
+결정, 임의 join 아님). meaning: 하나도 없으면 MISSING, 하나라도 500자 초과면 TOO_LONG(개별
+truncate 없음). example: japaneseText/reading/translation 중 하나라도 1000자 초과면
+EXAMPLE_TEXT_TOO_LONG. 실측 결과 필드 길이 blocker는 전부 0건(v2.1.1 실제 데이터가 현재 한도를
+넘지 않음).
+
+====================================================================
+14. Grammar mapping 분석
+====================================================================
+pattern: 없으면 MISSING, 200자 초과 시 TOO_LONG. connection(← connectionForm): 500자 초과 시
+TOO_LONG. explanation: 대응하는 단일 필드가 없어 **항상** GRAMMAR_MAPPING_POLICY_UNRESOLVED(모든
+Grammar candidate에 무조건 부여) - meaningGloss/nuance/frontExample.translation 중 무엇을 쓸지
+임의로 결정하지 않았다. frontExample/confusablePatterns → production Example/GrammarRelation/
+GrammarComparison 자동 매핑도 근거가 없어 하지 않았고 같은 blocker 코드로 표시했다. 실측 결과
+Grammar 1,078건 전부가 이 코드로 막힌다 - 의도된 결과.
+
+====================================================================
+15. Pitch mapping 결정
+====================================================================
+`"terminal="+terminalStates+";mora="+mora` - ApkgVocabularyImporter.extractPitchAccent()가
+production Word.pitchAccent를 쓰는 유일한 기존 코드이며, 정확히 같은 두 정규식(data-pitch-
+terminal-states/j1)에서 뽑은 두 값을 이 포맷으로 합친다. NormalizedVocabularyCandidateDetail의
+pitchAccentTerminalStates/pitchAccentMora는 VocabularyNormalizationParser가 **동일한 정규식**
+으로 뽑은 값이므로, 이 포맷을 재사용하는 것은 추측이 아니라 기존 코드의 유일한 실제 계약을
+따른 것이다.
+
+====================================================================
+16. Meaning/example mapping 결정
+====================================================================
+Meaning: languageTag="ko"로 매핑 - ApkgVocabularyImporter.createMeanings()가 production Meaning
+을 쓰는 유일한 기존 코드이며 항상 "ko"를 쓴다(그리고 ContentReleaseGateService의 한국어 의미
+체크와도 일치). Example: NormalizedVocabularyCandidateExample은 VocabularyNormalizationParser가
+production과 **동일한** ExampleHtmlParser 인스턴스로 파싱한 결과(단, audio 필드만 Ticket 1.5가
+상류에서 이미 제거) - 따라서 japaneseText/reading/translation을 그대로 Example로 옮기는 것은
+무손실 매핑이며 meaningLabel로 Meaning을 찾는 로직도 ApkgVocabularyImporter.attachExamples()와
+동일하게 텍스트 일치로 찾을 수 있다(이번 Ticket은 preview만 제공, 실제 연결/생성은 하지 않음).
+
+====================================================================
+17. JLPT level mapping
+====================================================================
+candidate의 levelCode(N1-N5 또는 null)를 기존 `Level(system="JLPT", code=...)` row와 대조하는
+read-only lookup만 수행 - 없는 Level row를 생성하지 않는다. 정확히 하나로 매핑되면 통과, 없거나
+매칭되는 Level row가 없으면 JLPT_LEVEL_UNMAPPABLE. 실측(이번 Ticket이 실행된 "sample" 프로파일
+fresh DB)에는 Level(JLPT,N5) 딱 1행만 존재해 N5가 아닌 후보는 전부 이 코드로 막혔다 - 이는
+필드 자체의 문제가 아니라 이 테스트 환경에 다른 레벨의 Level row가 없기 때문이며, 실제 운영
+DB(과거 import로 N1-N5 Level row가 이미 존재하는 상태)에서 재실행하면 결과가 달라질 것으로
+예상된다(Ticket 4E 전 재프로파일링 권장 - 42번 항목 참조).
+
+====================================================================
+18. Source rights 분리
+====================================================================
+ContentSourceRightsService.releaseEligibility(sourceRef)를 그대로(read-only) 재사용.
+sourceRightsStatus(별도 필드)와 mappingStatus(별도 필드)를 분리해 노출 - "mapping은 READY인데
+rights는 BLOCKED"인 조합이 실제로 존재할 수 있음을 그대로 보여준다. ContentSource가 없으면
+SOURCE_NOT_REGISTERED, rightsStatus=BLOCKED면 SOURCE_RIGHTS_NOT_ALLOWED, UNKNOWN/
+MANUAL_REVIEW_REQUIRED(또는 ALLOWED인데 필수 attribution 누락)면 SOURCE_RIGHTS_MANUAL_REVIEW.
+JLPT-MAX composite source를 자동으로 ALLOWED로 만든 적 없음(실측 결과도 전부
+NOT_REGISTERED - 이 코드베이스에 해당 source가 아직 등록되지 않았을 가능성이 높음을 보여줄 뿐).
+
+====================================================================
+19. Existing production provenance 감지
+====================================================================
+ImportedSourceRecord의 (source_ref, note_type, source_note_id) unique identity로 감지.
+candidateType→noteType 대응(VOCABULARY→"JLPT MAX덱 어휘", GRAMMAR→"JLPT MAX덱 문법")은
+PrivateApkgExtractor.category()와 ApkgVocabularyImporter의 상수가 독립적으로 인코딩한 동일한
+사실이라 "unsupported/unresolved"로 두지 않고 실제로 구현했다. record가 존재해도
+getContentItem()==null이면(연결 전 상태) ALREADY_PROMOTED로 세지 않는다 - "record 존재"가 아니라
+"실제로 production ContentItem에 연결됨"만 카운트한다. Write는 전혀 없음(read-only 조회만).
+
+====================================================================
+20. 전역 identity/slug 상태
+====================================================================
+UNRESOLVED 고정(ProductionIdentityStatus 열거형에 RESOLVED 값도 정의했지만 이번 Ticket에서는
+절대 산출하지 않음). EntryID/UnitID/sourceNoteId/정규화된 expression+reading/pattern 중 어느
+것도 slug/전역 identity로 자동 확정하지 않았다. ApkgVocabularyImporter의 기존
+"jlpt-max-"+entryId 관행은 private candidate 파이프라인 전체를 우회하는 별도 레거시 경로에서
+나온 것이라 ratified policy로 채택하지 않았다 - 모든 candidate에 무조건
+PRODUCTION_IDENTITY_POLICY_UNRESOLVED를 부여한다.
+
+====================================================================
+21. Batch/N+1 전략
+====================================================================
+candidate당 반복 쿼리 없음. 고정된 수의 배치 쿼리만 사용: candidate+detail fetch-join 1회,
+Vocabulary meanings/examples 각 1회(IN절), 현재 pair 전체 1회, Ticket 4C review 전체 1회,
+JLPT Level 전체 1회, source rights/existing-provenance는 scope 내 distinct sourceRef 개수만큼
+(보통 1회). pair→candidate 연결은 이미 로드된 candidate map을 재사용(프록시 getId()는 DB 히트
+없이 안전). 실측 Vocabulary 9,160 + Grammar 1,078 전체 스캔이 opt-in report에서 수 초 내 완료.
+
+====================================================================
+22. Admin list/detail UI
+====================================================================
+`/admin/normalized-candidates/promotion-readiness`(list) - candidateType/sourceRef/overallStatus/
+issueCode/quality 필터, scope 요약(총계/READY/BLOCKED/ALREADY_PROMOTED + blocker code별 건수),
+테이블(id/미리보기/quality/pair/mapping/rights/identity/overall/주요 blocker), 페이지네이션.
+`/admin/normalized-candidates/promotion-readiness/{candidateType}/{candidateId}`(detail) - 축별
+상태, blocker 전체 목록(메시지 포함), candidate 전체 persisted 필드, production mapping preview
+(Vocabulary 또는 Grammar), 현재 pair 목록(상대 candidate/기계판정/freshness/사람판단/이 pair의
+blocker). 기존 admin 스타일(`page-shell admin-shell`, `status-pill`, `admin-table`,
+`admin-facts`) 그대로 재사용. 대시보드에 shortcut 링크 1개 추가.
+
+====================================================================
+23. Security
+====================================================================
+`/admin/**`이 이미 SecurityConfig에서 `hasRole("ADMIN")`으로 제한돼 있어 별도 설정 변경 없음.
+새 API 엔드포인트는 만들지 않음(server-rendered read-only admin GET만). USER/anonymous 접근
+차단을 `AdminNormalizedCandidatePromotionReadinessControllerTest`로 확인(익명→3xx 리다이렉트,
+USER role→403, ADMIN→200).
+
+====================================================================
+24. Zero-write 증명
+====================================================================
+코드 검토: 새 서비스에 `.save(`/`.delete(`/entity setter 호출이 단 한 줄도 없음(grep으로 확인,
+javadoc 텍스트 언급 1건 제외). 모든 public 메서드가 `@Transactional(readOnly = true)`. 전용
+테스트 `readinessComputationNeverWritesAnyRowAnywhere`가 candidate/pair/review/history/
+contentItem/word/grammar/example/importedSourceRecord/contentSource/level/grammarEnrichment/
+grammarRelation/grammarComparison 13개 테이블의 row count를 list/summary/detail 반복 호출
+전후로 비교해 완전히 불변임을 확인.
+
+====================================================================
+25. 합성(synthetic) 테스트 결과
+====================================================================
+`NormalizedCandidatePromotionReadinessServiceTest`(27건) - 전부 PASS:
+- Quality A-D(clean/informational/review_required/fatal) 4건
+- Pair E-L(무pair/미검토/review stale/pair 자체 stale/needs_followup/distinct/same_content/
+  multi-pair 혼합/pair 소멸 후 이력만 남음) 8건
+- Vocabulary mapping M-S(expression 경계값/reading/partOfSpeech/meaning 없음/level 매핑 불가/
+  pitch overflow) 7건
+- Grammar mapping T-W(pattern/connection 경계값, explanation 미해결, curated entity 자동
+  생성 안 됨) 4건
+- Production identity X-Z(동일 expression+reading 비병합, 동일 pattern 비병합, 항상 unresolved) 3건
+- Source rights(미등록/allowed/blocked/manual_review) 4건
+- Already-promoted(연결됨/미연결) 2건
+- Zero-write 1건, Determinism/이슈 순서 결정성 2건
+`AdminNormalizedCandidatePromotionReadinessControllerTest`(4건) - list/detail admin-only, 404,
+잘못된 enum 필터 400.
+
+====================================================================
+26. 실제 v2.1.1 Vocabulary profiling
+====================================================================
+(NormalizedCandidatePromotionReadinessRealApkgReport, SHA-256 검증 통과, 총 9,160건)
+READY_FOR_DRAFT_PROMOTION 0 · BLOCKED 9,160 · ALREADY_PROMOTED 0.
+quality: CLEAN 9,159 · FATAL 1(REVIEW_REQUIRED 0 · INFORMATIONAL 0).
+pair 축: BLOCKED 2 · RESOLVED 9,158(Ticket 4B 실측 POSSIBLE_DUPLICATE pair 1개의 양쪽,
+PAIR_UNREVIEWED - 아직 아무도 검토하지 않음).
+mapping 축: BLOCKED 8,381 · READY 779(원인은 100% JLPT_LEVEL_UNMAPPABLE - 아래 주석 참조).
+필드 길이 blocker(EXPRESSION/READING/PART_OF_SPEECH/PITCH_ACCENT/MEANING/EXAMPLE_TOO_LONG)
+전부 0건. VOCAB_EXPRESSION_MISSING/READING_MISSING/MEANING_MISSING 각 1건(동일한 손상 note).
+source rights: 전부 NOT_REGISTERED(9,160). PRODUCTION_IDENTITY_POLICY_UNRESOLVED 9,160(전부).
+blocker 개수별 분포: 2개 779건 · 3개 8,378건 · 4개 2건 · 7개 1건(손상 note).
+※ JLPT_LEVEL_UNMAPPABLE 8,381건은 필드 결함이 아니라 이 profiling이 "sample" 프로파일의
+fresh in-memory H2(Level(JLPT,N5) 1행만 시드됨)에서 실행됐기 때문 - 실제 운영 DB에는 과거
+import로 N1-N5 Level row가 이미 존재할 가능성이 높으며, 그 경우 이 수치는 크게 달라질 것으로
+예상된다(42번 항목 참조, 임의로 이 수치에 맞춰 코드를 조정하지 않음).
+
+====================================================================
+27. 실제 v2.1.1 Grammar profiling
+====================================================================
+(총 1,078건) READY_FOR_DRAFT_PROMOTION 0 · BLOCKED 1,078(전부) · ALREADY_PROMOTED 0.
+quality: CLEAN 1,078(전부 - Ticket 3B-1 scope 자체가 IsBasic-only라 FATAL/REVIEW_REQUIRED
+없음). pair 축: BLOCKED 26 · RESOLVED 1,052(Ticket 4B 실측 POSSIBLE_DUPLICATE pair 32개에
+관련된 candidate 중 미검토 26건). mapping 축: 1,078건 전부 BLOCKED -
+GRAMMAR_MAPPING_POLICY_UNRESOLVED 1,078(전부, 의도된 결과) + JLPT_LEVEL_UNMAPPABLE 979(Vocabulary와
+동일한 이유 - fresh sample DB에 N5 Level만 존재). pattern/connection TOO_LONG 전부 0건.
+PRODUCTION_IDENTITY_POLICY_UNRESOLVED 1,078(전부). blocker 개수별 분포: 3개 81건 · 4개 989건 ·
+5개 8건(N5가 아니면서 pair에도 관련된 candidate).
+
+====================================================================
+28. Source rights actual 상태
+====================================================================
+이번 profiling scope("ticket4d-promotion-readiness")에는 ContentSource row를 등록하지 않았다 -
+실제 canonical sourceRef("JLPT-MAX-Deck-2.1.1.apkg")의 ContentSourceRightsStatus를 조회/변경한
+적이 없다. 이 코드베이스에 현재 그 sourceRef의 ContentSource row가 등록돼 있는지 여부는 이번
+Ticket 범위 밖(운영 DB 조회가 필요하며, 조회하더라도 상태를 바꾸지 않는다). JLPT-MAX composite
+source를 자동 ALLOWED로 만든 적 없음.
+
+====================================================================
+29. 전체 suite 결과
+====================================================================
+`./gradlew clean test`: BUILD SUCCESSFUL, 405 tests, 0 failures, 0 errors(72개 테스트 클래스).
+opt-in report(`NormalizedCandidatePromotionReadinessRealApkgReport`)는 기본 suite에서 제외되고
+`-Djapanese.actual-apkg=<path>` 지정 시에만 실행됨(1.1GB APKG를 기본 suite에서 요구하지 않음) -
+별도로 성공 실행 확인(26번/27번 항목).
+
+====================================================================
+30. git diff --check
+====================================================================
+통과. 나온 경고는 기존 저장소의 LF→CRLF 자동 변환 경고 3건뿐(trailing whitespace 등 실제 오류
+없음).
+
+====================================================================
+31. Commit SHA
+====================================================================
+(커밋 직후 실제 SHA로 대화 응답에 기록됨 - 본 파일은 커밋 대상에 포함되므로 self-reference는
+생략)
+
+====================================================================
+32. Push 결과
+====================================================================
+사용자 확인 하에 일반 push(force 아님) 진행 - 대화 응답 참조.
+
+====================================================================
+33. Remote HEAD
+====================================================================
+push 성공 시 origin/ui/japanese-ui-consolidation == 로컬 HEAD (대화 응답 참조).
+
+====================================================================
+34. Final git status
+====================================================================
+이번 Ticket 관련 파일만 staged/committed. AGENTS.md.md/CLAUDE.md.md/docs/design/**/기존
+JLPT_MAX_TICKET{1.5,2,3A,4B,4C}* 문서는 여전히 untracked/modified 상태로 그대로 남음(건드리지
+않음) - 대화 응답의 git status 참조.
+
+====================================================================
+35. BLOCKER / MAJOR / MINOR / NOTE
+====================================================================
+BLOCKER: 없음.
+MAJOR: 없음.
+MINOR:
+ - 실제 운영 DB 대비 JLPT Level 커버리지가 profiling에 사용된 fresh "sample" DB보다 좋을
+   가능성이 높아, mapping 축 BLOCKED 비율이 실제로는 더 낮을 것으로 예상(26/27번 항목).
+NOTE:
+ - PAIR_ANALYSIS_STALE/VOCAB_MEANING_TOO_LONG/VOCAB_EXAMPLE_TEXT_TOO_LONG 3개 코드는 ticket
+   초안 예시 목록에 없었으나 실제 코드 분석 결과 필요해 추가함(8번 항목에 근거 명시).
+
+====================================================================
+36. Ticket 4E 전에 반드시 결정해야 할 사항
+====================================================================
+1. Grammar `explanation` 매핑 정책 확정(meaningGloss/nuance/frontExample 중 무엇을 어떻게
+   결합할지, 혹은 별도 저작이 필요한지).
+2. frontExample/confusablePatterns을 production Example/GrammarRelation/GrammarComparison으로
+   옮길지, 옮긴다면 어떤 방식으로(자동/수동 큐레이션) 옮길지.
+3. production 전역 identity/slug 정책 확정(EntryID/UnitID/sourceNoteId 중 무엇을 기반으로
+   할지, 충돌/중복 시 처리 규칙).
+4. SAME_CONTENT pair의 canonical winner 선택 기준 및 merge 전략(어느 필드를 누구 것으로 채택할지).
+5. 실제 draft 생성(ContentItem/Word/Grammar/Meaning/Example insert, ImportedSourceRecord.
+   linkContentItem)의 원자성/부분 실패 시 재시도 정책.
+6. unpublished/PENDING draft에 한해 source rights 미결정 상태에서도 draft 생성을 허용할지
+   여부(12번 항목의 "mappingReady=true, rights=BLOCKED" 분리가 실제로 의미를 가지려면 이
+   결정이 먼저 필요).
+7. 운영 DB 기준(모든 N1-N5 Level row가 이미 존재하는 실제 상태)으로 이번 Ticket의 readiness
+   재프로파일링 - 현재 수치(26/27번)는 fresh "sample" DB 기준이라 mapping 축 BLOCKED 비율이
+   과대평가돼 있을 수 있음.
+
+====================================================================
+최종 확인 사항 (사용자 요청 명시 항목)
+====================================================================
+- production row write 0 (코드 검토 + zero-write 테스트로 확인)
+- automatic merge 없음
+- candidate delete 없음
+- canonical winner 선택 없음
+- global production identity 확정 없음 (PRODUCTION_IDENTITY_POLICY_UNRESOLVED 무조건 부여)
+- slug policy 확정 없음
+- ImportedSourceRecord write 없음 (read-only 조회만)
+- GrammarEnrichment/Relation/Comparison write 없음 (테스트로 count 0 확인)
+- source rights 변경 없음 (releaseEligibility read-only 재사용만)
+- publication 변경 없음
+- COMPREHENSIVE parser 변경 없음
+- V1-V8 migration 수정 없음
+- force push 없음
+- commit message에 Co-Authored-By/Claude-Session 등 attribution metadata 추가 없음(사용자 명시
+  지시에 따름)

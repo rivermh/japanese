@@ -62,4 +62,29 @@ public interface NormalizedCandidateMatchPairRepository extends JpaRepository<No
             + "where lc.candidateType = com.japanese.content.entity.NormalizedCandidateType.GRAMMAR "
             + "and (:sourceRef is null or lc.sourceRef = :sourceRef) order by p.id asc")
     List<NormalizedCandidateMatchPair> findGrammarPairsForReview(@Param("sourceRef") String sourceRef);
+
+    /**
+     * JLPT-MAX Ticket 4D: every current pair for a {@code (candidateType, sourceRef)} scope, where
+     * {@code sourceRef == null} means "every source ref for this type" - the promotion-readiness
+     * planner's batch pair-participation load (never one query per candidate). Deliberately does not
+     * fetch-join the candidates/evidence: the caller already holds a fully detail-loaded candidate
+     * map for the same scope and only ever needs this pair's id/assessment/generatedAt plus its two
+     * candidate ids (safe off an uninitialized proxy without triggering a query).
+     */
+    @Query("select p from NormalizedCandidateMatchPair p "
+            + "where p.leftCandidate.candidateType = :candidateType "
+            + "and (:sourceRef is null or p.leftCandidate.sourceRef = :sourceRef) order by p.id asc")
+    List<NormalizedCandidateMatchPair> findByCandidateTypeAndOptionalSourceRef(
+            @Param("candidateType") NormalizedCandidateType candidateType, @Param("sourceRef") String sourceRef);
+
+    /**
+     * JLPT-MAX Ticket 4D: every current pair a single candidate participates in (either side), with
+     * evidence fetch-joined, for the promotion-readiness detail page. Only ever called for one
+     * candidate at a time - never used for a scope-wide batch load (see
+     * {@link #findByLeftCandidate_CandidateTypeAndLeftCandidate_SourceRef} for that).
+     */
+    @Query("select distinct p from NormalizedCandidateMatchPair p "
+            + "join fetch p.leftCandidate join fetch p.rightCandidate left join fetch p.evidence "
+            + "where p.leftCandidate.id = :candidateId or p.rightCandidate.id = :candidateId order by p.id asc")
+    List<NormalizedCandidateMatchPair> findByEitherCandidateIdWithEvidence(@Param("candidateId") Long candidateId);
 }
