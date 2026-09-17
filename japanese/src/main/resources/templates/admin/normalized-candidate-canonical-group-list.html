@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Canonical Group 목록')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('admin')}"></header>
+<main id="main-content" class="page-shell admin-shell">
+  <header class="page-heading"><div><p class="eyebrow">CANONICAL SELECTION</p><h1>Canonical Group 목록</h1><p class="subtle">Ticket 4E-3A: SAME_CONTENT로 판단된 candidate 그룹에 대한 human canonical 선택 기록입니다. production merge는 아직 수행되지 않습니다 (별도 티켓).</p></div><a href="/admin">관리자 홈</a></header>
+  <p class="admin-message" th:if="${adminMessage}" th:text="${adminMessage}"></p>
+  <p class="admin-error" th:if="${adminError}" th:text="${adminError}"></p>
+  <form class="admin-filter" method="get">
+    <label>상태<select name="status"><option value="">전체</option><option th:each="v:${T(com.japanese.content.entity.NormalizedCandidateCanonicalGroupStatus).values()}" th:value="${v}" th:text="${v}" th:selected="${v==status}"></option></select></label>
+    <button>조회</button>
+  </form>
+  <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>ID</th><th>상태</th><th>Canonical candidate</th><th>sourceRef</th><th>멤버 수</th><th>결정자</th><th>결정 시각</th><th></th></tr></thead><tbody>
+    <tr th:each="row:${result.rows}">
+      <td th:text="${row.id}"></td>
+      <td><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(row.status.name())}" th:text="${row.status}"></span></td>
+      <td><code th:text="${row.canonicalCandidateId}"></code> <span th:text="${row.canonicalPreview}"></span></td>
+      <td th:text="${row.sourceRef}"></td>
+      <td th:text="${row.memberCount}"></td>
+      <td th:text="${row.decidedByDisplayName}"></td>
+      <td th:text="${row.decidedAt}"></td>
+      <td><a th:href="@{/admin/normalized-candidates/canonical-groups/{id}(id=${row.id})}">상세</a></td>
+    </tr>
+  </tbody></table></div>
+  <p class="empty-state" th:if="${result.empty}">조건에 맞는 canonical group이 없습니다.</p>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

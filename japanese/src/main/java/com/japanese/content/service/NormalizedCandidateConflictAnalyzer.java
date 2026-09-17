@@ -98,6 +98,19 @@ import org.springframework.transaction.annotation.Transactional;
  * that scope first, then re-derives pairs from the current candidate snapshot - a plain
  * delete-then-regenerate, not versioned or diffed. No separate "analysis run" table is kept;
  * {@code generatedAt} on each pair row is the only staleness signal, by design (JLPT-MAX Ticket 4B).
+ *
+ * <p><b>Cross-service concurrency invariant (JLPT-MAX Ticket 4E-3A hardening)</b>: {@link #analyze}
+ * now locks ({@code PESSIMISTIC_WRITE}) every candidate row in its {@code (candidateType, sourceRef)}
+ * scope, in ascending id order, BEFORE {@link #deleteExistingPairs} or any other pair-row mutation -
+ * see {@link com.japanese.content.repository.NormalizedContentCandidateRepository#findByIdForConflictAnalysis}.
+ * This is what makes a concurrent {@code NormalizedCandidateCanonicalGroupService} group-creation
+ * transaction (Ticket 4E-3A) - which locks the same candidate rows, in the same ascending order,
+ * before locking and relying on any current pair/review row for those candidates - safe to interleave
+ * with a reanalysis: whichever transaction acquires a shared candidate's lock first fully excludes the
+ * other from mutating or relying on that candidate's pair state until it commits or rolls back. Ticket
+ * 4B pair rows themselves are deliberately never separately locked by either service (see Ticket 4E-3A
+ * design review round 3) - candidate-level locking alone is sufficient because both services always
+ * acquire candidate locks first, in the same global ascending order, before touching any pair row.
  */
 @Service
 public class NormalizedCandidateConflictAnalyzer {
@@ -115,10 +128,18 @@ public class NormalizedCandidateConflictAnalyzer {
 
     @Transactional
     public NormalizedCandidateAnalysisSummary analyze(NormalizedCandidateType candidateType, String sourceRef) {
-        List<NormalizedContentCandidate> candidates = candidateRepository
-                .findByCandidateTypeAndSourceRef(candidateType, sourceRef).stream()
-                .sorted((a, b) -> Long.compare(a.getId(), b.getId()))
-                .toList();
+        // JLPT-MAX Ticket 4E-3A hardening: discover the scope's candidate ids first (unlocked, since a
+        // scalar-id projection cannot itself populate stale entity state into the persistence context -
+        // see NormalizedContentCandidateRepository#findIdsByCandidateTypeAndSourceRefOrderByIdAsc), then
+        // lock each one individually, in that exact ascending order, BEFORE any pair-row mutation below.
+        // This must happen before deleteExistingPairs/regeneration - see this class's own javadoc
+        // "Cross-service concurrency invariant" for why.
+        List<Long> candidateIds =
+                candidateRepository.findIdsByCandidateTypeAndSourceRefOrderByIdAsc(candidateType, sourceRef);
+        List<NormalizedContentCandidate> candidates = new ArrayList<>(candidateIds.size());
+        for (Long id : candidateIds) {
+            candidateRepository.findByIdForConflictAnalysis(id).ifPresent(candidates::add);
+        }
 
         deleteExistingPairs(candidateType, sourceRef);
 

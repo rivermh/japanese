@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Canonical Group 상세')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('admin')}"></header>
+<main id="main-content" class="page-shell detail-shell admin-shell" th:with="d=${detail}">
+  <a href="/admin/normalized-candidates/canonical-groups">목록</a>
+  <p class="admin-message" th:if="${adminMessage}" th:text="${adminMessage}"></p>
+  <p class="admin-error" th:if="${adminError}" th:text="${adminError}"></p>
+  <article class="admin-detail">
+    <header>
+      <div class="card-meta">
+        <span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(d.status.name())}" th:text="${d.status}"></span>
+      </div>
+      <h1 th:text="${'Canonical group ' + d.id}"></h1>
+      <p class="subtle" th:text="${'canonical candidate: ' + d.canonicalCandidateId + ' · 결정자: ' + d.decidedByDisplayName + ' · ' + d.decidedAt}"></p>
+      <p th:if="${d.note}" th:text="${d.note}"></p>
+      <p th:if="${d.status.name() == 'DISSOLVED'}" class="subtle" th:text="${'해체: ' + d.dissolvedByDisplayName + ' · ' + d.dissolvedAt + (d.dissolutionNote != null ? (' - ' + d.dissolutionNote) : '')}"></p>
+    </header>
+
+    <section>
+      <h2>멤버 (canonical 포함)</h2>
+      <ul>
+        <li th:each="m:${d.members}">
+          <code th:text="${m.candidateId}"></code> <span th:text="${m.preview}"></span>
+          <strong th:if="${m.canonical}"> (canonical)</strong>
+          <small th:text="${'normalizedAt @ decision: ' + m.normalizedAtSnapshot}"></small>
+        </li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Edge 감사 기록 (불변, C(N,2) 전수)</h2>
+      <ul>
+        <li th:each="e:${d.edges}">
+          <strong th:text="${e.leftCandidateId + ' - ' + e.rightCandidateId}"></strong>
+          <span class="status-pill" th:text="${e.reviewDecisionSnapshot}"></span>
+          <span class="status-pill" th:text="${e.assessmentSnapshot}"></span>
+          <span th:text="${'검토자: ' + e.reviewerDisplayName + ' · reviewedAt: ' + e.pairReviewedAtSnapshot + ' · version: ' + e.pairReviewVersionSnapshot}"></span>
+          <span th:text="${'normalizedAt @ decision - left: ' + e.leftNormalizedAtSnapshot + ' / right: ' + e.rightNormalizedAtSnapshot}"></span>
+        </li>
+      </ul>
+    </section>
+
+    <section th:if="${d.active()}">
+      <h2>Group 해체</h2>
+      <form method="post" th:action="@{/admin/normalized-candidates/canonical-groups/{id}/dissolve(id=${d.id})}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <input type="hidden" name="expectedVersion" th:value="${d.version}">
+        <label>해체 메모<textarea name="dissolutionNote" maxlength="2000" placeholder="해체 사유 (선택)"></textarea></label>
+        <button>group 해체</button>
+      </form>
+    </section>
+  </article>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>
