@@ -374,4 +374,4 @@ Figma 파일은 다음 page 구조를 사용한다.
 
 로그인 화면 방향 검토에 사용한 초기 desktop reference는 `docs/design/references/`에 보존한다.
 
-현재 세션에서 Figma 플러그인은 설치 상태지만 실행기 도구가 연결되지 않아 파일을 생성하지 못했다. 실행기 연결 후 이 구조와 화면 명세를 그대로 Figma auto layout 및 component로 옮긴다.
+이 구조와 화면 명세는 Figma auto layout 및 component 구현 기준으로 사용한다.

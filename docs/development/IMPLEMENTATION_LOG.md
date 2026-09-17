@@ -1144,8 +1144,11 @@
   `AdminNormalizedCandidatePromotionReadinessControllerTest`(ADMIN-only list/detail, 404,
   잘못된 enum 필터 값 400 = 4건), `NormalizedCandidatePromotionReadinessRealApkgReport`(opt-in,
   SHA-256 게이팅, 실제 deck 대상 summary 산출 + idempotency + 구조적 회귀 가드). 전체
-  `./gradlew clean test` 405 tests, 0 failures, 0 errors. `git diff --check` 통과(trailing
-  whitespace 없음, 기존 LF/CRLF 경고만).
+  `./gradlew clean test` 0 failures, 0 errors. `git diff --check` 통과(trailing whitespace 없음,
+  기존 LF/CRLF 경고만). (정정: 이 항목에는 당시 "405 tests"로 기록했으나, JUnit XML 직접 집계로
+  재확인한 실제 aggregate는 397 tests(skipped 11, 72 test class)다. 405는 위 lettered sub-case
+  수기 tally가 자체 합계(35건)와도 맞지 않는 기존 문서 오류였으며, test 삭제·회귀가 원인이
+  아니다.)
 - **Ticket 4E로 넘기는 결정사항**: (1) Grammar `explanation` 매핑 정책(meaningGloss/nuance/
   frontExample 중 무엇을, 어떻게 결합할지) 확정, (2) `frontExample`/`confusablePatterns`을
   production `Example`/`GrammarRelation`/`GrammarComparison`으로 옮길지/어떻게 옮길지 결정,
