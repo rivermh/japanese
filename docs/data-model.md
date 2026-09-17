@@ -27,3 +27,30 @@ ContentItem 1 ── 1 Word ── N Meaning
 ## 현재 구현 범위
 
 현재는 읽기 검색과 웹 화면, 콘텐츠 상세 화면, 같은 서비스 계층을 호출하는 `/api/v1/contents` 조회 API, 단어·뜻·예문·문법·분류·레벨의 JPA 모델을 제공한다. 어휘·문법 전체 import는 `import-sample` 프로필에서만 실행되며 검토 상태로 저장된다. 학습 기록은 `LearnerProfile`과 `StudyRecord`로 분리하고, 캐릭터 레벨과 EXP를 학습 서비스가 계산하므로 이후 인증·복습 알고리즘·캐릭터 성장 규칙을 연결할 수 있다. 출처는 `ContentSource`로 별도 관리한다.
+
+## 콘텐츠 정규화/후보 데이터 모델 (private, production과 분리)
+
+원본 JLPT-MAX 데이터를 production `ContentItem`으로 승격하기 전 단계는 별도 private 테이블 계열로 관리하며, 공개 검색·API에는 노출되지 않는다.
+
+```text
+ImportedSourceRecord (원본 field/value 보존)
+     │
+     └── private_apkg_notes (PrivateApkgExtractor staging, audio/media 제외)
+              │
+              └── NormalizedContentCandidate (정규화 결과 영속화)
+                       ├── NormalizedVocabularyCandidate ── N candidate meaning/example
+                       ├── NormalizedGrammarCandidate ────── N confusable pattern
+                       │
+                       ├── NormalizedCandidateMatchPair ── N NormalizedCandidateMatchEvidence
+                       │        (dedup/conflict 분석 결과, candidate 쌍 관계)
+                       │
+                       └── NormalizedCandidatePairReview ── N NormalizedCandidatePairReviewHistory
+                                (사람 검토 판정 및 append-only 이력)
+```
+
+- `NormalizedContentCandidate`: candidateType(VOCABULARY/GRAMMAR), sourceRef, quality 상태를 갖는 공통 루트. Vocabulary/Grammar 상세는 각각 별도 테이블로 1:1 확장한다.
+- `NormalizedCandidateMatchPair`/`NormalizedCandidateMatchEvidence`: 두 후보가 SAME_CONTENT/POSSIBLE_DUPLICATE 관계일 가능성을 기록하는 read-derived 분석 결과. 재분석 시 삭제 후 재생성된다.
+- `NormalizedCandidatePairReview`/`NormalizedCandidatePairReviewHistory`: pair 자체가 아니라 안정적인 candidate 쌍 identity를 기준으로 사람 검토 판정을 저장하므로, 재분석으로 분석 row가 바뀌어도 검토 이력은 유지된다.
+- `ContentReleaseBatch`/`ContentReleaseBatchItem`: 콘텐츠 공개 배치와 그 immutable 이력을 관리한다(정규화 후보 파이프라인과는 독립적인 기존 공개 흐름).
+
+이 계열의 어떤 엔티티도 `ContentItem`/`Word`/`Grammar`/`Meaning`/`Example`을 직접 생성하거나 수정하지 않는다. Production 승격(승인된 draft 생성)은 아직 구현되지 않았고, 현재는 승격 가능 여부만 조회하는 read-only 판정(`PromotionReadinessIssueCode`)만 제공한다.

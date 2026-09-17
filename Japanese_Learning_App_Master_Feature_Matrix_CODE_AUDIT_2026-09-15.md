@@ -258,6 +258,24 @@
 - V2 ambiguous overlap targeted migration test 통과
 - production source는 수정하지 않았으며 이 Matrix 문서만 갱신한다.
 
+### 콘텐츠 정규화/후보 검토 파이프라인 추가 (기준 HEAD: `da789116dd9f26692360379064f3d5c48bf9152c`, 2026-09-17)
+
+위 "코드 감사 요약"은 `a000656`(Phase 0) 시점 기준이며 그 이후 아래 private 콘텐츠 파이프라인이 새로 추가됐다. 이 섹션만 `da789116dd9f26692360379064f3d5c48bf9152c` 기준으로 별도 갱신하며, 위쪽 기능 매트릭스 행(`[x]`/`[~]`/`[ ]`)은 이번 갱신에서 재검증하지 않았으므로 그대로 유지한다.
+
+새로 추가된 것 (Flyway V4~V8, production과 분리된 private 테이블):
+
+- Safe content release workflow(`content_release_batches`/`content_release_batch_items`, V4)
+- Private APKG staging extraction(`private_apkg_notes`, V5) — audio/media binary 미추출
+- Vocabulary/Grammar 정규화 순수 파서 (DB 비결합)
+- 정규화 후보 영속화(`normalized_content_candidates` 및 Vocabulary/Grammar 상세, V6)
+- 후보 간 dedup/conflict 분석(`normalized_candidate_match_pairs`/`_match_evidence`, V7)
+- 관리자 사람 검토 UI `/admin/normalized-candidates/reviews`(`normalized_candidate_pair_reviews`/`_history`, V8)
+- 관리자 승격 준비도 조회(dry-run) UI `/admin/normalized-candidates/promotion-readiness` — 100% read-only, production/private 테이블에 쓰지 않음
+
+v2.1.1 APKG 실측(2026-09-17): Vocabulary 후보 9,160건, Grammar 후보 1,078건 모두 `READY_FOR_DRAFT_PROMOTION 0` — production `Level`(N1~N5) row가 이번 profiling 환경에 N5만 시드되어 있는 것과 production identity/slug 정책 미확정이 공통 원인이며, 필드 길이 초과 등 데이터 자체의 blocker는 실측 0건이다.
+
+아직 구현되지 않은 것(P0 콘텐츠 게이트와 직결): 실제 production 승격(ContentItem/Word/Grammar/Meaning/Example insert), 후보 쌍의 canonical winner 자동 병합, 공개 publication 자동화. 위 "Ticket 1A-1: 공개 콘텐츠 승인·품질 게이트" 항목은 이 파이프라인이 추가된 뒤에도 여전히 완료 상태가 아니다.
+
 ## Phase 1 추천 우선순위 — dependency 기준
 
 제품 우선순위는 `콘텐츠 신뢰성 > 회상/복습 품질 > 학습 흐름 UX > 통계/개인화 > Haru 보상 > 부가 게임화`를 유지한다.

@@ -1,6 +1,6 @@
 # Japanese 개발 현황
 
-최종 정리: **2026-09-13**
+최종 정리: **2026-09-17**
 
 Japanese는 JLPT 단어와 문법을 탐색하고, 새 콘텐츠를 학습한 뒤 SRS 복습으로 장기 기억을 돕는 웹 서비스다. 퀴즈, EXP, Streak, Haru 캐릭터는 학습을 보조하며 학습 흐름 자체를 대체하지 않는다. 현재 웹 화면과 REST API는 같은 Service 계층을 사용하므로 Android 클라이언트를 추가해도 핵심 규칙을 다시 구현할 필요가 없다.
 
@@ -522,3 +522,21 @@ WORD는 표기/읽기/대표 의미 누락, 예문·번역 누락, source/source
 자동화 테스트는 blank reading, 의미/예문 누락, WORD/GRAMMAR 중복 후보, blank grammar description, sourceRef 누락, clean 콘텐츠, severity, N5 issue filter/pagination, ADMIN 권한/CSRF와 감사 조회의 review/published 비변경을 검증한다. 전체 `./gradlew.bat test`는 110 tests, 0 failures, 0 errors, 1 skipped를 통과했다. 실제 MySQL/브라우저 검증 수치와 화면 결과는 배포 전 현재 데이터로 재확인한다.
 
 MySQL 8.0.39 read-only audit snapshot (2026-09-13): N5 WORD 780 (ERROR 0, WARNING 11, INFO 0, clean 769, duplicate candidate 11); N5 GRAMMAR 341 (ERROR 0, WARNING 262, INFO 3, clean 76, duplicate candidate 134). Counts are reviewer candidates, not automatic review outcomes.
+
+## 콘텐츠 정규화/후보 검토 파이프라인 (2026-09-15~09-17)
+
+기존 `ContentSource`/`ContentReviewHistory` 공개 검수와 별개로, JLPT-MAX 원본을 production 콘텐츠로 승격하기 전에 거치는 **private, read-only-safe 파이프라인**을 추가했다. 이 파이프라인이 만드는 모든 데이터는 현재 공개 검색·화면·API에 노출되지 않으며, 어떤 단계도 `ContentItem`/`Word`/`Grammar`를 자동으로 생성하거나 공개하지 않는다.
+
+단계:
+
+1. **Safe content release workflow** — `content_release_batches`/`content_release_batch_items`(V4)로 콘텐츠 공개 배치와 immutable 이력을 관리한다.
+2. **Private APKG staging** — `PrivateApkgExtractor`가 `private_apkg_notes`(V5)에 원본 note 필드를 저장하되, audio/media binary는 추출하지 않고 `[sound:...]`/`<audio>` 같은 텍스트 참조만 제거한다.
+3. **정규화 파서** — `VocabularyNormalizationParser`/`GrammarNormalizationParser`는 side-effect-free 순수 함수로, staging 원본을 입력받아 불변 정규화 결과(`NormalizedExample`/`NormalizedGrammarExample` 등)를 만든다. DB/Entity에 결합하지 않는다.
+4. **정규화 후보 영속화** — `NormalizedContentCandidate`와 하위 Vocabulary/Grammar 상세(`normalized_content_candidates`, `normalized_vocabulary_candidates`, `normalized_grammar_candidates` 등, V6)가 정규화 결과를 private 테이블에 저장한다.
+5. **Dedup/conflict 분석** — `NormalizedCandidateConflictAnalyzer`가 `normalized_candidate_match_pairs`/`normalized_candidate_match_evidence`(V7)에 후보 간 SAME_CONTENT/POSSIBLE_DUPLICATE 관계와 근거를 기록한다.
+6. **사람 검토** — `/admin/normalized-candidates/reviews`에서 관리자가 각 pair에 대해 `NormalizedCandidatePairReview`(V8, 이력은 `normalized_candidate_pair_review_history`)로 판정을 남긴다.
+7. **승격 준비도 조회(dry-run)** — `/admin/normalized-candidates/promotion-readiness`는 quality/pair/production-mapping/source-rights/production-identity 축을 모두 조회해 각 후보가 아직 승격 불가능한 이유(`PromotionReadinessIssueCode`)를 보여주는 **100% read-only** 화면이다. 어떤 축도 자동으로 통과시키지 않으며, production/private 테이블에 row를 쓰지 않는다.
+
+v2.1.1 APKG 기준 실측(2026-09-17): Vocabulary 후보 9,160건, Grammar 후보 1,078건 모두 `READY_FOR_DRAFT_PROMOTION 0`이다. 이는 버그가 아니라 설계된 결과로, production JLPT `Level` row가 아직 N5만 시드된 profiling 환경 특성(`JLPT_LEVEL_UNMAPPABLE`)과 production identity/slug 정책이 아직 확정되지 않은 것(`PRODUCTION_IDENTITY_POLICY_UNRESOLVED`)이 공통 원인이다. 자세한 수치와 근거는 `docs/development/IMPLEMENTATION_LOG.md`를 참고한다.
+
+이 범위에서 아직 구현하지 않은 것: 실제 production 승격(ContentItem/Word/Grammar/Meaning/Example insert), 중복 쌍의 canonical winner 자동 병합, 공개 publication 자동화. 이 결정들은 이후 별도 작업으로 남아 있다.
