@@ -670,3 +670,188 @@
   (VOCABULARY 9,160/GRAMMAR 1,078/합계 10,238/Vocabulary FATAL 1/Grammar
   FATAL·REVIEW_REQUIRED 0)를 assertion으로 고정했다 — 둘 다 실제 APKG opt-in
   재실행으로 확인 후 고정.
+
+## 2026-09-17  JLPT-MAX Ticket 4B — Normalized Candidate Dedup/Conflict Analysis
+
+- 작업 목적: Ticket 4A가 영속화한 private `NormalizedContentCandidate` 스냅샷들
+  사이의 중복/충돌을 탐지하고, 판정 결과와 근거(evidence)를 private 영역에
+  저장한다. 자동 merge/삭제/canonical winner 선택, production matching,
+  human review/approval 중 어느 것도 이번 Ticket 범위가 아니다 — 파이프라인은
+  raw/private staging → pure normalization → private normalized candidate →
+  **dedup/conflict detection(이번 Ticket)** → human review(4C, 미구현) →
+  production promotion → publication 순서이며, 이번 Ticket은 굵게 표시한
+  단계만 구현한다.
+- **identity 3분법**: (A) provenance(`sourceRef`+`sourceNoteId` — 어디서
+  왔는가), (B) source-native identity hint(Vocabulary `EntryID`/Grammar
+  `UnitID` — source가 부여한 semantic identity 힌트), (C) global production
+  content identity(아직 미결정)를 절대 혼동하지 않았다. `EntryID`/`UnitID`를
+  전역 `Word`/`Grammar` identity와 동일시하는 코드는 어디에도 없다.
+- **actual v2.1.1 profiling을 규칙 설계보다 먼저 수행**(`NormalizedCandidateConflictProfilingReport`,
+  opt-in, `-Djapanese.actual-apkg=<path>`, SHA-256
+  `9d8be3ff6b23e11ef890a146dffec7ec4649de4bcbd491be439a11b991fd154d` 재확인):
+  이전 Ticket 3A.1의 "duplicate normalized pattern ≈234 groups" 수치는 이번
+  Ticket에서 그대로 재사용하지 않고 현재 persisted-candidate-equivalent 필드
+  기준으로 처음부터 다시 계산했다(그 수치는 다른 profiling 목적/다른 필드
+  기준이었을 가능성이 높다 — 실측 재계산이 이 차이를 그대로 드러냈다). 실측
+  결과:
+  - **Vocabulary(9,160건)**: non-null EntryID 9,160/9,160(100%), **duplicate
+    EntryID groups = 0**(실제 데이터에는 EntryID 중복이 전혀 없다). 정규화
+    expression+reading 중복 그룹은 1개(2건, だぶる/だぶる) 뿐이고, 이 한 쌍조차
+    level(N2 vs N1)·meanings·EntryID가 전부 다르다 — 완전 동일(fully
+    identical) 쌍은 0건. expression-only 중복 그룹 14개/reading-only 중복
+    그룹 455개는 비교 대상에서 제외했다(아래 blocking 참고).
+  - **Grammar(1,078건)**: non-null UnitID 1,078/1,078(100%), **duplicate
+    UnitID groups = 0**(UnitID도 전혀 중복이 없다). 정규화 pattern 중복
+    그룹은 9개(최대 그룹 크기 6, 예: で 패턴 6건), pattern 단독 pair는
+    32쌍(전부 UnitID가 다름 — UnitID가 항상 유일하므로 당연함), 그중 30쌍은
+    level까지 같음(pattern+level 그룹 7개). 이 30쌍 중
+    meaningGloss/connection/nuance가 **완전히 동일한 쌍은 0건** — 즉 같은
+    pattern(같은 level 포함)을 공유하는 실제 데이터는 예외 없이 서로 다른
+    문법 항목(예: で=장소/도구/원인/이유 등 서로 다른 용법)이었다. 이 실측이
+    "pattern을 identity로 취급하면 안 된다"는 Ticket 지침을 정량적으로
+    뒷받침한다.
+- **분석 상태 모델**(`NormalizedCandidateMatchAssessment`): `UNIQUE`(계산
+  결과일 뿐 절대 행으로 저장되지 않음)/`EXACT_DUPLICATE`/
+  `POSSIBLE_DUPLICATE`/`CONFLICT` 4종만 정의했다 — `INSUFFICIENT_DATA` 등
+  추가 상태는 실제 필요성이 확인되지 않아 도입하지 않았다(FATAL candidate
+  처리는 별도 항목 참고). `NormalizedCandidateQualityState`(completeness
+  축)와는 완전히 분리된 별개의 axis이며 하나의 enum으로 합치지 않았다.
+- **분류 규칙**(Vocabulary/Grammar 대칭 설계, `NormalizedCandidateConflictAnalyzer`):
+  - CONFLICT: 같은 EntryID/UnitID(둘 다 present & 동일)를 주장하는데 핵심
+    필드(Vocabulary는 expression 또는 reading, Grammar는 pattern)가 다른
+    경우. 실제 데이터에는 EntryID/UnitID 중복이 없으므로 실제 v2.1.1
+    결과에는 CONFLICT가 0건이고, synthetic 테스트(C/D/H)로만 재현된다.
+  - 핵심 필드(Vocabulary: expression+reading 둘 다 동일, Grammar: pattern
+    동일)가 일치할 때만 EXACT/POSSIBLE을 판정한다. **EntryID/UnitID가 둘 다
+    present인데 서로 다르면("식별자 불일치") 다른 모든 필드가 완전히
+    같더라도 EXACT_DUPLICATE로 격상시키지 않고 POSSIBLE_DUPLICATE로
+    제한한다** — source가 명시적으로 다른 항목이라고 주장하는 이상 이
+    Ticket이 그 주장을 EXACT로 덮어쓰지 않는다는 설계 결정이다(테스트
+    `differentEntryIdCapsExactDuplicateEvenWithIdenticalContent`/`g_...`로
+    고정). EntryID/UnitID가 없거나(FATAL 등) 한쪽만 있는 경우는 이 cap이
+    적용되지 않는다 — 정보 부재는 "불일치"가 아니다.
+  - 핵심 필드 일치 + 식별자 불일치가 아님 + 보조 필드(Vocabulary:
+    meanings+level, Grammar: level+meaningGloss+connection+nuance)까지 전부
+    같으면 EXACT_DUPLICATE, 하나라도 다르면 POSSIBLE_DUPLICATE.
+  - expression-only/reading-only(Vocabulary) 단독 일치는 애초에 비교
+    대상에 포함하지 않는다(아래 blocking) — Ticket 지침("같은 표기라도
+    읽기가 다르면 동일 item 아님", 그 역도 마찬가지)과 정확히 일치하고,
+    실측으로도 reading-only 그룹이 455개(단순 동음이의어 잡음)임을 확인했다.
+- **evidence 모델**(`NormalizedCandidateMatchEvidence`, 자유형 blob 아님):
+  각 행은 `evidenceCode`(20개 값 enum, 비교한 필드마다 SAME_*/DIFFERENT_*
+  대칭 쌍 — 예: `SAME_ENTRY_ID`/`DIFFERENT_ENTRY_ID`,
+  `SAME_PATTERN`/`DIFFERENT_PATTERN`, `SAME_MEANING_GLOSS`/
+  `DIFFERENT_MEANING_GLOSS` 등), `fieldName`(기계 판독용 필드 키),
+  `detail`(사람이 읽는 실제 비교 값, 예: `a=N2 b=N1`) 세 컬럼으로 구조화했다.
+  실제 v2.1.1 분석 결과 전량을
+  `build/reports/jlpt-max-profiling/conflict-analysis-actual.txt`에
+  candidate-id 쌍 + assessment + evidence 전체로 출력해 사람이 그대로 검토
+  가능함을 확인했다.
+- **blocking 전략**(O(n²) 전수비교 회피, step 28): Vocabulary는
+  (entryId)와 (normalizedSearchExpression+normalizedSearchReading) 두 키로,
+  Grammar는 (unitId)와 (pattern) 두 키로만 그룹을 만들고 그룹 크기 ≥2인
+  경우에만 그룹 내부 쌍을 비교 대상으로 삼는다. 실측 결과 실제 비교 대상
+  쌍은 Vocabulary 1쌍 + Grammar 32쌍 = **총 33쌍**뿐이었다(10,238건 대비) —
+  cluster/union-find 같은 별도 구조 없이 단순 pairwise 저장으로 충분함을
+  숫자로 확인했다(3개 이상 겹치는 그룹은 Grammar で 6건 그룹 등 존재하지만
+  최대 pair 수 C(6,2)=15로 여전히 사소한 규모).
+- **comparison-only normalization**(`comparisonKey`): NFKC 유니코드 정규화 +
+  trim만 수행하고 조사·기호·괄호·～ 표기·공백 내부 구조는 건드리지 않는다.
+  Vocabulary는 Ticket 2가 이미 계산해 둔
+  `normalizedSearchExpression`/`normalizedSearchReading`을 우선 사용하고
+  (source raw 필드는 절대 mutate하지 않음), 없을 때만 raw
+  expression/reading에 `comparisonKey`를 적용한다.
+- **FATAL candidate 처리**(step 19): 조용히 제외하지 않는다 — blocking이
+  entryId/unitId 또는 expression+reading/pattern이 실제로 존재하는
+  candidate만 그룹화하므로, FATAL candidate라도 identity 힌트가 남아 있으면
+  정상적으로 비교 대상에 포함된다(`p_fatalCandidateIsStillCompared` 테스트:
+  EntryID는 있지만 expression/reading이 전부 null인 FATAL candidate가 같은
+  EntryID의 정상 candidate와 CONFLICT로 정확히 판정됨을 확인). 비교할 만한
+  identity 힌트가 전혀 없는 candidate(entryId도 expression+reading도 전부
+  없음)는 어떤 블로킹 그룹에도 들어가지 않아 결과적으로 UNIQUE가 되는데,
+  이는 "숨겨진 누락"이 아니라 "비교 대상이 없어 유일한 것으로 계산됨"이라는
+  명시적이고 설명 가능한 결과다(실제 v2.1.1의 유일한 Vocabulary FATAL
+  1건이 이 경로를 탄다).
+- **provenance scope**(step 16): 비교는 항상 같은 `(candidateType,
+  sourceRef)` scope 내부로 한정했다(`NormalizedCandidateConflictAnalyzer.analyze(type,
+  sourceRef)`가 그 scope의 candidate만 로드) — EntryID/UnitID가
+  source-native identity이기 때문이다. 현재 이 코드베이스에는 JLPT-MAX
+  단일 source만 존재해 이 scoping이 오늘 당장 결과를 바꾸지는 않지만,
+  향후 multi-source 통합 시 cross-source identity reconciliation은 별도
+  concern으로 분리된다 — 지금은 그 framework를 만들지 않았다.
+- **pair 저장 설계**(`NormalizedCandidateMatchPair`): `leftCandidate`/
+  `rightCandidate`를 생성자에서 항상 ascending id로 canonical ordering하고
+  (호출자의 인자 순서와 무관), self-match와 cross-candidateType pair는
+  생성자에서 `IllegalArgumentException`으로 즉시 거부한다(entity 차원의
+  방어 — `NormalizedCandidateMatchPairTest` 5건으로 고정). DB에도
+  `(left_candidate_id, right_candidate_id)` unique 제약을 걸었다. CHECK
+  제약(`left < right`)은 MySQL 배포 버전을 확정할 수 없어 이식성 문제로
+  넣지 않았고, 대신 service invariant + entity 단위 테스트로 방어했다
+  (Ticket이 명시적으로 허용한 대안).
+- **UNIQUE 미저장 설계**(step 21): 모든 candidate에 UNIQUE row를 저장하지
+  않는다 — pair 관계가 실제로 존재하는 candidate만 행을 가지며, UNIQUE는
+  "그 candidateType+sourceRef scope 안에서 pair가 하나도 없는 candidate
+  수"로 계산되는 파생값(`NormalizedCandidateAnalysisSummary.uniqueCount()`)이다.
+  4C가 conflict/possible-duplicate 목록을 조회하려면
+  `NormalizedCandidateMatchPairRepository`의
+  `findByLeftCandidate_CandidateTypeAndLeftCandidate_SourceRef(AndAssessment)`로
+  충분하다 — 별도 summary 테이블을 두지 않아 테이블 중복을 피했다.
+- **group vs pair**(step 22): union-find 등 cluster 구조는 만들지 않았다 —
+  실측 최대 그룹 크기(Grammar で 6건, pair 15개)가 pairwise 저장으로
+  충분히 감당 가능한 규모임을 확인했기 때문이다(전체 실제 pair 수도 33개).
+- **idempotency/rerun**(step 17/18): `analyze(type, sourceRef)`를 다시
+  실행하면 그 scope의 기존 pair(+evidence, cascade)를 벌크 JPQL delete로
+  전부 지우고 현재 candidate 스냅샷으로 처음부터 재계산한다 — 버전
+  관리/diff 없이 delete-then-regenerate만 수행하며, 각 pair의
+  `generatedAt`만 최신 재계산 시각을 나타낸다. 별도의 "analysis run"
+  테이블은 두지 않았다. `n_rerunningOnUnchangedPopulationIsIdempotent`
+  테스트로 pair 수/assessment/evidence가 재실행 후에도 동일함을(단, row
+  id 자체는 delete-then-regenerate이므로 바뀜 — 이는 설계상 정상) 확인했고,
+  실제 APKG에서도 `analyze`를 연속 2회 호출해 두 번째 결과가 첫 번째와
+  완전히 동일한 `NormalizedCandidateAnalysisSummary`임을 검증했다
+  (`NormalizedCandidateConflictAnalyzerRealApkgReport`).
+- **candidate refresh 후 재분석**(step 17): Ticket 4A의 refresh(같은
+  sourceRef+sourceNoteId 재저장)로 candidate 내용이 바뀐 뒤 재분석하면
+  이전 평가에 대응하는 stale pair/evidence가 남지 않음을
+  `o_candidateRefreshThenRerunLeavesNoStaleEvidence` 테스트로 확인했다
+  (EXACT_DUPLICATE였던 쌍이 meaning 변경 후 재실행하면 POSSIBLE_DUPLICATE로
+  갱신되고, evidence 행 수가 실제 저장된 evidence와 정확히 일치).
+- **cross-type/self-match 방지**(step 14/15): analyzer는 한 번에 하나의
+  `candidateType`만 로드하므로 구조적으로 cross-type pair가 생성될 수
+  없고, entity 생성자가 추가로 이를 방어한다
+  (`k_crossTypeCandidatesAreNeverPaired`/`l_selfMatchNeverPersists`,
+  그리고 entity 단위 `crossTypeMatchIsRejected`/`selfMatchIsRejected`).
+- **production isolation**(step 23/24): `ContentItem`/`Word`/`Grammar`/
+  `GrammarEnrichment`/`GrammarRelation`/`GrammarComparison`/
+  `ImportedSourceRecord`을 생성·수정·참조하지 않는다 —
+  `GrammarRelation`/`GrammarComparison`은 이름이 비슷해 보이지만 curated
+  production 도메인이므로 재사용하지 않고 이번 Ticket 전용 private analysis
+  domain(`normalized_candidate_match_pairs`/`normalized_candidate_match_evidence`)을
+  새로 만들었다. `q_analysisNeverChangesProductionOrImportedSourceRowCounts`
+  테스트로 `content_items`/`words`/`grammars`/`GrammarEnrichment`/
+  `GrammarRelation`/`GrammarComparison`/`ImportedSourceRecord` 각 count가
+  분석 전후 불변임을 확인했다.
+- **Migration**: `V7__add_normalized_candidate_match_analysis.sql`(H2/MySQL
+  동일 의미, V1-V6 무수정)로 `normalized_candidate_match_pairs`(+ index
+  on `right_candidate_id`/`assessment`)와 `normalized_candidate_match_evidence`
+  2개 테이블을 추가했다. `FlywayMigrationTest`에 V7 fresh-DB/V6→V7
+  upgrade(기존 content/candidate row 보존 + 신규 테이블에 pair/evidence
+  insert 가능 + unique 제약 동작 확인)/MySQL-additive 테스트를 추가하고,
+  기존 V1-V6 upgrade 테스트들의 `migrationsExecuted` 기대값을 전부 +1
+  갱신했다(V7 추가로 pending migration 수가 하나씩 늘어났기 때문).
+- **자동 merge/production mapping/human review: 전부 없음**. 이번
+  Ticket은 dedup/conflict 판정 결과를 private 영역에 저장하는 것으로
+  끝나며, canonical winner 선택, candidate 삭제, `Word`/`Grammar` 갱신,
+  reviewer 승인/거부, Release Gate, source rights/publication 변경,
+  COMPREHENSIVE parser는 전부 범위 밖이다(4C 이후 과제).
+- **테스트**: `NormalizedCandidateMatchPairTest`(5건, entity invariant),
+  `NormalizedCandidateConflictAnalyzerTest`(19건, synthetic A-Q 전체
+  시나리오), `FlywayMigrationTest`(V7 관련 2건 신규 + 기존 5건 기대값
+  보정), 신규 opt-in `NormalizedCandidateConflictProfilingReport`(actual
+  raw profiling)/`NormalizedCandidateConflictAnalyzerRealApkgReport`(actual
+  분석 + idempotency 검증). 전체 `./gradlew clean test` 311 tests, 0
+  failures, 0 errors, 10 skipped(기존 9건 opt-in + 이번 Ticket 신규 opt-in
+  profiling 1건 - RealApkgReport는 opt-in 플래그 없이 실행 시 스스로
+  skip되어 이 10건에 포함됨). opt-in 2건(profiling/actual analysis)은
+  실제 APKG로 별도 Gradle 실행으로 통과 확인(SHA-256 재검증 포함).
+  `git diff --check` 통과, 신규 파일 trailing whitespace 없음.

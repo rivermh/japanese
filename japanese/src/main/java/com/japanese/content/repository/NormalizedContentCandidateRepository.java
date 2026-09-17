@@ -11,4 +11,7 @@ public interface NormalizedContentCandidateRepository extends JpaRepository<Norm
             String sourceRef, long sourceNoteId, NormalizedCandidateType candidateType);
 
     List<NormalizedContentCandidate> findByCandidateType(NormalizedCandidateType candidateType);
+
+    List<NormalizedContentCandidate> findByCandidateTypeAndSourceRef(NormalizedCandidateType candidateType,
+            String sourceRef);
 }
