@@ -8,7 +8,7 @@ import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
 /**
- * JLPT-MAX Ticket 4B step 14/15: pins the {@link NormalizedCandidateMatchPair} constructor
+ * JLPT-MAX Ticket 4B: pins the {@link NormalizedCandidateMatchPair} constructor
  * invariants that must never depend on the caller getting things right - self-match rejection,
  * cross-{@link NormalizedCandidateType} rejection, cross-source-ref rejection (independent-review
  * follow-up, item 6), and canonical (ascending-id) left/right ordering regardless of argument order.

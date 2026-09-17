@@ -1,4 +1,4 @@
-# AGENTS.md
+# Project Guidelines
 
 ## Project
 
@@ -13,8 +13,7 @@ Entity, DB, 검색, 카테고리 구조를 JLPT에만 종속시키지 않는다.
 * Spring Data JPA / MySQL
 * Thymeleaf / HTML / CSS / JavaScript
 
-기본 구조는 `Controller → Service → Repository → Entity`를 따른다. 필요시 DTO, Exception, Config 등을 추가하되 불필요한 추상화나 과도하게 복잡한 아키텍처를 도입하지 않는다.
-혹시 위 기본구조보다 나은구조가 있으면 적극적으로 채택가능
+기본 구조는 `Controller → Service → Repository → Entity`를 따른다. 필요시 DTO, Exception, Config 등을 추가하되 불필요한 추상화나 과도하게 복잡한 아키텍처를 도입하지 않는다. 기본 구조보다 더 적합한 구조가 있으면 적극적으로 채택한다.
 
 웹 서비스를 먼저 완성한 후 Android 앱으로 확장한다. 핵심 비즈니스 로직을 View나 Controller에 종속시키지 않고 향후 REST API와 Android에서도 재사용 가능하게 설계한다.
 
@@ -28,7 +27,7 @@ Entity, DB, 검색, 카테고리 구조를 JLPT에만 종속시키지 않는다.
 
 전체 UI는 현대적이고 깔끔하며 직관적인 학습 서비스로 디자인한다. 모바일 앱으로 확장할 것을 고려하여 반응형으로 구현한다.
 
-**불필요한 공백과 과도한 여백을 만들지 않는다.** 화면을 의미 없이 크게 벌리는 padding, margin, 빈 영역, 과도하게 큰 카드와 섹션을 피한다. 정보 밀도와 가독성의 균형을 유지하며 한 화면의 공간을 효율적으로 사용한다.
+불필요한 공백과 과도한 여백을 만들지 않는다. 화면을 의미 없이 크게 벌리는 padding, margin, 빈 영역, 과도하게 큰 카드와 섹션을 피한다. 정보 밀도와 가독성의 균형을 유지하며 한 화면의 공간을 효율적으로 사용한다.
 
 일관된 typography, spacing, button, card, input, color system을 유지한다. 기능마다 제각각인 UI를 만들지 않고 공통 컴포넌트와 스타일을 재사용한다. 캐릭터가 존재하더라도 지나치게 유아적이거나 게임 UI처럼 만들지 않는다.
 
@@ -45,3 +44,11 @@ Entity, DB, 검색, 카테고리 구조를 JLPT에만 종속시키지 않는다.
 임시 하드코딩, UI만 존재하는 가짜 기능, 동작하지 않는 placeholder를 완료된 기능으로 취급하지 않는다. 기능은 실제 데이터 흐름을 통해 처음부터 끝까지 동작해야 한다.
 
 확장성을 고려하되 아직 필요하지 않은 기능을 과도하게 미리 구현하지 않는다. 단순하고 명확하며 유지보수 가능한 코드를 우선한다.
+
+## Code Style
+
+새 코드는 기존 코드베이스의 naming, package 구조, method/class 분리 방식, exception/null 처리, test 스타일, comment/Javadoc 밀도를 먼저 확인하고 자연스럽게 맞춘다.
+
+자명한 코드를 설명하는 장황한 주석, 기존 프로젝트 스타일에 없는 과도한 Javadoc, 불필요한 interface/factory/wrapper/helper 계층을 만들지 않는다.
+
+기존 코드베이스와 일관된 production-quality code를 우선한다. 단, 버그나 테스트 실패, provenance, 미확정 사항을 숨기거나 사실과 다르게 기록해서는 안 된다.

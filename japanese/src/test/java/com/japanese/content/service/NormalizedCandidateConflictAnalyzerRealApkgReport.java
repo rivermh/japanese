@@ -30,7 +30,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * JLPT-MAX Ticket 4B step 23/29: opt-in verification tool (test/dev scope only) that runs the full
+ * JLPT-MAX Ticket 4B: opt-in verification tool (test/dev scope only) that runs the full
  * real chain - extract -&gt; normalize -&gt; {@link NormalizedCandidateStore} (Ticket 4A) -&gt;
  * {@link NormalizedCandidateConflictAnalyzer} (this ticket) - against the actual v2.1.1 JLPT-MAX
  * deck and reports the final persisted pair/assessment counts. Not part of the production build

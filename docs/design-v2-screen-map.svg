@@ -12,7 +12,7 @@
   </defs>
   <rect class="canvas" width="1800" height="2400"/>
   <text x="60" y="60" class="title">Japanese Design Guide v2 · Desktop + Mobile Core Screen Map</text>
-  <text x="60" y="90" class="small">Figma reconstruction blueprint · detailed behavior and tokens: DESIGN.md.md</text>
+  <text x="60" y="90" class="small">Figma reconstruction blueprint · detailed behavior and tokens: DESIGN.md</text>
 
   <!-- 01 Home -->
   <g transform="translate(60 130)"><rect class="tile" width="540" height="690" rx="18"/><text x="22" y="38" class="name">01 Home</text>

@@ -69,15 +69,15 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><b>Scope</b>: comparisons only ever happen between two candidates that share both
  * {@code candidateType} and {@code sourceRef} - {@link NormalizedCandidateMatchPair}'s constructor
  * additionally hard-rejects a cross-{@code candidateType} pair, and {@link #analyze} never even
- * builds a cross-{@code sourceRef} candidate pool to begin with (JLPT-MAX Ticket 4B step 16: source-native
+ * builds a cross-{@code sourceRef} candidate pool to begin with (JLPT-MAX Ticket 4B: source-native
  * identity - EntryID/UnitID - is only meaningful within the source that assigned it).
  *
- * <p><b>Blocking</b> (JLPT-MAX Ticket 4B step 28/29 profiling against the real v2.1.1 deck): candidates
+ * <p><b>Blocking</b> (JLPT-MAX Ticket 4B profiling against the real v2.1.1 deck): candidates
  * are only ever compared when they share a non-blank {@code entryId}/{@code unitId}, or a non-blank
  * normalized {@code expression+reading} (Vocabulary) / {@code pattern} (Grammar) - never on
  * expression-only or reading-only matches (profiled at 14/455 groups respectively on the real deck;
- * both are common, unrelated-word homograph/homophone noise, not identity signals - JLPT-MAX Ticket 4B
- * step 10's explicit warning). On the real v2.1.1 deck this keeps the compared-pair count at 33
+ * both are common, unrelated-word homograph/homophone noise, not identity signals (JLPT-MAX Ticket 4B).
+ * On the real v2.1.1 deck this keeps the compared-pair count at 33
  * total (1 Vocabulary + 32 Grammar) against 10,238 candidates, so no cluster/union-find structure is
  * needed - see IMPLEMENTATION_LOG.md for the full profiling numbers.
  *
@@ -97,8 +97,7 @@ import org.springframework.transaction.annotation.Transactional;
  * pair (and its evidence, via cascade on the Java side / explicit bulk delete on the SQL side) in
  * that scope first, then re-derives pairs from the current candidate snapshot - a plain
  * delete-then-regenerate, not versioned or diffed. No separate "analysis run" table is kept;
- * {@code generatedAt} on each pair row is the only staleness signal, by design (JLPT-MAX Ticket 4B
- * step 17).
+ * {@code generatedAt} on each pair row is the only staleness signal, by design (JLPT-MAX Ticket 4B).
  */
 @Service
 public class NormalizedCandidateConflictAnalyzer {
@@ -452,7 +451,7 @@ public class NormalizedCandidateConflictAnalyzer {
     /**
      * Comparison-only normalization (NFKC unicode form + trim), deliberately conservative -
      * whitespace/case/punctuation inside the value are left untouched so a Japanese grammar
-     * pattern's particles/symbols/brackets/{@code ～} are never altered (JLPT-MAX Ticket 4B step 9).
+     * pattern's particles/symbols/brackets/{@code ～} are never altered (JLPT-MAX Ticket 4B).
      * Never mutates the source entity field it is called on; only used to build in-memory
      * comparison keys.
      */

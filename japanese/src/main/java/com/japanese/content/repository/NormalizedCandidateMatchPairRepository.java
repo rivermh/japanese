@@ -41,7 +41,7 @@ public interface NormalizedCandidateMatchPairRepository extends JpaRepository<No
             @Param("leftCandidateId") Long leftCandidateId, @Param("rightCandidateId") Long rightCandidateId);
 
     /**
-     * The admin review list's read path for VOCABULARY (JLPT-MAX Ticket 4C step 21): one query fetch
+     * The admin review list's read path for VOCABULARY (JLPT-MAX Ticket 4C): one query fetch
      * -joins both candidates and their {@code vocabularyDetail} so rendering a short left/right
      * preview for every row in scope never triggers one lazy-load per candidate. {@code sourceRef}
      * is optional - {@code null} matches every source ref. {@code distinct} avoids duplicate pair

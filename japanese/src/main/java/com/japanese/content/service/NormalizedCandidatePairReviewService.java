@@ -46,12 +46,12 @@ import org.springframework.transaction.annotation.Transactional;
  * {@link NormalizedCandidatePairReview}/{@link NormalizedCandidatePairReviewHistory}, and the single
  * write path that records a human decision.
  *
- * <p><b>Boundary</b> (JLPT-MAX Ticket 4C step 3): this class never reads, writes, or references
+ * <p><b>Boundary</b> (JLPT-MAX Ticket 4C): this class never reads, writes, or references
  * {@code ContentItem}/{@code ReviewStatus}/{@code ContentReviewHistory}/{@code CurationReviewHistory}/
  * {@code GrammarRelation}/{@code GrammarComparison} - production review state and this private
  * candidate-pair review state are entirely separate domains. Recording {@link HumanReviewDecision#SAME_CONTENT}
- * never merges, deletes a candidate, picks a canonical winner, or promotes anything to production
- * (step 19/34) - it only ever records what a human decided.
+ * never merges, deletes a candidate, picks a canonical winner, or promotes anything to production -
+ * it only ever records what a human decided.
  */
 @Service
 public class NormalizedCandidatePairReviewService {
@@ -86,9 +86,8 @@ public class NormalizedCandidatePairReviewService {
      * {@code candidateType} (+ optional {@code sourceRef}) - at the real v2.1.1 deck's current scale
      * (33 pairs total) this is simpler and just as correct as a DB-level dynamic query, and every
      * filterable signal here (human decision, freshness) is computed, not a stored column that a
-     * plain {@code WHERE} could target anyway (JLPT-MAX Ticket 4C step 20 - "overengineering 금지").
-     * The DB side still does a fixed, small number of queries regardless of row count - no
-     * per-row query is issued (step 21).
+     * plain {@code WHERE} could target anyway. The DB side still does a fixed, small number of
+     * queries regardless of row count - no per-row query is issued.
      */
     @Transactional(readOnly = true)
     public ReviewListResult list(NormalizedCandidateType candidateType, String sourceRef,
@@ -176,7 +175,7 @@ public class NormalizedCandidatePairReviewService {
      * Detail is looked up by the two stable candidate ids, never by a Ticket 4B pair id (which is
      * not stable - see {@link NormalizedCandidatePairReview}'s javadoc). Deliberately does not
      * require a current pair to exist: a pair that disappeared after a candidate refresh/reanalyze
-     * must still render its preserved review/history without crashing (JLPT-MAX Ticket 4C step 16).
+     * must still render its preserved review/history without crashing (JLPT-MAX Ticket 4C).
      */
     @Transactional(readOnly = true)
     public ReviewDetailView detail(NormalizedCandidateType candidateType, Long leftCandidateId, Long rightCandidateId) {
@@ -264,7 +263,7 @@ public class NormalizedCandidatePairReviewService {
 
     /**
      * Records a human decision for one pair identity, enforcing every eligibility/freshness/
-     * concurrency check up front (JLPT-MAX Ticket 4C step 17/29) before touching any row:
+     * concurrency check up front (JLPT-MAX Ticket 4C) before touching any row:
      * <ol>
      * <li>both candidates exist, share {@code candidateType} and {@code sourceRef};</li>
      * <li>a current Ticket 4B pair exists for this identity;</li>
@@ -356,7 +355,7 @@ public class NormalizedCandidatePairReviewService {
 
     /**
      * A thin, explicit admin action wrapping {@code NormalizedCandidateConflictAnalyzer.analyze} -
-     * never triggered implicitly by a GET/list request (JLPT-MAX Ticket 4C step 13/14). Never
+     * never triggered implicitly by a GET/list request (JLPT-MAX Ticket 4C). Never
      * touches any review/history row: reanalysis only ever deletes/reinserts Ticket 4B pair/evidence
      * rows, which this ticket's review tables have no foreign key to.
      */

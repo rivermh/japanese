@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 /**
- * JLPT-MAX Ticket 4B step 8/29: reproducible, read-only actual-data profiling tool (test/dev scope
+ * JLPT-MAX Ticket 4B: reproducible, read-only actual-data profiling tool (test/dev scope
  * only) that measures real dedup/conflict signal population sizes on the v2.1.1 deck <em>before</em>
  * any classification rule is written, so the rule set that {@link NormalizedCandidateConflictAnalyzer}
  * eventually implements is designed against real numbers rather than assumption. Not part of the

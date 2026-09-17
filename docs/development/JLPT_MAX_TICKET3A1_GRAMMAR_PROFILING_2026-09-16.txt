@@ -2,7 +2,6 @@ JLPT-MAX Ticket 3A.1 — Grammar Profiling Utility Extension
 Report date: 2026-09-16 (updated same day: actual-APKG measurement, then a
 read-only self-review that corrected the pattern>200/explanation>2000 root
 cause - see section 29)
-Author: Claude (cloud session), on behalf of kmh000904@gmail.com
 
 ================================================================================
 1. VERDICT
@@ -19,19 +18,19 @@ suspected) as the exact source of the pattern>200 and explanation>2000
 findings. See section 28 for the exact recommendation.
 
 Historical note (superseded by this update): the first version of this
-report, written earlier in this session, could not obtain the real
-JLPT-MAX-Deck-2.1.1.apkg (no such file existed anywhere in the cloud
-environment) and left all ten mandatory questions UNRESOLVED. Later in the
-same session the file was downloaded directly from the official GitHub
-Release, verified byte-for-byte, and run through the profiling utility built
-earlier. This document now reports that real measurement. Do not confuse the
-numbers below (all newly measured this session) with the pre-existing
-Ticket 1/1.5/2 IMPLEMENTATION_LOG.md figures cited for comparison.
+report could not obtain the real JLPT-MAX-Deck-2.1.1.apkg (no such file
+existed anywhere in the working environment at that point) and left all ten
+mandatory questions UNRESOLVED. The file was subsequently downloaded
+directly from the official GitHub Release, verified byte-for-byte, and run
+through the profiling utility built earlier. This document now reports that
+real measurement. Do not confuse the numbers below (all newly measured in
+this pass) with the pre-existing Ticket 1/1.5/2 IMPLEMENTATION_LOG.md
+figures cited for comparison.
 
 IMPORTANT CORRECTION TO PRIOR TICKET 1 RECORD (CONFIRMED BY SELF-REVIEW,
 see section 29): the IMPLEMENTATION_LOG.md Ticket 1 entry states
 "정규(비-종합실전) GRAMMAR pattern 1,078/1,078건이 production
-Grammar.pattern(200자) 제한을 초과". This session's note-level,
+Grammar.pattern(200자) 제한을 초과". This measurement's note-level,
 category-isolated remeasurement directly contradicts the ATTRIBUTION of that
 finding, though not its raw count: for category=GRAMMAR (the true normal
 1,078), the parser-selected `<mark>` text is min=1 max=26 avg=7.3 chars —
@@ -50,7 +49,7 @@ See section 13/14/29 below for the confirmed root cause.
 
 - Branch: ui/japanese-ui-consolidation
 - HEAD at start of this continuation: 262e46524332a57e71f15aabde3557d79b69b8db
-  (local-only commit from the earlier part of this session; verified
+  (local-only commit from an earlier working pass; verified
   unchanged before starting, per section 3 below)
 - HEAD at end of this continuation: UNCHANGED, still 262e46524332a57e71f15aabde3557d79b69b8db
 - No commit, amend, rebase, reset, or revert was performed in this
@@ -68,7 +67,7 @@ See section 13/14/29 below for the confirmed root cause.
 Before doing anything else in this continuation:
 - `git branch --show-current` -> ui/japanese-ui-consolidation
 - `git rev-parse HEAD` -> 262e46524332a57e71f15aabde3557d79b69b8db (unchanged
-  from the end of the prior part of this session)
+  from the end of the prior working pass)
 - `git status --porcelain` -> empty (clean)
 - `git diff --stat` -> empty
 - `git log -3 --oneline` -> 262e465 (Ticket 3A.1 utility), fcb2820 (Ticket 2
@@ -168,7 +167,7 @@ in-scope population:
 - COMPREHENSIVE (종합 실전 deck): 2,527 (actual, this run)
 
 Matches the Ticket 3A baseline figures exactly (3,605 / 1,078 / 2,527) — this
-population is stable across sessions.
+population is stable across measurement runs.
 
 ================================================================================
 11. Is* RAW VALUES + NOTE-LEVEL CROSS-TAB (actual, this run)
@@ -737,7 +736,7 @@ CI runs it):
 - The 5 skips are the expected opt-in-gated real-apkg tests, skipped because
   `-Djapanese.actual-apkg` was not passed on this particular run (by design -
   see the heap-space note above; each opt-in test was independently verified
-  to pass earlier in this session when run with the property).
+  to pass earlier when run with the property).
 - The 1 failure is the same `LearningOrganizationServiceTest` failure,
   confirmed pre-existing per section 23.
 - No test was skipped to force a pass; no test assertions were weakened.
@@ -778,7 +777,7 @@ BLOCKER: none.
 MAJOR (RESOLVED - see section 29 for the self-review that closed this out):
 - The Ticket 1 IMPLEMENTATION_LOG.md entry's claim that "정규 GRAMMAR
   pattern 1,078/1,078건이 200자 제한을 초과" is CONTRADICTED, and now
-  CORRECTED, by this session's work: the category-isolated remeasurement
+  CORRECTED: the category-isolated remeasurement
   showed 0/1,078 normal-GRAMMAR notes exceed 200 (or even 50), and a
   follow-up self-review (section 29) then proved by exact note-ID set
   comparison that the real ">200" 1,078-note population is
@@ -820,7 +819,7 @@ NOTE:
    no DB/entity coupling), scoped ONLY to category=GRAMMAR. Reuse
    `GrammarHtmlParser`'s existing `<mark>`-based pattern selector and
    `div._j4z`/`section._j4a`-based explanation/example selectors - both are
-   proven 100%-reliable on this subset by this session's measurement (0
+   proven 100%-reliable on this subset by this measurement (0
    fallback, 0 overflow, consistent exactly-2 examples). Do NOT populate
    `Grammar.connection` from `Kind` (section 12/22 Q3) - leave it null/absent
    for this dataset, or drop the field mapping entirely if the schema allows.
@@ -837,7 +836,7 @@ NOTE:
    full-field samples than this profiling pass captured.
 
 3. Before implementing 3B-2/3B-3, do a short follow-up profiling pass
-   (extending this session's `GrammarNormalizationProfilingReport`, or a new
+   (extending this pass's `GrammarNormalizationProfilingReport`, or a new
    sibling tool) focused specifically on the exact `li._jbr`/`div._jbs`
    choice-content structure and the `span.star-piece` arrangement-tile
    structure, since this Ticket's DOM skeletons only went 3 levels deep
@@ -846,10 +845,10 @@ NOTE:
    index/label precisely).
 
 ================================================================================
-29. SELF-REVIEW ADDENDUM (same session, read-only re-verification)
+29. Verification Addendum (read-only re-verification)
 ================================================================================
 
-A later READ-ONLY self-review, run in the same session against the same
+A later READ-ONLY self-review, run against the same
 verified APKG (cached at `/tmp/jlpt-max-ticket3a1/JLPT-MAX-Deck-2.1.1.apkg`,
 same size/SHA-256 as sections 6/7), re-derived every key finding above
 independently (a small, throwaway, temporary test file was written, run, and
@@ -929,10 +928,6 @@ ticket brief asked ("일반 GRAMMAR FrontHTML 구조 분석"), so it never
 computed a category/subtype-crossed pattern-length table on its own - that
 cross-tab required this self-review's separate, temporary script. The tool
 itself was NOT modified in this self-review or in this finalization pass.
-
-Full self-review narrative and additional detail were also delivered
-separately to the user as a standalone text-file report during this
-session.
 
 ================================================================================
 30. FINAL DISCLOSURES (per ticket requirement)

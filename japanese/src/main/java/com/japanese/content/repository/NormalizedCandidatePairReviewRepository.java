@@ -15,7 +15,7 @@ public interface NormalizedCandidatePairReviewRepository extends JpaRepository<N
 
     /**
      * Fetch-joins {@code leftCandidate}/{@code rightCandidate}/{@code reviewer} so an admin review
-     * list page (JLPT-MAX Ticket 4C step 21) can look up every review for a
+     * list page (JLPT-MAX Ticket 4C) can look up every review for a
      * {@code (candidateType, sourceRef)} scope in one query and join it in memory against the
      * current Ticket 4B pairs, rather than issuing one review lookup per pair row.
      * {@code sourceRef} is optional - {@code null} matches every source ref for the given type.

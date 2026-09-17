@@ -91,7 +91,7 @@ public class NormalizedCandidatePairReview {
     private NormalizedCandidateMatchAssessment assessmentSnapshot;
 
     /**
-     * Optimistic-concurrency guard (JLPT-MAX Ticket 4C step 41): two admins opening the same detail
+     * Optimistic-concurrency guard (JLPT-MAX Ticket 4C): two admins opening the same detail
      * page and submitting a decision concurrently must not silently last-write-wins each other. There
      * is no existing {@code @Version} precedent elsewhere in this codebase - this is the first use of
      * one - chosen as the simplest standard JPA mechanism for this exact problem.
@@ -143,7 +143,7 @@ public class NormalizedCandidatePairReview {
      * snapshots. Never changes {@link #leftCandidate}/{@link #rightCandidate} (those are fixed at
      * creation) and never touches any {@link NormalizedCandidateMatchPair} row - the machine
      * assessment stays exactly what Ticket 4B computed, this only ever records what a human decided
-     * about it (JLPT-MAX Ticket 4C step 19).
+     * about it (JLPT-MAX Ticket 4C).
      */
     public void recordDecision(HumanReviewDecision decision, UserAccount reviewer, String note, Instant reviewedAt,
             Instant leftNormalizedAtSnapshot, Instant rightNormalizedAtSnapshot,

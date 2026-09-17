@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
  * self-match/cross-type/cross-source-ref rejection (mirroring {@link NormalizedCandidateMatchPair}'s
  * own invariants, since this entity's identity is the same two-candidate pair) and canonical
  * left/right ordering of both the candidates and their per-candidate {@code normalizedAt} snapshots
- * regardless of argument order (step 28).
+ * regardless of argument order.
  */
 class NormalizedCandidatePairReviewTest {
 

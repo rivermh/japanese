@@ -27,7 +27,7 @@ public final class NormalizedCandidatePairReviewModels {
     /**
      * Whether an existing {@code NormalizedCandidatePairReview} is still valid for the current
      * candidate/pair state. {@code NOT_REVIEWED} is a computed absence, not a stored row (JLPT-MAX
-     * Ticket 4C step 6).
+     * Ticket 4C).
      */
     public enum ReviewFreshness {
         NOT_REVIEWED, FRESH, STALE, ANALYSIS_NO_LONGER_PRESENT
@@ -82,7 +82,7 @@ public final class NormalizedCandidatePairReviewModels {
      * {@code NormalizedCandidateMatchEvidence.detail} (a reviewer-convenience excerpt that may be
      * truncated, per {@code NormalizedCandidateConflictAnalyzer}'s {@code EVIDENCE_EXCERPT_MAX_LENGTH})
      * so a Ticket 4C reviewer always has the option to check the real, untruncated candidate data
-     * rather than judging from evidence text alone (JLPT-MAX Ticket 4C step 23).
+     * rather than judging from evidence text alone (JLPT-MAX Ticket 4C).
      */
     public record CandidateFieldsView(
             Long candidateId,

@@ -30,7 +30,7 @@ import java.util.Objects;
  * once written, a history row is never modified, mirroring {@code ContentReviewHistory}/
  * {@code CurationReviewHistory}'s own immutable-audit-row convention (constructor + getters only, no
  * setters). Candidate refresh, reanalysis, or the pair itself later disappearing never deletes a
- * history row - see JLPT-MAX Ticket 4C step 16/40.
+ * history row (JLPT-MAX Ticket 4C).
  */
 @Entity
 @Table(name = "normalized_candidate_pair_review_history", indexes = {
