@@ -37,6 +37,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,6 +79,8 @@ class NormalizedCandidatePairReviewServiceTest {
     GrammarComparisonRepository grammarComparisons;
     @Autowired
     ImportedSourceRecordRepository importedSourceRecords;
+    @Autowired
+    JdbcClient jdbcClient;
 
     private String ref() {
         return "pair-review-test-" + UUID.randomUUID();
@@ -162,6 +165,80 @@ class NormalizedCandidatePairReviewServiceTest {
         assertThat(current.getVersion()).isEqualTo(versionAfterFirst);
         assertThat(current.getReviewedAt()).isEqualTo(reviewedAtAfterFirst);
         assertThat(historyRepository.findByCandidatePairOrderByReviewedAtAsc(leftId, rightId)).hasSize(1);
+        assertThat(reviewService.detail(NormalizedCandidateType.VOCABULARY, leftId, rightId)
+                .currentReview().freshness()).isEqualTo(ReviewFreshness.FRESH);
+    }
+
+    @Test
+    void e_staleSameDecisionAndNoteReaffirmsTheCurrentCandidateSnapshot() {
+        String ref = ref();
+        seedDuplicatePair(ref);
+        NormalizedCandidateMatchPair firstPair = onlyPair(ref);
+        Long leftId = firstPair.getLeftCandidate().getId();
+        Long rightId = firstPair.getRightCandidate().getId();
+        long leftNoteId = firstPair.getLeftCandidate().getSourceNoteId();
+        var leftDetail = firstPair.getLeftCandidate().getVocabularyDetail();
+
+        reviewService.submitDecision(NormalizedCandidateType.VOCABULARY,
+                submission(firstPair, HumanReviewDecision.SAME_CONTENT, null), admin("e1"));
+        NormalizedCandidatePairReview firstReview = reviewRepository
+                .findByLeftCandidateIdAndRightCandidateId(leftId, rightId).orElseThrow();
+        long firstVersion = firstReview.getVersion();
+
+        store.saveVocabulary(vocab(ref, leftNoteId, leftDetail.getEntryId(), leftDetail.getExpression(),
+                leftDetail.getReading(), leftDetail.getLevelCode(), "word (refreshed)"));
+        assertThat(reviewService.detail(NormalizedCandidateType.VOCABULARY, leftId, rightId)
+                .currentReview().freshness()).isEqualTo(ReviewFreshness.STALE);
+
+        analyzer.analyze(NormalizedCandidateType.VOCABULARY, ref);
+        NormalizedCandidateMatchPair refreshedPair = onlyPair(ref);
+        assertThat(reviewService.detail(NormalizedCandidateType.VOCABULARY, leftId, rightId)
+                .pairFreshness()).isEqualTo(PairFreshness.FRESH);
+
+        reviewService.submitDecision(NormalizedCandidateType.VOCABULARY,
+                submissionWithVersion(refreshedPair, HumanReviewDecision.SAME_CONTENT, null, firstVersion), admin("e2"));
+
+        NormalizedCandidatePairReview reaffirmed = reviewRepository
+                .findByLeftCandidateIdAndRightCandidateId(leftId, rightId).orElseThrow();
+        assertThat(reaffirmed.getVersion()).isEqualTo(firstVersion + 1);
+        assertThat(reaffirmed.getLeftNormalizedAtSnapshot())
+                .isEqualTo(refreshedPair.getLeftCandidate().getNormalizedAt());
+        assertThat(reaffirmed.getRightNormalizedAtSnapshot())
+                .isEqualTo(refreshedPair.getRightCandidate().getNormalizedAt());
+        assertThat(reaffirmed.getAssessmentSnapshot()).isEqualTo(refreshedPair.getAssessment());
+        assertThat(reviewService.detail(NormalizedCandidateType.VOCABULARY, leftId, rightId)
+                .currentReview().freshness()).isEqualTo(ReviewFreshness.FRESH);
+        var history = historyRepository.findByCandidatePairOrderByReviewedAtAsc(leftId, rightId);
+        assertThat(history).hasSize(2);
+        assertThat(history.get(1).getPreviousDecision()).isEqualTo(HumanReviewDecision.SAME_CONTENT);
+        assertThat(history.get(1).getNewDecision()).isEqualTo(HumanReviewDecision.SAME_CONTENT);
+    }
+
+    @Test
+    void noteLengthIsValidatedBeforeAnyReviewOrHistoryWrite() {
+        String ref = ref();
+        seedDuplicatePair(ref);
+        NormalizedCandidateMatchPair pair = onlyPair(ref);
+        Long leftId = pair.getLeftCandidate().getId();
+        Long rightId = pair.getRightCandidate().getId();
+
+        reviewService.submitDecision(NormalizedCandidateType.VOCABULARY,
+                submission(pair, HumanReviewDecision.SAME_CONTENT, "x".repeat(2000)), admin("note-ok"));
+        NormalizedCandidatePairReview accepted = reviewRepository
+                .findByLeftCandidateIdAndRightCandidateId(leftId, rightId).orElseThrow();
+        long acceptedVersion = accepted.getVersion();
+        Instant acceptedReviewedAt = accepted.getReviewedAt();
+
+        assertThatThrownBy(() -> reviewService.submitDecision(NormalizedCandidateType.VOCABULARY,
+                submissionWithVersion(pair, HumanReviewDecision.DISTINCT_CONTENT, "x".repeat(2001), acceptedVersion),
+                admin("note-too-long"))).isInstanceOf(IllegalArgumentException.class);
+
+        NormalizedCandidatePairReview unchanged = reviewRepository
+                .findByLeftCandidateIdAndRightCandidateId(leftId, rightId).orElseThrow();
+        assertThat(unchanged.getVersion()).isEqualTo(acceptedVersion);
+        assertThat(unchanged.getReviewedAt()).isEqualTo(acceptedReviewedAt);
+        assertThat(unchanged.getDecision()).isEqualTo(HumanReviewDecision.SAME_CONTENT);
+        assertThat(historyRepository.findByCandidatePairOrderByReviewedAtAsc(leftId, rightId)).hasSize(1);
     }
 
     @Test
@@ -173,7 +250,7 @@ class NormalizedCandidatePairReviewServiceTest {
                 new NormalizedContentCandidate(NormalizedCandidateType.VOCABULARY, orphanA.getSourceRef(), 2L, null,
                         com.japanese.content.entity.NormalizedCandidateQualityState.CLEAN, Instant.now()));
 
-        assertThatExceptionOfType(java.util.NoSuchElementException.class).isThrownBy(() ->
+        assertThatExceptionOfType(NormalizedCandidatePairReviewConflictException.class).isThrownBy(() ->
                 reviewService.submitDecision(NormalizedCandidateType.VOCABULARY,
                         new DecisionSubmission(orphanA.getId(), orphanB.getId(), HumanReviewDecision.SAME_CONTENT, null,
                                 Instant.now(), NormalizedCandidateMatchAssessment.POSSIBLE_DUPLICATE, null),
@@ -332,6 +409,27 @@ class NormalizedCandidatePairReviewServiceTest {
         assertThat(productionCounts()).isEqualTo(before);
     }
 
+    @Test
+    void reviewOperationsKeepEveryProductionTableCountUnchangedAtEachStep() {
+        String ref = ref();
+        seedDuplicatePair(ref);
+        NormalizedCandidateMatchPair pair = onlyPair(ref);
+        Map<String, Long> before = productionCounts();
+
+        reviewService.submitDecision(NormalizedCandidateType.VOCABULARY,
+                submission(pair, HumanReviewDecision.SAME_CONTENT, null), admin("isolation-first"));
+        assertThat(productionCounts()).isEqualTo(before);
+
+        reviewService.submitDecision(NormalizedCandidateType.VOCABULARY,
+                submissionWithVersion(pair, HumanReviewDecision.DISTINCT_CONTENT, null,
+                        currentVersion(pair.getLeftCandidate().getId(), pair.getRightCandidate().getId())),
+                admin("isolation-rereview"));
+        assertThat(productionCounts()).isEqualTo(before);
+
+        reviewService.reanalyze(NormalizedCandidateType.VOCABULARY, ref);
+        assertThat(productionCounts()).isEqualTo(before);
+    }
+
     // ===================================================================================
     // Helpers
     // ===================================================================================
@@ -339,6 +437,8 @@ class NormalizedCandidatePairReviewServiceTest {
     private Map<String, Long> productionCounts() {
         return Map.of(
                 "contentItems", contentItems.count(),
+                "words", jdbcClient.sql("select count(*) from words").query(Long.class).single(),
+                "grammars", jdbcClient.sql("select count(*) from grammars").query(Long.class).single(),
                 "grammarEnrichments", grammarEnrichments.count(),
                 "grammarRelations", grammarRelations.count(),
                 "grammarComparisons", grammarComparisons.count(),

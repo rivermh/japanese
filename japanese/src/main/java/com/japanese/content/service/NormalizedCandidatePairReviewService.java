@@ -57,6 +57,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class NormalizedCandidatePairReviewService {
 
     private static final int PAGE_SIZE = 25;
+    private static final int MAX_REVIEW_NOTE_LENGTH = 2000;
 
     private final NormalizedContentCandidateRepository candidateRepository;
     private final NormalizedCandidateMatchPairRepository pairRepository;
@@ -281,6 +282,7 @@ public class NormalizedCandidatePairReviewService {
     public CurrentReviewView submitDecision(NormalizedCandidateType candidateType, DecisionSubmission submission,
             UserAccount reviewer) {
         Objects.requireNonNull(reviewer, "reviewer is required");
+        validateReviewNote(submission.note());
         Long rawLeft = Objects.requireNonNull(submission.leftCandidateId(), "leftCandidateId is required");
         Long rawRight = Objects.requireNonNull(submission.rightCandidateId(), "rightCandidateId is required");
         if (rawLeft.equals(rawRight)) {
@@ -294,8 +296,8 @@ public class NormalizedCandidatePairReviewService {
         requireCanonicalSameScopePair(candidateType, left, right);
 
         NormalizedCandidateMatchPair currentPair = pairRepository.findByLeftCandidateIdAndRightCandidateId(leftId, rightId)
-                .orElseThrow(() -> new NoSuchElementException(
-                        "현재 분석된 pair가 없습니다 - 재분석이 필요할 수 있습니다."));
+                .orElseThrow(() -> new NormalizedCandidatePairReviewConflictException(
+                        "현재 분석된 pair가 없습니다. 새로고침 후 다시 시도하세요."));
 
         if (submission.expectedAssessment() != currentPair.getAssessment()
                 || submission.expectedPairGeneratedAt() == null
@@ -322,10 +324,9 @@ public class NormalizedCandidatePairReviewService {
                 throw new NormalizedCandidatePairReviewConflictException(
                         "다른 관리자가 이미 이 검토를 수정했습니다. 새로고침 후 다시 시도하세요.");
             }
-            // Resubmitting the exact same decision+note is a no-op - no history row, no field
-            // change - mirroring AdminContentReviewService's "already approved" idempotent
-            // short-circuit convention rather than inventing new semantics for this ticket.
-            noOp = existing.getDecision() == submission.decision() && Objects.equals(existing.getNote(), note);
+            noOp = existing.getDecision() == submission.decision()
+                    && Objects.equals(existing.getNote(), note)
+                    && reviewFreshness(existing, currentPair, left, right) == ReviewFreshness.FRESH;
             if (!noOp) {
                 existing.recordDecision(submission.decision(), reviewer, note, now, left.getNormalizedAt(),
                         right.getNormalizedAt(), currentPair.getAssessment());
@@ -374,6 +375,12 @@ public class NormalizedCandidatePairReviewService {
     private NormalizedContentCandidate requireCandidate(Long id) {
         return candidateRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("candidate를 찾을 수 없습니다: " + id));
+    }
+
+    private void validateReviewNote(String note) {
+        if (note != null && note.length() > MAX_REVIEW_NOTE_LENGTH) {
+            throw new IllegalArgumentException("Review note must be 2000 characters or fewer");
+        }
     }
 
     private void requireCanonicalSameScopePair(NormalizedCandidateType candidateType, NormalizedContentCandidate left,

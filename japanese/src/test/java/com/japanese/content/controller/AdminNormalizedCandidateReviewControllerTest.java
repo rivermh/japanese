@@ -21,6 +21,7 @@ import com.japanese.content.importer.NormalizedMeaning;
 import com.japanese.content.importer.VocabularyNormalizationResult;
 import com.japanese.content.repository.NormalizedCandidateMatchPairRepository;
 import com.japanese.content.repository.NormalizedCandidatePairReviewRepository;
+import com.japanese.content.repository.NormalizedCandidatePairReviewHistoryRepository;
 import com.japanese.content.service.NormalizedCandidateConflictAnalyzer;
 import com.japanese.content.service.NormalizedCandidateStore;
 import java.util.List;
@@ -59,6 +60,8 @@ class AdminNormalizedCandidateReviewControllerTest {
     NormalizedCandidateMatchPairRepository pairRepository;
     @Autowired
     NormalizedCandidatePairReviewRepository reviewRepository;
+    @Autowired
+    NormalizedCandidatePairReviewHistoryRepository historyRepository;
 
     UserAccount admin;
     String ref;
@@ -147,6 +150,28 @@ class AdminNormalizedCandidateReviewControllerTest {
                 .andExpect(flash().attributeExists("adminError"));
 
         assertThat(reviewRepository.findByLeftCandidateIdAndRightCandidateId(leftId, rightId)).isEmpty();
+    }
+
+    @Test
+    void submittingAnOldFormAfterItsPairDisappearsRedirectsWithAnErrorWithoutWritingAReview() throws Exception {
+        Long leftId = pair.getLeftCandidate().getId();
+        Long rightId = pair.getRightCandidate().getId();
+        String path = "/admin/normalized-candidates/reviews/VOCABULARY/" + leftId + "/" + rightId + "/decision";
+
+        store.saveVocabulary(vocab(ref, pair.getRightCandidate().getSourceNoteId(), "E9", "different", "different", "N3",
+                "different word"));
+        analyzer.analyze(NormalizedCandidateType.VOCABULARY, ref);
+        assertThat(pairRepository.findByLeftCandidateIdAndRightCandidateId(leftId, rightId)).isEmpty();
+
+        mvc.perform(post(path).param("decision", "SAME_CONTENT")
+                        .param("expectedPairGeneratedAt", pair.getGeneratedAt().toString())
+                        .param("expectedAssessment", pair.getAssessment().name())
+                        .with(user(admin.getLoginId()).roles("ADMIN")).with(csrf()))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(flash().attributeExists("adminError"));
+
+        assertThat(reviewRepository.findByLeftCandidateIdAndRightCandidateId(leftId, rightId)).isEmpty();
+        assertThat(historyRepository.findByCandidatePairOrderByReviewedAtAsc(leftId, rightId)).isEmpty();
     }
 
     @Test
