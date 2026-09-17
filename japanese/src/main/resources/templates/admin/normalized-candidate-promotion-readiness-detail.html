@@ -5,6 +5,8 @@
 <header th:replace="~{fragments/layout :: header('admin')}"></header>
 <main id="main-content" class="page-shell detail-shell admin-shell" th:with="r=${detail.result}, f=${detail.candidateFields}, mp=${detail.mappingPreview}">
   <a th:href="@{/admin/normalized-candidates/promotion-readiness(candidateType=${r.candidateType},sourceRef=${r.sourceRef})}">목록</a>
+  <p class="admin-message" th:if="${adminMessage}" th:text="${adminMessage}"></p>
+  <p class="admin-error" th:if="${adminError}" th:text="${adminError}"></p>
   <article class="admin-detail">
     <header>
       <div class="card-meta">
@@ -13,7 +15,15 @@
       </div>
       <h1 th:text="${'Candidate ' + r.candidateId}"></h1>
       <p class="subtle" th:text="${'sourceRef: ' + r.sourceRef + ' · sourceNoteId: ' + r.sourceNoteId}"></p>
-      <p class="subtle">읽기 전용 dry-run 결과입니다. 이 화면에서 production 승격/게시는 일어나지 않습니다.</p>
+      <p class="subtle">이 화면 자체는 여전히 읽기 전용 dry-run 결과입니다 (아래 목록/blocker/mapping preview는 어떤 production/private row도 변경하지 않습니다).
+        production 승격은 아래 "Vocabulary 승격" 버튼을 눌러야만 실행됩니다 (Ticket 4E-1, VOCABULARY만 가능, Grammar는 대상 아님).</p>
+      <form th:if="${r.candidateType.name() == 'VOCABULARY'}"
+            th:action="@{/admin/normalized-candidates/promotion-readiness/{type}/{id}/promote(type=${r.candidateType},id=${r.candidateId})}"
+            method="post">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+        <input type="hidden" name="expectedNormalizedAt" th:value="${f.normalizedAt}"/>
+        <button type="submit" th:disabled="${r.overallStatus.name() != 'READY_FOR_DRAFT_PROMOTION'}">Vocabulary 승격 (production DRAFT 생성)</button>
+      </form>
     </header>
 
     <section>

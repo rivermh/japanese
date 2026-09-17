@@ -754,7 +754,14 @@ public class NormalizedCandidatePromotionReadinessService {
         return new MappingPreview(null, preview);
     }
 
-    private static String pitchAccentPreview(NormalizedVocabularyCandidateDetail vocab) {
+    /**
+     * Package-private (not {@code private}) so {@code NormalizedVocabularyCandidatePromotionService}
+     * (Ticket 4E-1) can reuse this exact serialization when actually writing {@code Word.pitchAccent} -
+     * this is a pure, side-effect-free format helper (identical to {@code ApkgVocabularyImporter}'s own
+     * {@code "terminal=...;mora=..."} convention), not a promotion-readiness business rule, so sharing
+     * it is not the kind of readiness-policy duplication the Ticket 4E-1 contract above warns against.
+     */
+    static String pitchAccentPreview(NormalizedVocabularyCandidateDetail vocab) {
         if (vocab.getPitchAccentTerminalStates() == null || vocab.getPitchAccentMora() == null) {
             return null;
         }
