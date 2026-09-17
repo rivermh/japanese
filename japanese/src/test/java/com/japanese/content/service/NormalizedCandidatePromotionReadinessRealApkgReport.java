@@ -31,20 +31,33 @@ import org.springframework.test.context.DynamicPropertySource;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * JLPT-MAX Ticket 4D: opt-in verification tool (test/dev scope only) that runs the full real
- * chain - extract -&gt; normalize -&gt; {@link NormalizedCandidateStore} (4A) -&gt;
- * {@link NormalizedCandidateConflictAnalyzer} (4B) -&gt;
- * {@link NormalizedCandidatePromotionReadinessService} (this ticket) - against the actual v2.1.1
+ * JLPT-MAX Ticket 4D (real-APKG semantics re-measured for Ticket 4E-0): opt-in verification tool
+ * (test/dev scope only) that runs the full real chain - extract -&gt; normalize -&gt;
+ * {@link NormalizedCandidateStore} (4A) -&gt; {@link NormalizedCandidateConflictAnalyzer} (4B) -&gt;
+ * {@link NormalizedCandidatePromotionReadinessService} (4D/4E-0) - against the actual v2.1.1
  * JLPT-MAX deck and reports the real promotion-readiness breakdown. Not part of the production build
  * path. Runs only when {@code -Djapanese.actual-apkg=<path>} is explicitly supplied (opt-in, same
  * SHA-256-pinned gate as {@code NormalizedCandidateStoreRealApkgReport}/
  * {@code NormalizedCandidateConflictAnalyzerRealApkgReport}), in its own fresh isolated in-memory H2
  * database, and as its own separate Gradle invocation.
  *
+ * <p>{@code SOURCE_REF} is the exact canonical JLPT-MAX Vocabulary sourceRef literal ({@code
+ * ApkgVocabularyImporter.SOURCE_REF} / {@code NormalizedVocabularyMeaningLanguagePolicy}'s literal) -
+ * this real file's true, source-native identity, not a synthetic placeholder. Ticket 4D originally used
+ * a synthetic {@code "ticket4d-promotion-readiness"} ref here specifically to stay clear of {@code
+ * ContentSourceCatalog}'s canonical-source seeding; Ticket 4E-0 makes that avoidance actively
+ * misleading, since {@code NormalizedVocabularyMeaningLanguagePolicy} only ever resolves against this
+ * exact literal - measuring under any other sourceRef would make the Vocabulary meaning-language axis
+ * permanently unresolved against the real deck regardless of how the policy actually behaves for it.
+ *
  * <p>No Ticket 4C human decision is submitted here - this reports the real, currently-unreviewed
- * state of the actual deck. No {@code ContentSource} row is registered either (this ticket never
- * auto-registers or auto-allows the JLPT-MAX source), so every candidate is expected to show
- * {@code SOURCE_NOT_REGISTERED} - that is a correct, expected finding, not a defect.
+ * state of the actual deck. {@code ContentSourceCatalog} ("sample" profile, already active here) does
+ * seed a {@code ContentSource} row for this exact sourceRef at context startup, with {@code
+ * rightsStatus = UNKNOWN} - this test never calls {@code ContentSourceRightsService.reviewRights} or
+ * otherwise mutates it, so every candidate is expected to show {@code SOURCE_RIGHTS_MANUAL_REVIEW}
+ * (the source is registered, just not yet rights-cleared) rather than the old {@code
+ * SOURCE_NOT_REGISTERED} - that is a correct, expected finding, not a defect and not a rights-check
+ * weakening.
  */
 @SpringBootTest
 @ActiveProfiles("sample")
@@ -54,7 +67,8 @@ class NormalizedCandidatePromotionReadinessRealApkgReport {
             + ";MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1";
     private static final String EXPECTED_SHA_256 =
             "9d8be3ff6b23e11ef890a146dffec7ec4649de4bcbd491be439a11b991fd154d";
-    private static final String SOURCE_REF = "ticket4d-promotion-readiness";
+    /** Matches {@code ApkgVocabularyImporter.SOURCE_REF} / {@code NormalizedVocabularyMeaningLanguagePolicy}. */
+    private static final String SOURCE_REF = "JLPT-MAX-Deck-2.1.1.apkg";
 
     @DynamicPropertySource
     static void databaseProperties(DynamicPropertyRegistry registry) {
@@ -110,12 +124,14 @@ class NormalizedCandidatePromotionReadinessRealApkgReport {
         Path reportPath = Path.of("build", "reports", "jlpt-max-profiling", "promotion-readiness-actual.txt");
         Files.createDirectories(reportPath.getParent());
         try (PrintWriter out = new PrintWriter(Files.newBufferedWriter(reportPath, StandardCharsets.UTF_8))) {
-            out.println("JLPT-MAX Ticket 4D Actual Promotion Readiness Report (v2.1.1)");
+            out.println("JLPT-MAX Ticket 4D/4E-0 Actual Promotion Readiness Report (v2.1.1)");
             out.println("source file: " + source);
             out.println("source sha-256: " + EXPECTED_SHA_256);
-            out.println("NOTE: no ContentSource row is registered for this scope, so SOURCE_NOT_REGISTERED");
-            out.println("      is expected on every candidate - this ticket never auto-registers or");
-            out.println("      auto-allows the JLPT-MAX source's rights status.");
+            out.println("source ref: " + SOURCE_REF + " (canonical - matches ApkgVocabularyImporter.SOURCE_REF)");
+            out.println("NOTE: ContentSourceCatalog (\"sample\" profile) seeds this exact sourceRef's");
+            out.println("      ContentSource with rightsStatus=UNKNOWN at startup; this test never mutates");
+            out.println("      it, so SOURCE_RIGHTS_MANUAL_REVIEW is expected on every candidate - this");
+            out.println("      ticket never auto-clears the JLPT-MAX source's rights status.");
             out.println();
             printSummary("VOCABULARY", vocabulary, out);
             out.println();
@@ -125,15 +141,32 @@ class NormalizedCandidatePromotionReadinessRealApkgReport {
         System.out.println("TICKET4D_ACTUAL_VOCAB_SUMMARY " + vocabulary);
         System.out.println("TICKET4D_ACTUAL_GRAMMAR_SUMMARY " + grammar);
 
-        // Every real candidate today carries PRODUCTION_IDENTITY_POLICY_UNRESOLVED and
-        // SOURCE_NOT_REGISTERED unconditionally (this ticket never resolves either), so
-        // READY_FOR_DRAFT_PROMOTION is expected to be exactly zero against the real deck - a
-        // structural finding of this ticket, not a bug to fix by relaxing either policy.
+        // Ticket 4E-0 structurally changed this axis against the real deck (measured under this exact
+        // canonical sourceRef, not preserved from the old Ticket 4D synthetic-sourceRef numbers):
+        //  - identity is resolved for both real candidate types (ProductionContentSlugPolicy supports
+        //    VOCABULARY/GRAMMAR unconditionally) - PRODUCTION_IDENTITY_POLICY_UNRESOLVED no longer
+        //    appears on any real candidate.
+        //  - this is the exact canonical sourceRef, so NormalizedVocabularyMeaningLanguagePolicy
+        //    resolves "ko" for every real Vocabulary candidate - VOCABULARY_MEANING_LANGUAGE_POLICY_UNRESOLVED
+        //    no longer appears either.
+        //  - the source is registered (ContentSourceCatalog seeds it), just not rights-cleared
+        //    (rightsStatus stays UNKNOWN - this test never mutates it), so every candidate is blocked by
+        //    SOURCE_RIGHTS_MANUAL_REVIEW instead of the old SOURCE_NOT_REGISTERED.
+        //  - Grammar mapping remains unconditionally unresolved (Ticket 3B/4D's deliberate deferral,
+        //    untouched by 4E-0), so GRAMMAR_MAPPING_POLICY_UNRESOLVED still equals every Grammar candidate.
+        //  - READY_FOR_DRAFT_PROMOTION is therefore still zero against the real deck - not because
+        //    identity or Vocabulary meaning-language are unresolved (they are now resolved), but because
+        //    rights are never auto-cleared here and Grammar mapping is still unconditionally blocked.
         assertThat(vocabulary.readyForDraftPromotion()).isZero();
         assertThat(grammar.readyForDraftPromotion()).isZero();
-        assertThat(vocabulary.blockedByIssueCode().get("PRODUCTION_IDENTITY_POLICY_UNRESOLVED"))
+        assertThat(vocabulary.blockedByIssueCode().get("PRODUCTION_IDENTITY_POLICY_UNRESOLVED")).isZero();
+        assertThat(grammar.blockedByIssueCode().get("PRODUCTION_IDENTITY_POLICY_UNRESOLVED")).isZero();
+        assertThat(vocabulary.blockedByIssueCode().get("VOCABULARY_MEANING_LANGUAGE_POLICY_UNRESOLVED")).isZero();
+        assertThat(vocabulary.blockedByIssueCode().get("SOURCE_NOT_REGISTERED")).isZero();
+        assertThat(grammar.blockedByIssueCode().get("SOURCE_NOT_REGISTERED")).isZero();
+        assertThat(vocabulary.blockedByIssueCode().get("SOURCE_RIGHTS_MANUAL_REVIEW"))
                 .isEqualTo(vocabulary.totalCandidates());
-        assertThat(grammar.blockedByIssueCode().get("PRODUCTION_IDENTITY_POLICY_UNRESOLVED"))
+        assertThat(grammar.blockedByIssueCode().get("SOURCE_RIGHTS_MANUAL_REVIEW"))
                 .isEqualTo(grammar.totalCandidates());
         assertThat(grammar.blockedByIssueCode().get("GRAMMAR_MAPPING_POLICY_UNRESOLVED"))
                 .isEqualTo(grammar.totalCandidates());

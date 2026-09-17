@@ -92,6 +92,9 @@ class NormalizedCandidatePromotionReadinessServiceTest {
     @Autowired ContentReleaseBatchItemRepository releaseBatchItems;
     @Autowired JdbcClient jdbcClient;
 
+    /** Matches {@code ApkgVocabularyImporter.SOURCE_REF} / {@code NormalizedVocabularyMeaningLanguagePolicy}. */
+    private static final String CANONICAL_JLPT_MAX_SOURCE_REF = "JLPT-MAX-Deck-2.1.1.apkg";
+
     private String ref() {
         return "promotion-readiness-test-" + UUID.randomUUID();
     }
@@ -482,11 +485,13 @@ class NormalizedCandidatePromotionReadinessServiceTest {
     }
 
     // ===================================================================================
-    // X-Z: production identity/slug is never decided here
+    // X-Z: production identity/slug (Ticket 4E-0: ProductionContentSlugPolicy resolves this axis
+    // for both candidate types - it never merges/combines candidates into one identity, and never
+    // derives a slug from expression/reading/pattern; see ProductionContentSlugPolicyTest)
     // ===================================================================================
 
     @Test
-    void x_sameExpressionAndReadingCandidatesAreNeverAutoMergedIntoOneGlobalIdentity() {
+    void x_sameExpressionAndReadingCandidatesAreStillTwoIndependentlyResolvedIdentitiesNeverMerged() {
         String ref = ref();
         seedN5Level();
         store.saveVocabulary(vocab(ref, 1L, "E1", "語", "ご", "noun", "N5", "meaning"));
@@ -497,12 +502,16 @@ class NormalizedCandidatePromotionReadinessServiceTest {
         assertThat(all).hasSize(2);
         for (NormalizedContentCandidate c : all) {
             var result = readiness.detail(NormalizedCandidateType.VOCABULARY, c.getId()).result();
-            assertThat(codesOf(result)).contains(PromotionReadinessIssueCode.PRODUCTION_IDENTITY_POLICY_UNRESOLVED);
+            // The identity axis resolves per candidate type, not from expression/reading - it does not
+            // (and cannot) treat these two candidates as one, since it never inspects their fields.
+            assertThat(codesOf(result)).doesNotContain(PromotionReadinessIssueCode.PRODUCTION_IDENTITY_POLICY_UNRESOLVED);
+            assertThat(result.productionIdentityStatus())
+                    .isEqualTo(com.japanese.content.dto.PromotionReadinessModels.ProductionIdentityStatus.RESOLVED);
         }
     }
 
     @Test
-    void y_sameGrammarPatternCandidatesAreNeverCombinedIntoOneGlobalIdentity() {
+    void y_sameGrammarPatternCandidatesAreStillTwoIndependentlyResolvedIdentitiesNeverCombined() {
         String ref = ref();
         seedN5Level();
         store.saveGrammar(grammar(ref, 1L, "U1", "pattern", "connection", "N5"));
@@ -513,12 +522,14 @@ class NormalizedCandidatePromotionReadinessServiceTest {
         assertThat(all).hasSize(2);
         for (NormalizedContentCandidate c : all) {
             var result = readiness.detail(NormalizedCandidateType.GRAMMAR, c.getId()).result();
-            assertThat(codesOf(result)).contains(PromotionReadinessIssueCode.PRODUCTION_IDENTITY_POLICY_UNRESOLVED);
+            assertThat(codesOf(result)).doesNotContain(PromotionReadinessIssueCode.PRODUCTION_IDENTITY_POLICY_UNRESOLVED);
+            assertThat(result.productionIdentityStatus())
+                    .isEqualTo(com.japanese.content.dto.PromotionReadinessModels.ProductionIdentityStatus.RESOLVED);
         }
     }
 
     @Test
-    void z_productionIdentityIsAlwaysUnresolvedAndNeverReadyForDraftPromotionAsAResult() {
+    void z_productionIdentityResolvesForASupportedTypeRegardlessOfSourceRef() {
         String ref = ref();
         seedN5Level();
         store.saveVocabulary(vocab(ref, 1L, "E1", "語", "ご", "noun", "N5", "meaning"));
@@ -527,12 +538,66 @@ class NormalizedCandidatePromotionReadinessServiceTest {
 
         var result = readiness.detail(NormalizedCandidateType.VOCABULARY, candidate.getId()).result();
 
-        // Even with every other axis clean (CLEAN quality, no pairs, valid mapping, ALLOWED rights),
-        // production identity/slug policy is unresolved, so overall is never READY_FOR_DRAFT_PROMOTION.
+        // Identity resolution depends only on candidateType (VOCABULARY is supported), never on
+        // sourceRef - unlike VOCABULARY_MEANING_LANGUAGE_POLICY_UNRESOLVED below, which does.
         assertThat(result.productionIdentityStatus())
-                .isEqualTo(com.japanese.content.dto.PromotionReadinessModels.ProductionIdentityStatus.UNRESOLVED);
-        assertThat(codesOf(result)).contains(PromotionReadinessIssueCode.PRODUCTION_IDENTITY_POLICY_UNRESOLVED);
+                .isEqualTo(com.japanese.content.dto.PromotionReadinessModels.ProductionIdentityStatus.RESOLVED);
+        assertThat(codesOf(result)).doesNotContain(PromotionReadinessIssueCode.PRODUCTION_IDENTITY_POLICY_UNRESOLVED);
+        // ref() is not the canonical JLPT-MAX source, so this candidate is still BLOCKED overall -
+        // just no longer for an identity reason.
+        assertThat(codesOf(result)).contains(PromotionReadinessIssueCode.VOCABULARY_MEANING_LANGUAGE_POLICY_UNRESOLVED);
         assertThat(result.overallStatus()).isEqualTo(OverallStatus.BLOCKED);
+    }
+
+    // ===================================================================================
+    // Vocabulary meaning-language policy (Ticket 4E-0: NormalizedVocabularyMeaningLanguagePolicy)
+    // ===================================================================================
+
+    @Test
+    void unknownVocabularySourceIsBlockedByTheMeaningLanguagePolicy() {
+        String ref = ref();
+        seedN5Level();
+        store.saveVocabulary(vocab(ref, 1L, "E1", "語", "ご", "noun", "N5", "meaning"));
+        var result = readiness.detail(NormalizedCandidateType.VOCABULARY, onlyCandidate(ref).getId()).result();
+        assertThat(codesOf(result)).contains(PromotionReadinessIssueCode.VOCABULARY_MEANING_LANGUAGE_POLICY_UNRESOLVED);
+    }
+
+    @Test
+    void canonicalJlptMaxVocabularySourcePassesTheMeaningLanguageAxis() {
+        seedN5Level();
+        store.saveVocabulary(vocab(CANONICAL_JLPT_MAX_SOURCE_REF, 100001L, "E1", "語", "ご", "noun", "N5", "meaning"));
+        NormalizedContentCandidate candidate = onlyCandidate(CANONICAL_JLPT_MAX_SOURCE_REF);
+
+        var result = readiness.detail(NormalizedCandidateType.VOCABULARY, candidate.getId()).result();
+
+        assertThat(codesOf(result))
+                .doesNotContain(PromotionReadinessIssueCode.VOCABULARY_MEANING_LANGUAGE_POLICY_UNRESOLVED);
+    }
+
+    @Test
+    void grammarCandidatesNeverCarryTheVocabularyMeaningLanguageCode() {
+        String ref = ref();
+        seedN5Level();
+        store.saveGrammar(grammar(ref, 1L, "U1", "pattern", "connection", "N5"));
+        var result = readiness.detail(NormalizedCandidateType.GRAMMAR, onlyCandidate(ref).getId()).result();
+        assertThat(codesOf(result))
+                .doesNotContain(PromotionReadinessIssueCode.VOCABULARY_MEANING_LANGUAGE_POLICY_UNRESOLVED);
+    }
+
+    @Test
+    void aFullyCleanCanonicalSourceVocabularyCandidateIsNowReadyForDraftPromotion() {
+        seedN5Level();
+        store.saveVocabulary(vocab(CANONICAL_JLPT_MAX_SOURCE_REF, 100002L, "E2", "本", "ほん", "noun", "N5", "meaning"));
+        NormalizedContentCandidate candidate = onlyCandidate(CANONICAL_JLPT_MAX_SOURCE_REF);
+        registerAllowedCanonicalSource();
+
+        var result = readiness.detail(NormalizedCandidateType.VOCABULARY, candidate.getId()).result();
+
+        // As of Ticket 4E-0, a candidate with clean quality, no pairs, valid field mapping, a
+        // resolved meaning language, a mappable Level, ALLOWED rights, and a resolved identity axis
+        // has no remaining issues at all.
+        assertThat(result.issues()).isEmpty();
+        assertThat(result.overallStatus()).isEqualTo(OverallStatus.READY_FOR_DRAFT_PROMOTION);
     }
 
     // ===================================================================================
@@ -723,6 +788,33 @@ class NormalizedCandidatePromotionReadinessServiceTest {
         ContentSource source = contentSources.save(new ContentSource(ref, "test source", "1", null, null, null, null));
         source.reviewRights(ContentSourceRightsStatus.MANUAL_REVIEW_REQUIRED, "검토 시작", false, null);
         source.reviewRights(ContentSourceRightsStatus.ALLOWED, "허용", false, null);
+    }
+
+    /**
+     * {@code ContentSourceCatalog} ("sample"/"import-sample" profiles) already commits a
+     * {@code ContentSource(JLPT-MAX-Deck-2.1.1.apkg)} row (rightsStatus {@code UNKNOWN}) once at
+     * application startup, shared across this whole test JVM run - mirrors {@link #seedN5Level()}'s
+     * idempotent get-or-create for exactly the same reason.
+     *
+     * <p>This helper's precondition is that this canonical source ends this call {@code ALLOWED} -
+     * every caller relies on that to exercise the fully-clean/rights-cleared path. It only knows how to
+     * get there from {@code UNKNOWN} or {@code MANUAL_REVIEW_REQUIRED} (already {@code ALLOWED} is also
+     * fine - nothing to do); any other starting state (e.g. {@code BLOCKED}) is a fixture assumption
+     * this helper was not designed for, so it fails loudly instead of silently leaving the source
+     * un-cleared and letting the caller's assertions fail with a confusing, unrelated blocker.
+     */
+    private void registerAllowedCanonicalSource() {
+        ContentSource source = contentSources.findBySourceRef(CANONICAL_JLPT_MAX_SOURCE_REF).orElseThrow();
+        if (source.getRightsStatus() == ContentSourceRightsStatus.UNKNOWN) {
+            source.reviewRights(ContentSourceRightsStatus.MANUAL_REVIEW_REQUIRED, "검토 시작", false, null);
+        }
+        if (source.getRightsStatus() == ContentSourceRightsStatus.MANUAL_REVIEW_REQUIRED) {
+            source.reviewRights(ContentSourceRightsStatus.ALLOWED, "허용", false, null);
+        }
+        assertThat(source.getRightsStatus())
+                .as("registerAllowedCanonicalSource()는 UNKNOWN/MANUAL_REVIEW_REQUIRED/ALLOWED 초기 상태만 지원합니다 - "
+                        + "실제 초기 상태(%s)는 이 fixture가 설계된 전제를 벗어납니다.", source.getRightsStatus())
+                .isEqualTo(ContentSourceRightsStatus.ALLOWED);
     }
 
     private NormalizedContentCandidate onlyCandidate(String ref) {

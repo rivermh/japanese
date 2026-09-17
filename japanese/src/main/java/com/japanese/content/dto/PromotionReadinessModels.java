@@ -44,7 +44,8 @@ public final class PromotionReadinessModels {
 
     /**
      * Whether this codebase has a ratified production {@code ContentItem.slug}/global-identity
-     * policy for candidates. Only {@link #UNRESOLVED} is ever produced today - see
+     * policy for this candidate's type. As of Ticket 4E-0, {@code ProductionContentSlugPolicy}
+     * resolves this for both {@code VOCABULARY} and {@code GRAMMAR} - see
      * {@link PromotionReadinessIssueCode#PRODUCTION_IDENTITY_POLICY_UNRESOLVED}.
      */
     public enum ProductionIdentityStatus {

@@ -2,9 +2,11 @@ package com.japanese.content.repository;
 
 import com.japanese.content.entity.NormalizedCandidateType;
 import com.japanese.content.entity.NormalizedContentCandidate;
+import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -32,4 +34,15 @@ public interface NormalizedContentCandidateRepository extends JpaRepository<Norm
             + "where c.candidateType = :candidateType and (:sourceRef is null or c.sourceRef = :sourceRef)")
     List<NormalizedContentCandidate> findByCandidateTypeAndSourceRefWithDetailForReadiness(
             @Param("candidateType") NormalizedCandidateType candidateType, @Param("sourceRef") String sourceRef);
+
+    /**
+     * JLPT-MAX Ticket 4E-0: promotion-time {@code PESSIMISTIC_WRITE} row lock, serializing two admins
+     * who concurrently attempt to promote the same candidate. Only a future promotion write
+     * transaction (Ticket 4E-1) is meant to call this - every read-only readiness query above
+     * deliberately never does.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from NormalizedContentCandidate c where c.id = :id and c.candidateType = :candidateType")
+    Optional<NormalizedContentCandidate> findByIdAndCandidateTypeForPromotion(
+            @Param("id") Long id, @Param("candidateType") NormalizedCandidateType candidateType);
 }

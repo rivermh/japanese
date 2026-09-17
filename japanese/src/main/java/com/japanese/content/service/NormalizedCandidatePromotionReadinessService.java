@@ -26,6 +26,7 @@ import static com.japanese.content.service.PromotionReadinessIssueCode.VOCAB_PAR
 import static com.japanese.content.service.PromotionReadinessIssueCode.VOCAB_PITCH_ACCENT_TOO_LONG;
 import static com.japanese.content.service.PromotionReadinessIssueCode.VOCAB_READING_MISSING;
 import static com.japanese.content.service.PromotionReadinessIssueCode.VOCAB_READING_TOO_LONG;
+import static com.japanese.content.service.PromotionReadinessIssueCode.VOCABULARY_MEANING_LANGUAGE_POLICY_UNRESOLVED;
 
 import com.japanese.content.dto.NormalizedCandidatePairReviewModels.CandidateFieldsView;
 import com.japanese.content.dto.NormalizedCandidatePairReviewModels.ConfusablePatternView;
@@ -97,23 +98,24 @@ import org.springframework.transaction.annotation.Transactional;
  * <p><b>Absolute boundary (never done here, never will be by this class)</b>: no
  * {@code ContentItem}/{@code Word}/{@code Grammar}/{@code Meaning}/{@code Example} is ever created or
  * updated; {@code ImportedSourceRecord.linkContentItem} is never called; no candidate is merged,
- * deleted, or chosen as a canonical winner; no production {@code ContentItem.slug}/global identity is
- * ever decided; {@code ContentSource.rightsStatus} is never changed; nothing here is
- * {@code @Transactional} without {@code readOnly = true}. Recording a Ticket 4C
+ * deleted, or chosen as a canonical winner; {@code ContentSource.rightsStatus} is never changed;
+ * nothing here is {@code @Transactional} without {@code readOnly = true}. {@code ProductionContentSlugPolicy}
+ * (Ticket 4E-0) is consulted only via its side-effect-free {@code supports(...)} check - its
+ * {@code generateSlug(...)} is never called here, so no candidate is ever assigned a production slug
+ * by this class, and repeated readiness calls never mint a new identity. Recording a Ticket 4C
  * {@link HumanReviewDecision#SAME_CONTENT} decision is a statement about a <em>pair</em>, not a
  * canonical-winner selection - a candidate on either side of a fresh {@code SAME_CONTENT} pair is
  * therefore still never promotion-ready on its own (see
  * {@link PromotionReadinessIssueCode#SAME_CONTENT_CANONICAL_SELECTION_REQUIRED}).
  *
- * <p><b>Why every real candidate is blocked today</b>: {@link PromotionReadinessIssueCode#PRODUCTION_IDENTITY_POLICY_UNRESOLVED}
- * is added to every single candidate unconditionally, because this codebase has no ratified policy
- * for deriving a production {@code ContentItem.slug}/global identity from a private candidate
- * (source-native {@code EntryID}/{@code UnitID}, {@code sourceNoteId}, and normalized
- * expression+reading/pattern are all deliberately kept distinct from global production identity
- * throughout Tickets 4A-4C). A near-zero (or zero)
+ * <p><b>Production identity/slug (Ticket 4E-0)</b>: {@link PromotionReadinessIssueCode#PRODUCTION_IDENTITY_POLICY_UNRESOLVED}
+ * is added only when {@code ProductionContentSlugPolicy.supports(candidate.getCandidateType())} is
+ * {@code false} - as of this ticket that policy supports both {@code VOCABULARY} and {@code GRAMMAR},
+ * so this axis is resolved for every real candidate today. What remains unconditional (Grammar
+ * mapping) or source-conditional (Vocabulary meaning language, see below) still keeps
  * {@link com.japanese.content.dto.PromotionReadinessModels.OverallStatus#READY_FOR_DRAFT_PROMOTION}
- * count against the real v2.1.1 deck is therefore an expected finding of this ticket, not a defect -
- * see the Ticket 4D report for the actual measured numbers.
+ * rare against the real v2.1.1 deck - see the Ticket 4D report for the pre-4E-0 measured numbers and
+ * the Ticket 4E-0 report for what changed.
  *
  * <p><b>Grammar mapping is deliberately conservative</b>: production {@code Grammar.explanation} is
  * {@code NOT NULL}, but no normalized Grammar candidate field ({@code meaningGloss}/{@code nuance}/
@@ -129,12 +131,13 @@ import org.springframework.transaction.annotation.Transactional;
  * (verbatim {@code AnkiFieldTextNormalizer.text(...)} copies, exactly like the sole existing
  * production {@code Word} writer, {@code ApkgVocabularyImporter}), {@code pitchAccent} (the
  * {@code "terminal="+terminalStates+";mora="+mora} serialization is that same importer's sole existing
- * {@code Word.pitchAccent} write format), {@code meanings} (Korean-language {@code Meaning} rows,
- * matching that importer's sole existing {@code Meaning} write path), and vocabulary
- * {@code examples} (the normalized examples are parsed by the very same {@code ExampleHtmlParser} the
- * production importer uses, so the mapping is lossless by construction) - each still individually
- * blocked by {@link PromotionReadinessIssueCode} when a value would not actually fit the target
- * production column, never silently truncated.
+ * {@code Word.pitchAccent} write format), and vocabulary {@code examples} (the normalized examples are
+ * parsed by the very same {@code ExampleHtmlParser} the production importer uses, so the mapping is
+ * lossless by construction) - each still individually blocked by {@link PromotionReadinessIssueCode}
+ * when a value would not actually fit the target production column, never silently truncated.
+ * {@code meanings} additionally require {@code NormalizedVocabularyMeaningLanguagePolicy} to resolve a
+ * production {@code Meaning.languageTag} for the candidate's {@code sourceRef} (Ticket 4E-0) - see
+ * {@link PromotionReadinessIssueCode#VOCABULARY_MEANING_LANGUAGE_POLICY_UNRESOLVED}.
  *
  * <p><b>Existing production provenance</b> is detected via {@code ImportedSourceRecord}'s
  * {@code (sourceRef, noteType, sourceNoteId)} identity, where {@code noteType} is derived from
@@ -150,6 +153,25 @@ import org.springframework.transaction.annotation.Transactional;
  * examples by candidate id, current Ticket 4B pairs by scope, Ticket 4C reviews by scope, JLPT
  * {@code Level} rows, source rights per distinct {@code sourceRef}, existing-provenance per distinct
  * {@code sourceRef}) - never one query per candidate, regardless of candidate count.
+ *
+ * <p><b>Ticket 4E-1's intended promotion transaction contract</b> (not implemented by this ticket -
+ * this class remains 100% read-only; recorded here as the contract a future write service must
+ * follow, using the {@code PESSIMISTIC_WRITE} lock primitives this ticket adds to
+ * {@code NormalizedContentCandidateRepository}/{@code ImportedSourceRecordRepository}):
+ * <ol>
+ *   <li>Lock the candidate row ({@code findByIdAndCandidateTypeForPromotion}).</li>
+ *   <li>Re-verify candidate/type/source identity against the locked row.</li>
+ *   <li>Recompute readiness inside this same transaction (never trust a stale GET-time result).</li>
+ *   <li>If an {@code ImportedSourceRecord} already exists for this identity, lock that row too
+ *       ({@code findBySourceRefAndNoteTypeAndSourceNoteIdForPromotion}); a race where no row exists
+ *       yet is instead guarded by the candidate lock plus the existing
+ *       {@code uk_imported_source_record} unique constraint plus this whole transaction rolling back
+ *       together on conflict - a bare row lock cannot protect a row that does not exist yet.</li>
+ *   <li>Re-check {@link PromotionReadinessIssueCode#ALREADY_PROMOTED} against the (now-locked) state.</li>
+ *   <li>Only then create the production entity/entities.</li>
+ *   <li>Link provenance in the same transaction.</li>
+ *   <li>Commit - or roll back the whole transaction on any failure, leaving no partial production row.</li>
+ * </ol>
  */
 @Service
 public class NormalizedCandidatePromotionReadinessService {
@@ -176,6 +198,8 @@ public class NormalizedCandidatePromotionReadinessService {
     private final ImportedSourceRecordRepository importedSourceRecordRepository;
     private final LevelRepository levelRepository;
     private final ContentSourceRightsService sourceRights;
+    private final ProductionContentSlugPolicy slugPolicy;
+    private final NormalizedVocabularyMeaningLanguagePolicy meaningLanguagePolicy;
     private final EntityManager entityManager;
 
     public NormalizedCandidatePromotionReadinessService(
@@ -185,6 +209,8 @@ public class NormalizedCandidatePromotionReadinessService {
             ImportedSourceRecordRepository importedSourceRecordRepository,
             LevelRepository levelRepository,
             ContentSourceRightsService sourceRights,
+            ProductionContentSlugPolicy slugPolicy,
+            NormalizedVocabularyMeaningLanguagePolicy meaningLanguagePolicy,
             EntityManager entityManager) {
         this.candidateRepository = candidateRepository;
         this.pairRepository = pairRepository;
@@ -192,6 +218,8 @@ public class NormalizedCandidatePromotionReadinessService {
         this.importedSourceRecordRepository = importedSourceRecordRepository;
         this.levelRepository = levelRepository;
         this.sourceRights = sourceRights;
+        this.slugPolicy = slugPolicy;
+        this.meaningLanguagePolicy = meaningLanguagePolicy;
         this.entityManager = entityManager;
     }
 
@@ -452,6 +480,11 @@ public class NormalizedCandidatePromotionReadinessService {
         // C. production mapping compatibility (field-level + JLPT level)
         if (candidate.getCandidateType() == NormalizedCandidateType.VOCABULARY) {
             evaluateVocabularyMapping(candidate.getVocabularyDetail(), meanings, examples, issuesByCode);
+            // C2. Vocabulary meaning-language policy (Ticket 4E-0) - VOCABULARY only, see class javadoc.
+            if (meaningLanguagePolicy.resolveLanguageTag(candidate.getSourceRef()).isEmpty()) {
+                addIssue(issuesByCode, VOCABULARY_MEANING_LANGUAGE_POLICY_UNRESOLVED,
+                        "이 candidate의 sourceRef에 대해 production Meaning.languageTag를 결정할 ratified 정책이 없습니다.");
+            }
         } else {
             evaluateGrammarMapping(candidate.getGrammarDetail(), issuesByCode);
         }
@@ -488,9 +521,13 @@ public class NormalizedCandidatePromotionReadinessService {
             }
         }
 
-        // F. unresolved production identity/slug policy - unconditional, see class javadoc.
-        addIssue(issuesByCode, PRODUCTION_IDENTITY_POLICY_UNRESOLVED,
-                "candidate로부터 production ContentItem의 전역 slug/identity를 도출하는 정책이 아직 없습니다.");
+        // F. production identity/slug policy (Ticket 4E-0) - resolved once ProductionContentSlugPolicy
+        // supports this candidate's type; never depends on sourceRef or any other candidate field.
+        boolean identityResolved = slugPolicy.supports(candidate.getCandidateType());
+        if (!identityResolved) {
+            addIssue(issuesByCode, PRODUCTION_IDENTITY_POLICY_UNRESOLVED,
+                    "candidate로부터 production ContentItem의 전역 slug/identity를 도출하는 정책이 아직 없습니다.");
+        }
 
         // E. existing production provenance/link
         ExistingProductionLinkStatus linkStatus = alreadyPromoted
@@ -519,7 +556,8 @@ public class NormalizedCandidatePromotionReadinessService {
 
         return new PromotionReadinessResult(candidate.getId(), candidate.getCandidateType(), candidate.getSourceRef(),
                 candidate.getSourceNoteId(), shortPreview(candidate), candidate.getQualityState(),
-                pairResolutionStatus, mappingStatus, rightsStatus, ProductionIdentityStatus.UNRESOLVED,
+                pairResolutionStatus, mappingStatus, rightsStatus,
+                identityResolved ? ProductionIdentityStatus.RESOLVED : ProductionIdentityStatus.UNRESOLVED,
                 linkStatus, overall, issues);
     }
 
@@ -527,7 +565,8 @@ public class NormalizedCandidatePromotionReadinessService {
         return switch (code) {
             case VOCAB_EXPRESSION_MISSING, VOCAB_EXPRESSION_TOO_LONG, VOCAB_READING_MISSING, VOCAB_READING_TOO_LONG,
                     VOCAB_PART_OF_SPEECH_TOO_LONG, VOCAB_PITCH_ACCENT_TOO_LONG, VOCAB_MEANING_MISSING,
-                    VOCAB_MEANING_TOO_LONG, VOCAB_EXAMPLE_TEXT_TOO_LONG, GRAMMAR_PATTERN_MISSING,
+                    VOCAB_MEANING_TOO_LONG, VOCABULARY_MEANING_LANGUAGE_POLICY_UNRESOLVED,
+                    VOCAB_EXAMPLE_TEXT_TOO_LONG, GRAMMAR_PATTERN_MISSING,
                     GRAMMAR_PATTERN_TOO_LONG, GRAMMAR_CONNECTION_TOO_LONG, GRAMMAR_MAPPING_POLICY_UNRESOLVED,
                     JLPT_LEVEL_UNMAPPABLE -> true;
             default -> false;

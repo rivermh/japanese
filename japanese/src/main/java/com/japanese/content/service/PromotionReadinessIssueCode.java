@@ -60,6 +60,16 @@ public enum PromotionReadinessIssueCode {
 
     VOCAB_MEANING_MISSING,
     VOCAB_MEANING_TOO_LONG,
+
+    /**
+     * {@code NormalizedVocabularyMeaningLanguagePolicy} could not resolve a production
+     * {@code Meaning.languageTag} for this candidate's {@code sourceRef} - either the source is not
+     * the one canonical JLPT-MAX Vocabulary source this codebase has a ratified {@code "ko"} policy
+     * for, or it is unrecognized entirely. Never defaulted to {@code "ko"}. Grammar candidates never
+     * carry this code (Grammar has no {@code Meaning}).
+     */
+    VOCABULARY_MEANING_LANGUAGE_POLICY_UNRESOLVED,
+
     VOCAB_EXAMPLE_TEXT_TOO_LONG,
 
     GRAMMAR_PATTERN_MISSING,
@@ -99,10 +109,12 @@ public enum PromotionReadinessIssueCode {
     SOURCE_RIGHTS_MANUAL_REVIEW,
 
     /**
-     * There is no ratified policy in this codebase for deriving a production {@code ContentItem.slug}
-     * / global identity from a private candidate. Every candidate carries this code today, by design
-     * - see {@link NormalizedCandidatePromotionReadinessService}'s class javadoc. Never resolved by
-     * this ticket.
+     * There is no ratified policy for deriving a production {@code ContentItem.slug}/global identity
+     * for this candidate's type. As of Ticket 4E-0, {@code ProductionContentSlugPolicy} resolves this
+     * for both {@code VOCABULARY} and {@code GRAMMAR} (a source-independent opaque
+     * {@code <prefix>-UUID} slug - see that class's javadoc), so this code is not expected to appear
+     * for either candidate type today; it remains here only for a future candidate type this policy
+     * does not yet support.
      */
     PRODUCTION_IDENTITY_POLICY_UNRESOLVED,
 
