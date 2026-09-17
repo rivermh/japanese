@@ -537,3 +537,127 @@
   `nuance`/`confusablePatterns`를 이 도메인들에 자동 매핑하지 않았다(이름이 비슷하다는
   이유만으로 curated/reviewed 도메인에 편입시키지 않음). migration/schema/production
   data 변경 없음. commit은 이 로그 항목과 함께 별도로 수행한다.
+
+## 2026-09-17  JLPT-MAX Ticket 4A — Normalized Content Candidate 영속화 계층
+
+- 작업 목적: 순수 in-memory `VocabularyNormalizationResult`/`GrammarNormalizationResult`
+  (Ticket 2/3B-1, 이번 Ticket에서 미수정)와 아직 구현되지 않은 dedup(4B)/review(4C)/
+  promotion 단계 사이에, 독립적으로 영속화되는 private candidate snapshot 계층을
+  추가했다. raw staging(`private_apkg_notes`) / 순수 normalization 결과 / 이번
+  Ticket의 candidate 스냅샷 / production(`ContentItem`/`Word`/`Grammar`) 4개 계층을
+  섞지 않았고, `ImportedSourceRecord`(production-`ContentItem` 연결 가능 구조)는
+  재사용하지 않았다.
+- **신규 엔티티**(`com.japanese.content.entity`, 8개 + enum 2개): `NormalizedContentCandidate`
+  (envelope: candidateType/sourceRef/sourceNoteId/sourceIdentityKey/qualityState/
+  normalizedAt), `NormalizedCandidateType`(VOCABULARY, GRAMMAR — 향후 도메인 확장을
+  전제로 하되 오늘 필요한 2종만), `NormalizedCandidateQualityState`(FATAL >
+  REVIEW_REQUIRED > INFORMATIONAL > CLEAN, worst-wins, `validForPromotion`/
+  `hasNoFatalIssues`를 approval 상태로 재라벨링하지 않음), `NormalizedCandidateWarning`/
+  `NormalizedCandidateExtraField`(두 타입이 공유하는 자식 테이블), Vocabulary 전용
+  `NormalizedVocabularyCandidateDetail`/`...Meaning`/`...Example`, Grammar 전용
+  `NormalizedGrammarCandidateDetail`/`...ConfusablePattern`. JSON blob이 아닌 구조적
+  relational 자식 테이블로 warnings/meanings/examples/confusablePatterns/extras를
+  저장했다(추후 4B/4C에서 쿼리 가능하도록).
+- **identity 설계**: `(source_ref, source_note_id, candidate_type)`가 정확히 하나의
+  현재 스냅샷을 나타내는 unique 제약이다. `source_identity_key`(Vocabulary의 EntryID,
+  Grammar의 UnitID)는 **unique 제약을 의도적으로 부여하지 않았다** — dedup은 Ticket
+  4B의 몫이다. raw staging과의 연결은 논리적 참조만 사용했다(`source_ref`+
+  `source_note_id`, FK 없음) — `private_apkg_notes`는 이 코드베이스 전체에서 JDBC 전용
+  raw 테이블로 취급되고 JPA 엔티티가 존재하지 않아, 이 테이블만을 위한 첫 JPA 엔티티를
+  새로 만들지 않기로 했고, candidate가 staging row와 강한 cascade-delete로 묶이지
+  않도록 하기 위함이다.
+- **FATAL 영속화**: 모든 semantic 컬럼을 nullable로 설계해 FATAL candidate(예:
+  EntryID/Word/Reading 전부 누락)도 그대로 저장된다 — 필터링하거나 드롭하지 않는다.
+  실제 APKG 검증에서 Vocabulary FATAL 1건이 정확히 저장됨을 확인했다(아래 참고).
+- **Migration**: `V6__add_normalized_content_candidates.sql`(H2/MySQL 동일 의미,
+  V1-V5 무수정)로 8개 테이블을 추가했다:
+  `normalized_content_candidates`, `normalized_candidate_warnings`,
+  `normalized_candidate_extra_fields`, `normalized_vocabulary_candidates`,
+  `normalized_vocabulary_candidate_meanings`, `normalized_vocabulary_candidate_examples`,
+  `normalized_grammar_candidates`, `normalized_grammar_candidate_confusable_patterns`.
+  `FlywayMigrationTest`에 V6 fresh-DB/V5→V6 upgrade/MySQL-additive 테스트를 추가하고,
+  기존 migrationsExecuted 기대값(V1-V5 → V1-V6)을 갱신했다.
+- **`NormalizedCandidateStore`**(`com.japanese.content.service`): `saveVocabulary`/
+  `saveGrammar` 두 메서드로 Result → entity 매핑을 결정적으로 수행한다. 파서는
+  전혀 수정하지 않았고, sourceRef/sourceNoteId는 오직 Result 자체에서만 가져온다.
+  재저장(refresh) 시에는 기존 envelope을 찾아 자식 테이블들을 **즉시 실행되는 벌크
+  JPQL delete**로 먼저 제거하고(`entityManager.createQuery("delete from ... where
+  candidate.id = :id")`), `flush()+clear()`로 stale 1차 캐시를 비운 뒤 candidate를
+  다시 로드해 새 자식들을 채운다 — 처음에는 엔티티 컬렉션의 `clear()` + `orphanRemoval`
+  방식으로 구현했으나, 두 번째 저장 시 새 행의 INSERT가 기존 행의 DELETE보다 먼저
+  flush되어 `(candidate_id, order)` unique 제약을 위반하는 실패를 실제로 재현했고
+  (`doubleSaveOfIdenticalResultDoesNotDuplicate`/`refreshReplacesSnapshotWithoutStaleChildRows`
+  테스트가 최초 구현에서 실패), 벌크 delete + flush/clear 방식으로 교체해 해결했다.
+  전체 저장은 하나의 `@Transactional` 메서드 안에서 원자적으로 수행된다.
+- **Production isolation**: `saveVocabulary`/`saveGrammar`는 `ContentItem`/`Word`/
+  `Grammar`/`GrammarEnrichment`/`GrammarRelation`/`GrammarComparison`을 생성·수정·
+  참조하지 않고 `ImportedSourceRecord.linkContentItem`도 호출하지 않는다.
+  `savingCandidatesNeverChangesProductionOrImportedSourceRowCounts` 테스트로 각
+  repository의 count가 저장 전후 불변임을 확인했다.
+- **테스트**(`NormalizedCandidateStoreTest`, `NormalizedCandidateStoreAtomicityTest`):
+  clean/FATAL Vocabulary·Grammar 저장-조회 lossless 검증(meanings/examples/
+  confusablePatterns/frontExample 순서 보존 포함), EntryID/UnitID가 unique하지
+  않음(같은 키로 다른 note 2건 저장 성공), 동일 결과 두 번 저장 시 중복 없음, refresh 시
+  stale child row 없음(직접 SQL count로 검증), production/ImportedSourceRecord row
+  count 불변. Atomicity 테스트는 class-level `@Transactional`을 의도적으로 붙이지
+  않고(테스트 트랜잭션 rollback에 편승하면 실제 원자성을 검증하지 못하므로) confusable
+  pattern 2건에 동일 displayOrder를 주어 unique 제약 위반을 유도한 뒤, 예외 발생과
+  envelope row 전체 rollback(0건)을 직접 SQL로 확인했다.
+- **actual APKG 검증**(opt-in, `NormalizedCandidateStoreRealApkgReport`, 전체 test
+  suite와 별도 Gradle 실행으로 OOM 회피): SHA-256 `9d8be3ff6b23e11ef890a146dffec7ec4649de4bcbd491be439a11b991fd154d`
+  재확인 후 VOCABULARY 9,160건(FATAL 1건 포함) + GRAMMAR 1,078건 = 총 10,238건 전수
+  parse+save 성공, `repository.findByCandidateType(...)` count가 각각 저장 건수와
+  정확히 일치함을 확인했다(FATAL 1건이 스킵되지 않고 저장됐음을 직접 검증).
+- 검증: `NormalizedCandidateStoreTest` 8건 + `NormalizedCandidateStoreAtomicityTest`
+  2건 전부 pass. 전체 `./gradlew test` 280 tests, 0 failures, 0 errors, 8 skipped
+  (opt-in 7건 + 이번 Ticket opt-in 1건). `git diff --check`/`git diff --no-index --check`
+  통과.
+- dedup/conflict resolution, human review, promotion, production `Grammar`/`Word`
+  매핑, source rights/publication 변경, Release Gate 변경, COMPREHENSIVE parser,
+  Practice/Question 도메인, Admin UI, public API/컨트롤러/Thymeleaf 노출, 검색
+  인덱싱은 전부 이번 Ticket 범위 밖이다.
+
+### 2026-09-17 Ticket 4A commit 전 최종 리뷰(uncommitted 상태에서 진행)
+
+- **HEAD SHA 오타 확인**: baseline HEAD는 `eeeacdb41763063c38a04794bd11830e81665475`
+  이다(리뷰 시작 시 `git rev-parse HEAD`로 재확인). 이전 턴에서 채팅으로 전달한
+  보고서 텍스트 파일(repo 밖, `/tmp` scratch 파일)에 `...bd11838e...`로 한 글자
+  오타가 있었으나, repo 내 어떤 파일에도(이 로그 포함) 해당 SHA가 기록된 적이
+  없음을 `grep`으로 확인했다 — 코드/history 수정 없음, repo 문서 수정도 불필요했다.
+- **Word/Grammar production isolation 누락 보완**: 기존
+  `savingCandidatesNeverChangesProductionOrImportedSourceRowCounts` 테스트는
+  ContentItem/GrammarEnrichment/GrammarRelation/GrammarComparison/
+  ImportedSourceRecord count만 확인하고 있었다(Word/Grammar는 전용 Repository가
+  없어 누락돼 있었음). `words`/`grammars` 테이블에 대한 직접 `JdbcClient` count
+  비교를 추가해 저장 전후 두 테이블도 불변임을 확인하도록 최소 수정했다.
+- **refresh 실패 rollback 테스트 추가**: 기존 atomicity 테스트는 신규 candidate
+  최초 저장 실패만 검증하고 있었다. 기존 스냅샷이 있는 상태에서 refresh(bulk
+  delete → flush → clear → reload → 새 child insert) 도중 constraint violation이
+  나는 경우를 별도로 검증하는
+  `aFailedRefreshRollsBackAndPreservesThePreviousSnapshot` 테스트를 추가했다:
+  정상 Grammar candidate 저장 → 동일 identity로 confusablePattern 2건에 동일
+  displayOrder를 준 refresh 시도 → `DataIntegrityViolationException` 확인 →
+  envelope/detail/confusablePattern/warning/extraField가 전부 refresh 이전
+  값 그대로 유지됨을(신규 detached-lazy-collection 문제를 피하기 위해 직접 SQL로)
+  확인했다. 실패한 새 스냅샷의 흔적은 전혀 남지 않았다.
+- **QualityState ordinal 의존성 제거**: `NormalizedCandidateQualityState.worstOf`가
+  `Comparator.naturalOrder()`(= enum 선언 순서/ordinal)에 의존하고 있어, 상수
+  선언 순서를 실수로 바꾸면 worst-wins 의미가 조용히 달라질 수 있는 구조였다.
+  각 상수에 명시적 `severityRank`(FATAL=0, REVIEW_REQUIRED=1, INFORMATIONAL=2,
+  CLEAN=3) 정수 필드를 추가하고 `worstOf`가 이 값으로 비교하도록 최소 수정했다
+  (별도 mapping 클래스/과도한 추상화 없이 enum 내부 필드만 추가). 신규
+  `NormalizedCandidateQualityStateTest`(7건: 무경고→CLEAN, INFO단독,
+  REVIEW_REQUIRED단독, FATAL단독, INFO+REVIEW_REQUIRED, REVIEW_REQUIRED+FATAL,
+  INFO+FATAL)로 조합별 worst-wins 결과를 고정했다.
+- **보고서 숫자 정정**: 채팅으로 전달했던 보고서의 "`NormalizedCandidateStoreTest`
+  9건"은 실제로는 8건이었고(위에서 이미 정정), "신규 파일 16건"도 실제로는
+  이 리뷰 이전 시점 기준 16건이 맞았으나 이번 리뷰에서 파일 2건
+  (`NormalizedCandidateQualityStateTest.java`, 그리고 이전 턴에 이미 추가돼 있던
+  `NormalizedCandidateStoreRealApkgReport.java`를 포함한 부록 목록 자체가 17개였음)
+  이 추가/누락 집계돼 있었다. 리뷰 완료 시점 기준 정확한 수치는 최종 응답에
+  기록한다.
+- 이번 리뷰에서 `NormalizedCandidateStore.java`/엔티티의 저장 매핑 semantic은
+  변경하지 않았다(quality state 계산 결과 자체는 동일, 내부 비교 방식만 변경).
+  따라서 1.1GB 실제 APKG 전체 재검증은 다시 수행하지 않았다 — 이전 턴에
+  VOCABULARY 9,160(FATAL 1건 포함)+GRAMMAR 1,078=10,238건 검증 결과가 그대로
+  유효하다. commit/push는 이 리뷰 직후 별도로 수행한다.

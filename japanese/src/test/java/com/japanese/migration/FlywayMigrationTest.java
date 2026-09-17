@@ -25,9 +25,9 @@ class FlywayMigrationTest {
         MigrateResult first = flyway.migrate();
         MigrateResult second = flyway.migrate();
 
-        assertThat(first.migrationsExecuted).isEqualTo(5);
+        assertThat(first.migrationsExecuted).isEqualTo(6);
         assertThat(second.migrationsExecuted).isZero();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("5");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("6");
         assertThat(tableExists(url, "private_apkg_notes")).isTrue();
         assertThat(tableExists(url, "content_items")).isTrue();
         assertThat(tableExists(url, "today_study_sessions")).isTrue();
@@ -35,6 +35,14 @@ class FlywayMigrationTest {
         assertThat(columnExists(url, "content_sources", "rights_status")).isTrue();
         assertThat(tableExists(url, "content_release_batches")).isTrue();
         assertThat(tableExists(url, "content_release_batch_items")).isTrue();
+        assertThat(tableExists(url, "normalized_content_candidates")).isTrue();
+        assertThat(tableExists(url, "normalized_candidate_warnings")).isTrue();
+        assertThat(tableExists(url, "normalized_candidate_extra_fields")).isTrue();
+        assertThat(tableExists(url, "normalized_vocabulary_candidates")).isTrue();
+        assertThat(tableExists(url, "normalized_vocabulary_candidate_meanings")).isTrue();
+        assertThat(tableExists(url, "normalized_vocabulary_candidate_examples")).isTrue();
+        assertThat(tableExists(url, "normalized_grammar_candidates")).isTrue();
+        assertThat(tableExists(url, "normalized_grammar_candidate_confusable_patterns")).isTrue();
     }
 
     @Test
@@ -78,7 +86,7 @@ class FlywayMigrationTest {
 
         Flyway upgraded = Flyway.configure().dataSource(url, "sa", "")
                 .locations("classpath:db/migration/h2").cleanDisabled(true).load();
-        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(4);
+        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(5);
         assertThat(upgraded.migrate().migrationsExecuted).isZero();
 
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
@@ -122,7 +130,7 @@ class FlywayMigrationTest {
         }
 
         Flyway upgraded = flyway(url, false);
-        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(3);
+        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(4);
         assertThat(upgraded.migrate().migrationsExecuted).isZero();
 
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
@@ -169,7 +177,7 @@ class FlywayMigrationTest {
             sql.executeUpdate("insert into learning_progress (id, consecutive_correct, lapse_count, review_count, content_item_id, learner_profile_id, last_studied_at, next_review_at, last_result, learning_state) values (1, 0, 0, 1, 1, 1, current_timestamp, current_timestamp, 'CORRECT', 'REVIEW')");
         }
         Flyway upgraded = flyway(url, false);
-        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(3);
         assertThat(upgraded.migrate().migrationsExecuted).isZero();
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
             assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'")).isEqualTo(1);
@@ -201,7 +209,7 @@ class FlywayMigrationTest {
                     + "values (1,false,'existing-private','private-source','WORD','PENDING')");
         }
         Flyway upgrade = flyway(url, false);
-        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(2);
         assertThat(upgrade.migrate().migrationsExecuted).isZero();
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
             assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'"))
@@ -218,6 +226,50 @@ class FlywayMigrationTest {
         assertThat(migration).contains("create table private_apkg_notes", "uk_private_apkg_note")
                 .doesNotContain("drop ").doesNotContain("delete ").doesNotContain("alter table content_items")
                 .doesNotContain("update content_sources");
+    }
+
+    @Test
+    void v6UpgradesV5WithoutTouchingExistingContentOrStagingAndIsRepeatable() throws Exception {
+        String url = databaseUrl("normalized_candidate_upgrade");
+        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration/h2")
+                .target("5").cleanDisabled(true).load().migrate();
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            sql.executeUpdate("insert into content_sources (id,source_ref,display_name,rights_status,attribution_required) "
+                    + "values (1,'private-source','Private','UNKNOWN',false)");
+            sql.executeUpdate("insert into content_items (id,published,slug,source_ref,type,review_status) "
+                    + "values (1,false,'existing-private','private-source','WORD','PENDING')");
+            sql.executeUpdate("insert into private_apkg_notes (id,source_ref,source_file,source_version,source_note_id,"
+                    + "model_id,note_type,category,anki_guid,deck_paths,card_metadata,tags,field_names,field_values,"
+                    + "normalized_values,audio_reference_count,extracted_at) values (1,'private-source','deck.apkg','2.1.1',"
+                    + "1,1,'note','VOCABULARY','guid-1','[]','[]','','[]','[]','{}',0,current_timestamp)");
+        }
+        Flyway upgrade = flyway(url, false);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(upgrade.migrate().migrationsExecuted).isZero();
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'"))
+                    .isEqualTo(1);
+            assertThat(singleInt(sql, "select count(*) from private_apkg_notes where id=1")).isEqualTo(1);
+            assertThat(tableExists(url, "normalized_content_candidates")).isTrue();
+            sql.executeUpdate("insert into normalized_content_candidates (id,candidate_type,source_ref,source_note_id,"
+                    + "source_identity_key,quality_state,normalized_at) values (1,'VOCABULARY','private-source',1,"
+                    + "'E-1','CLEAN',current_timestamp)");
+            assertThat(singleInt(sql, "select count(*) from normalized_content_candidates where id=1")).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void mysqlV6IsAdditiveAndDoesNotTouchProductionOrStaging() throws Exception {
+        String migration = new ClassPathResource("db/migration/mysql/V6__add_normalized_content_candidates.sql")
+                .getContentAsString(StandardCharsets.UTF_8).toLowerCase();
+        assertThat(migration).contains("create table normalized_content_candidates", "uk_normalized_candidate_snapshot",
+                        "create table normalized_candidate_warnings", "create table normalized_candidate_extra_fields",
+                        "create table normalized_vocabulary_candidates", "create table normalized_vocabulary_candidate_meanings",
+                        "create table normalized_vocabulary_candidate_examples", "create table normalized_grammar_candidates",
+                        "create table normalized_grammar_candidate_confusable_patterns")
+                .doesNotContain("drop ").doesNotContain("delete ")
+                .doesNotContain("alter table content_items").doesNotContain("alter table private_apkg_notes")
+                .doesNotContain("update content_sources").doesNotContain("update content_items");
     }
 
     private int singleInt(Statement sql, String query) throws Exception {
