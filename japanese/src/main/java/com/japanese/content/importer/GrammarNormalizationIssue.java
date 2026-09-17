@@ -59,12 +59,24 @@ public enum GrammarNormalizationIssue {
     /** The "헷갈리는 문형"(Confusable patterns) card had a number of {@code li._j1f} entries other
      * than the expected 3. Ticket 3B-1 actual measurement: 0/1,078. */
     CONFUSABLE_PATTERN_COUNT_UNEXPECTED(REVIEW_REQUIRED),
-    /** A {@code li._j1f} entry in the Confusable-patterns card either (a) was missing its
-     * pattern/explanation span text and was dropped rather than kept as a broken entry, or (b) had
-     * a third (or later) direct {@code <span>} child beyond the expected pattern+explanation pair -
-     * kept with its known pattern/explanation values, but flagged rather than silently dropping the
-     * extra span's content, since that could be real source information this parser does not yet
-     * have a place for. */
+    /** A {@code li._j1f} entry in the Confusable-patterns card had one of the following shape
+     * problems - one entry can raise this more than once, for distinct reasons:
+     * <ul>
+     *   <li>missing {@code span._j1e} pattern text - the whole entry is dropped (no pattern means
+     *       no usable entry);</li>
+     *   <li>more than one direct {@code span._j1e} child - only the first is used as
+     *       {@code pattern}; the rest are never reinterpreted as {@code explanation} just because
+     *       that slot was free;</li>
+     *   <li>missing/blank explanation span text - the entry is KEPT (with pattern) but
+     *       {@code explanation} is null, since actual v2.1.1 data always has both and a missing one
+     *       is source drift, not something to accept silently;</li>
+     *   <li>a third (or later) direct {@code <span>} child beyond the expected pattern+explanation
+     *       pair - kept with its known pattern/explanation values, but flagged rather than silently
+     *       dropping the extra span's content, since that could be real source information this
+     *       parser does not yet have a place for.</li>
+     * </ul>
+     * In every case, an unexpected/extra span's text is never merged into {@code pattern},
+     * {@code explanation}, or any other field. */
     MALFORMED_CONFUSABLE_PATTERN_ENTRY(REVIEW_REQUIRED),
     /** Kind normalized to real text instead of the expected U+2063 placeholder (Ticket 3A.1: 100%
      * of real notes are the placeholder). Never auto-promoted to {@code connection} - the

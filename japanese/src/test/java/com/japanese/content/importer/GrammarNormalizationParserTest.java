@@ -267,6 +267,22 @@ class GrammarNormalizationParserTest {
     }
 
     @Test
+    void duplicatePatternSpanIsNeverUsedAsExplanation() {
+        // Two direct span._j1e children: directSpanCount stays 2 here (so the ">2 direct spans"
+        // guard alone would NOT catch this) - span._j1e must be treated as pattern-only, never
+        // fall through to explanationSpan just because a slot happened to be free.
+        String itemWithDuplicatePatternSpan =
+                "<li class=\"_j1f\"><span class=\"_j1e\">～の</span><span class=\"_j1e\">～のに</span></li>\n";
+        String confusableWithDuplicatePatternSpan = CONFUSABLE_SECTION.replace(THIRD_CONFUSABLE_ITEM, itemWithDuplicatePatternSpan);
+        var result = parser.parse("s", 1L, "GRAMMAR",
+                grammar(Map.of("BackHTML", backHtml(NUANCE_SECTION, CONNECTION_SECTION, confusableWithDuplicatePatternSpan))));
+        var thirdEntry = result.confusablePatterns().get(2);
+        assertThat(thirdEntry.pattern()).isEqualTo("～の");
+        assertThat(thirdEntry.explanation()).isNull();
+        assertThat(result.hasIssue(GrammarNormalizationIssue.MALFORMED_CONFUSABLE_PATTERN_ENTRY)).isTrue();
+    }
+
+    @Test
     void extraDirectSpanBeyondPatternAndExplanationPreservesKnownValuesButRaisesReviewWarning() {
         // A third direct <span> is unexplained source content - silently ignoring it would risk
         // dropping real semantic information, so this must be flagged, not a silent no-op.
@@ -283,7 +299,10 @@ class GrammarNormalizationParserTest {
     }
 
     @Test
-    void confusablePatternWithEmptyExplanationIsKeptWithNullExplanationNotDropped() {
+    void missingConfusableExplanationIsPreservedButFlagged() {
+        // Actual v2.1.1 data always has a non-blank explanation alongside the pattern, so a missing
+        // one is source drift - the entry must still be kept (pattern alone is still useful) but
+        // must not pass through silently.
         String itemWithBlankExplanation =
                 "<li class=\"_j1f\"><span class=\"_j1e\">～の</span><span></span></li>\n";
         String confusableWithBlankExplanation = CONFUSABLE_SECTION.replace(THIRD_CONFUSABLE_ITEM, itemWithBlankExplanation);
@@ -292,7 +311,7 @@ class GrammarNormalizationParserTest {
         var thirdEntry = result.confusablePatterns().get(2);
         assertThat(thirdEntry.pattern()).isEqualTo("～の");
         assertThat(thirdEntry.explanation()).isNull();
-        assertThat(result.hasIssue(GrammarNormalizationIssue.MALFORMED_CONFUSABLE_PATTERN_ENTRY)).isFalse();
+        assertThat(result.hasIssue(GrammarNormalizationIssue.MALFORMED_CONFUSABLE_PATTERN_ENTRY)).isTrue();
     }
 
     // ===== L. unsupported subtype =====

@@ -249,12 +249,21 @@ public class GrammarNormalizationParser {
                 // of one into the other) - the real structure is always two sibling <span> children.
                 Element patternSpan = null;
                 Element explanationSpan = null;
+                int patternSpanCount = 0;
                 int directSpanCount = 0;
                 for (Element child : li.children()) {
                     if (!"span".equals(child.tagName())) continue;
                     directSpanCount++;
-                    if (child.hasClass("_j1e") && patternSpan == null) patternSpan = child;
-                    else if (explanationSpan == null) explanationSpan = child;
+                    // span._j1e is EXCLUSIVELY a pattern candidate - a second (or later) one must
+                    // never fall through to explanationSpan, even though the "> 2 direct spans"
+                    // check below would not otherwise catch a li with exactly two span._j1e
+                    // children and nothing else (directSpanCount stays 2 in that case).
+                    if (child.hasClass("_j1e")) {
+                        patternSpanCount++;
+                        if (patternSpan == null) patternSpan = child;
+                    } else if (explanationSpan == null) {
+                        explanationSpan = child;
+                    }
                 }
                 String comparisonPattern = patternSpan == null ? null : blankToNull(patternSpan.text().trim());
                 String comparisonExplanation = explanationSpan == null ? null : blankToNull(explanationSpan.text().trim());
@@ -262,6 +271,20 @@ public class GrammarNormalizationParser {
                     warnings.add(warning(GrammarNormalizationIssue.MALFORMED_CONFUSABLE_PATTERN_ENTRY,
                             "A confusable-pattern li._j1f entry was missing its span._j1e pattern text and was dropped"));
                     continue;
+                }
+                if (patternSpanCount > 1) {
+                    warnings.add(warning(GrammarNormalizationIssue.MALFORMED_CONFUSABLE_PATTERN_ENTRY,
+                            "A confusable-pattern li._j1f entry had " + patternSpanCount
+                                    + " direct span._j1e children (expected 1); only the first was used as"
+                                    + " pattern, the rest were never reinterpreted as explanation"));
+                }
+                // Actual v2.1.1 data always has a non-blank explanation alongside the pattern, so a
+                // missing one is source drift/malformed structure - the entry is still kept (pattern
+                // alone is still useful), but this must not pass through silently.
+                if (comparisonExplanation == null) {
+                    warnings.add(warning(GrammarNormalizationIssue.MALFORMED_CONFUSABLE_PATTERN_ENTRY,
+                            "A confusable-pattern li._j1f entry was missing its explanation span text;"
+                                    + " entry kept with explanation=null"));
                 }
                 // A third (or later) direct <span> child is unexplained source content - silently
                 // ignoring it would drop real semantic information. Keep the known pattern/
