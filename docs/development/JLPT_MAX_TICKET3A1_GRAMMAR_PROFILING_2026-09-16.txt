@@ -541,6 +541,22 @@ as a concept may not even apply to this subtype.
   evidence that the existing GrammarHtmlParser's example-extraction logic is
   fully functional and reliable for this subset (consistent min=max=2, no
   variance, no failures).
+
+  **[Ticket 3B-1 (2026-09-17) correction: the selector-hit COUNT above (always
+  exactly 2, zero variance) was measured correctly, but the SEMANTIC LABEL
+  "examples" was wrong.** A full 1,078-note re-review (see
+  `GrammarBackHtmlStructureReReview`, opt-in test tool) found that
+  `section._j4a` always holds exactly THREE fixed, label-identified reference
+  cards - "뉘앙스"(Nuance), "접속"(Connection), "헷갈리는 문형"(Confusable
+  patterns) - never bilingual example sentences. The old
+  `GrammarHtmlParser`-based filter (require `div._jcq` + `div._j4v` with
+  non-blank text) happens to accept the first two cards (Nuance, Connection)
+  and always reject the third (it uses a `<ul>` list, not `div._j4v`), which
+  is exactly why the count was always, stably, "2" - not because 2 real
+  examples exist. `GrammarNormalizationParser` (Ticket 3B-1) replaces this
+  with `nuance`/`connection`/`confusablePatterns` fields identified by label
+  text, not an "examples" list. See `docs/development/IMPLEMENTATION_LOG.md`,
+  "2026-09-17 JLPT-MAX Ticket 3B-1" entry, for the full corrected model.]**
 - COMPREHENSIVE (n=2,527): min=0 max=0 avg=0.00, zeroExampleNotes=2,527
   (100%). `section._j4a` never matches on COMPREHENSIVE content at all - but
   per section 15/16, COMPREHENSIVE's real content (the 4-choice
@@ -637,14 +653,21 @@ level-specific parsing rule is warranted.
    fragment/ordering-shaped extraction, not a shared "4-choice MCQ" parser.
 
 9. 일반 GRAMMAR 1,078건은 Ticket 3B-1 pure parser 구현을 시작해도 안전한가?
-   **YES.** All real evidence points the same direction for this subset:
-   100% `<mark>` selector hit rate (0 fallback), pattern length cleanly
-   within limits (max 26 of 200 chars), 0/1,078 explanations over 2000
-   chars, and a perfectly consistent exactly-2-examples-per-note result with
-   zero gaps (section 20). The existing `GrammarHtmlParser` selectors already
-   work correctly and cleanly on this exact subset; a `GrammarNormalizationParser`
-   built the same way as `VocabularyNormalizationParser` (Ticket 2) should be
-   safe to implement for category=GRAMMAR specifically.
+   **YES - CONFIRMED (Ticket 3B-1 implemented and verified 2026-09-17).**
+   All real evidence pointed the same direction for this subset: 100%
+   `<mark>` selector hit rate (0 fallback), pattern length cleanly within
+   limits (max 26 chars), and (per the section 20 correction above) a
+   perfectly consistent, zero-exception underlying DOM structure - just not
+   the "explanation"/"examples" concepts originally assumed. Ticket 3B-1
+   built `GrammarNormalizationParser` against the CORRECTED model
+   (pattern/frontExample/meaningGloss/nuance/connection/confusablePatterns,
+   no explanation/examples fields) and ran it against the full 1,078-note
+   population: 0 fatal, 0 review-required, every issue count 0. The YES
+   conclusion here held, but not for the reason originally stated (that
+   reason - "explanations"/"examples" being clean - was itself based on the
+   mislabeled model); see `docs/development/IMPLEMENTATION_LOG.md`,
+   "2026-09-17 JLPT-MAX Ticket 3B-1" entry, for the corrected reasoning and
+   result.
 
 10. COMPREHENSIVE 2,527건은 다음 단계에서 어떻게 분리해야 하는가?
     Split into exactly the three real, mutually-exclusive, deck-confirmed
@@ -886,6 +909,14 @@ notes}` (zero variance). Every figure matches the original
 `GrammarNormalizationProfilingReport` run exactly - independent
 confirmation that this Ticket's primary profiling tool has no hidden bias
 or miscount for the normal-GRAMMAR subset.
+
+**[Ticket 3B-1 correction: "structured-explanation hit rate" and
+"example-count distribution" above are the same selector-hit counts as
+section 20's, and inherit the same semantic correction noted there -
+`div._j4z` is the front-sentence translation (not an explanation), and the
+"2 examples" are actually the Nuance+Connection reference cards, not
+bilingual examples. The counts themselves (100% hit rate, always exactly 2)
+remain independently confirmed and unchanged; only their label was wrong.]**
 
 Profiling-tool self-review (source read in full):
 `GrammarNormalizationProfilingReport.java` was re-read end-to-end. No

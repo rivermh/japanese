@@ -438,14 +438,25 @@
   개수(1,078)였기 때문에 category 분리 없이 측정했던 기존 도구가 잘못 귀속한 것으로 판단된다.
 - **explanation>2000 정정**: 667건 전부 `COMPREHENSIVE`/`IsPassageBlank`이며 100%
   `back.text()` fallback 경로에서만 발생한다(구조화 `div._j4z` 추출로 초과한 건 0건). `GRAMMAR`/
-  `IsBasic`은 667건 중 0건 — structured explanation 추출 성공률 1,078/1,078(100%). 즉 이 문제는
+  `IsBasic`은 667건 중 0건 — **[Ticket 3B-1(2026-09-17) 정정: 여기서 "structured explanation
+  추출 성공률 1,078/1,078(100%)"이라고 쓴 것은 selector 적중 횟수 자체는 맞았으나 semantic
+  귀속이 틀렸다. `div._j4z`는 grammar explanation이 아니라 FrontHTML 예문 문장의 한국어
+  번역문이다. 상세: 아래 "JLPT-MAX Ticket 3B-1" 항목 참고.]**. 즉 이 문제는
   `Grammar.explanation` 컬럼 크기 문제가 아니라, 지문형(passage-length) `IsPassageBlank` 콘텐츠에
   Grammar용 explanation selector를 잘못 적용한 결과다.
 - **정규 GRAMMAR(`IsBasic`, 1,078건) 안정성**: `<mark>` selector 적중률 1,078/1,078(100%,
   fallback 0), pattern max 26자·avg 7.3자(200자 제한과 무관), structured explanation 추출
-  1,078/1,078(100%, >2000 0건), example 개수 정확히 2개/노트(zeroExampleNotes 0, 분산 없음).
-  독립적으로 재작성한 self-review 스크립트로도 동일 수치가 재현되어, Ticket 3B-1(정규 GRAMMAR
-  pure parser)은 착수해도 안전하다고 판단했다.
+  1,078/1,078(100%, >2000 0건), example 개수 정확히 2개/노트(zeroExampleNotes 0, 분산 없음)
+  **[Ticket 3B-1 정정: 이 두 수치("structured explanation 추출 100%", "example 정확히 2개")는
+  count 자체는 정확했으나 semantic label이 틀렸다. 실제로는 `div._j4z`(front 예문 번역문) 추출
+  성공률과, `section._j4a`의 "뉘앙스"+"접속" 참고 카드 2개가 우연히 기존 example 필터 조건을
+  만족해 "example"로 잘못 인식된 것이었다. 세 번째 카드("헷갈리는 문형")는 구조가 달라(div._j4v
+  대신 ul 리스트) 항상 필터에서 탈락했기 때문에 "언제나 정확히 2개"라는 안정적 착시가 생겼다.
+  실제 semantic model은 pattern/frontExample(일본어+번역)/meaningGloss/nuance/connection/
+  confusablePatterns 6개이며 "explanation"/"examples" 개념은 존재하지 않는다. 상세: 아래
+  "JLPT-MAX Ticket 3B-1" 항목 참고.]**. 독립적으로 재작성한 self-review 스크립트로도 동일
+  count가 재현되어, Ticket 3B-1(정규 GRAMMAR pure parser)은 착수해도 안전하다고 판단했다 — 이
+  결론(3B-1 착수 가능) 자체는 Ticket 3B-1에서도 유지되었다.
 - **COMPREHENSIVE(2,527건) 성격**: 구조 분석 결과 한국어 지시문 + 일본어 지문(blank 포함) +
   한국어 번역 + 4지선다 `<ol>`(`li.is-correct`로 정답 표시) 형태로, `div._j4z`/`section._j4a`
   적중률이 0/2,527이다 — Grammar 지식 콘텐츠(pattern/explanation/example)가 아니라
@@ -465,3 +476,64 @@
   Grammar entity 확장이 아니라 별도 Practice/Question 도메인 모델로 설계해야 하며,
   `IsGrammarForm`/`IsPassageBlank`(4지선다)와 `IsSentenceArrangement`(단어배열)는 서로 다른
   parser가 필요하다 — 각각 후속 Ticket으로 분리 권장.
+
+## 2026-09-17  JLPT-MAX Ticket 3B-1 — Grammar Normalization Parser (semantic model 재정정 포함)
+
+- 작업 목적: `category=GRAMMAR`/`IsBasic` active(1,078건)를 대상으로 pure Grammar
+  normalization parser를 구현했다. actual `JLPT-MAX-Deck-2.1.1.apkg`(size
+  1,148,891,855 bytes, SHA-256 `9d8be3ff6b23e11ef890a146dffec7ec4649de4bcbd491be439a11b991fd154d`,
+  기존 Ticket 3A.1과 동일 파일 재확인)로 검증했다. COMPREHENSIVE(2,527건)는 이번 Ticket
+  대상이 아니다.
+- **BackHTML semantic model 재정정(중요)**: 구현 중 `section._j4a`를 "example"로 다루던
+  기존 해석이 실제로는 틀렸음을 발견했고, 전체 1,078건 재실측(예외 0건)으로 확정했다.
+  기존 Ticket 1/3A.1 기록의 "structured explanation 100%", "example 정확히 2개"는 selector
+  적중 count 자체는 맞았으나 semantic 귀속이 틀렸다(위 Ticket 1/3A.1 항목에 correction
+  추가함). 실제 구조:
+  - `div._j4z` = FrontHTML 예문 문장의 한국어 번역 (explanation 아님)
+  - `div._j4x` = 문법 의미 gloss (예: "저~") — 이전까지 아무도 추출하지 않던 필드
+  - `section._j4a`는 항상 정확히 3개, label 고정("뉘앙스"/"접속"/"헷갈리는 문형") —
+    bilingual example이 아니라 Nuance/Connection/Confusable-patterns 참고 카드다.
+    "접속"(Connection) 카드의 `div._j4v`가 실제 grammar connection 정보이며, `Kind`
+    필드(U+2063 placeholder, 항상 비어있음)는 connection source가 아니다.
+- **최종 normalized 필드**(`GrammarNormalizationResult`): sourceRef, sourceNoteId, unitId,
+  pattern, frontExample(japaneseText/reading/translation), meaningGloss, nuance,
+  connection, confusablePatterns(List), level, rawKind, unknownFields, warnings,
+  hasNoFatalIssues. `explanation`/`examples` 필드는 없다 — production `Grammar`
+  entity(pattern/explanation/connection)에 강제로 맞추지 않았고, explanation에 무엇을
+  매핑할지는 별도 promotion Ticket의 결정 사항으로 남겼다.
+- **frontExample**: FrontHTML `div._j4u`(mark 포함 전체 예문 문장)에서 추출, reading은
+  v2.1.1에서 항상 null(front 예문에 ruby 0/1,078). translation은 `div._j4z`. 전체
+  1,078건에서 FrontHTML `div._j4u`와 BackHTML 자체 사본 `div._j4u`의 ruby-stripped
+  텍스트가 100% 정확히 일치함을 확인했다 — 이전 발견("front/back mark 텍스트 71% 불일치")은
+  콘텐츠 차이가 아니라 순수 furigana 렌더링 차이였음이 이번에 확정됐다.
+- **subtype guard**: `COMPREHENSIVE`/`IsGrammarForm`/`IsPassageBlank`/`IsSentenceArrangement`는
+  `UNSUPPORTED_SUBTYPE`(FATAL)로 즉시 반환하고 content 필드는 채우지 않는다. `IsBasic`과
+  다른 subtype flag가 동시에 켜지면 subtype identity 자체가 불확실해지므로
+  `CONFLICTING_SUBTYPE_FLAGS`를 FATAL로 판정한다(content는 참고용으로 계속 추출).
+- **silent-loss guard**: 헷갈리는 문형 카드의 `li._j1f`에 알려진 pattern/explanation
+  span 외 세 번째 이상의 직계 `<span>`이 있으면, 값은 알려진 두 필드만 보존하되
+  `MALFORMED_CONFUSABLE_PATTERN_ENTRY`(REVIEW_REQUIRED)로 플래그해 미지의 source
+  정보가 조용히 유실되지 않게 했다.
+- **severity**: FATAL = UNSUPPORTED_SUBTYPE, CONFLICTING_SUBTYPE_FLAGS, MISSING_UNIT_ID,
+  MISSING_PATTERN, MISSING_FRONT_EXAMPLE, MISSING_FRONT_TRANSLATION, MISSING_MEANING_GLOSS,
+  MISSING_NUANCE, MISSING_CONNECTION, MISSING/INVALID_JLPT_LEVEL. REVIEW_REQUIRED/
+  INFORMATIONAL은 fallback/count-mismatch/label-mismatch/malformed-entry/unexpected-Kind/
+  audio-residue/unknown-field 등. provenance(`sourceRef`/`sourceNoteId`)는
+  `VocabularyNormalizationParser`와 동일하게 프로그래머 계약 위반으로
+  `IllegalArgumentException`을 던진다.
+- **legacy `GrammarHtmlParser`**: 수정하지 않았다. production import 경로(pattern/
+  explanation/connection 200/2000/500자 silent truncation 포함)는 이번 Ticket과 무관하게
+  그대로 유지된다 — semantic이 틀렸다는 사실만 문서화했다.
+- 검증: `GrammarNormalizationParserTest` 35건 전부 pass. actual APKG 1,078건 전수
+  실행 결과 fatal 0 / review-required 0 / 모든 issue count 0(완전히 clean),
+  max pattern 26자, max meaningGloss 36자, max connection 95자, confusablePatterns
+  count != 3인 note 0건. 전체 `./gradlew test` 259 tests, 0 failures, 0 errors, 7
+  skipped, `git diff --check` 통과. `LearningOrganizationServiceTest`는 이번 실행에서
+  통과했다(2026-09-16 세션에서는 baseline 포함 일관되게 실패 → 2026-09-17에는 코드 변경
+  없이 통과 — 날짜 의존적 flaky 가능성, 이번 Ticket과 무관, 별도 조사 필요).
+- candidate 영속화, dedup, source rights/publication 연동, production `Grammar`
+  스키마 매핑은 이번 Ticket 범위 밖이며 후속 promotion Ticket에서 결정한다.
+  `GrammarEnrichment`/`GrammarRelation`/`GrammarComparison`은 생성/수정하지 않았고,
+  `nuance`/`confusablePatterns`를 이 도메인들에 자동 매핑하지 않았다(이름이 비슷하다는
+  이유만으로 curated/reviewed 도메인에 편입시키지 않음). migration/schema/production
+  data 변경 없음. commit은 이 로그 항목과 함께 별도로 수행한다.
