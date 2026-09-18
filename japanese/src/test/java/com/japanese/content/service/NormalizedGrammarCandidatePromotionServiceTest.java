@@ -11,6 +11,7 @@ import com.japanese.content.entity.ContentItem;
 import com.japanese.content.entity.ContentSource;
 import com.japanese.content.entity.ContentSourceRightsStatus;
 import com.japanese.content.entity.ContentType;
+import com.japanese.content.entity.Grammar;
 import com.japanese.content.entity.HumanReviewDecision;
 import com.japanese.content.entity.ImportedSourceRecord;
 import com.japanese.content.entity.Level;
@@ -18,15 +19,16 @@ import com.japanese.content.entity.NormalizedCandidateMatchPair;
 import com.japanese.content.entity.NormalizedCandidateType;
 import com.japanese.content.entity.NormalizedContentCandidate;
 import com.japanese.content.entity.ReviewStatus;
-import com.japanese.content.entity.Word;
-import com.japanese.content.importer.NormalizedExample;
+import com.japanese.content.importer.GrammarNormalizationIssue;
+import com.japanese.content.importer.GrammarNormalizationResult;
+import com.japanese.content.importer.GrammarNormalizationWarning;
+import com.japanese.content.importer.NormalizedConfusablePattern;
+import com.japanese.content.importer.NormalizedGrammarExample;
 import com.japanese.content.importer.NormalizedJlptLevel;
-import com.japanese.content.importer.NormalizedMeaning;
-import com.japanese.content.importer.VocabularyNormalizationIssue;
-import com.japanese.content.importer.VocabularyNormalizationResult;
-import com.japanese.content.importer.VocabularyNormalizationWarning;
 import com.japanese.content.repository.ContentItemRepository;
 import com.japanese.content.repository.ContentSourceRepository;
+import com.japanese.content.repository.GrammarComparisonRepository;
+import com.japanese.content.repository.GrammarRelationRepository;
 import com.japanese.content.repository.ImportedSourceRecordRepository;
 import com.japanese.content.repository.LevelRepository;
 import com.japanese.content.repository.NormalizedCandidateMatchPairRepository;
@@ -44,29 +46,25 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * JLPT-MAX Ticket 4E-1: scenario coverage for {@link NormalizedVocabularyCandidatePromotionService}.
- * Every candidate is built through {@code NormalizedCandidateStore}/{@code NormalizedCandidateConflictAnalyzer}/
- * {@code NormalizedCandidatePairReviewService}, matching {@code NormalizedCandidatePromotionReadinessServiceTest}'s
- * (Ticket 4D) own fixture conventions - this class never constructs a candidate by any other means.
+ * JLPT-MAX Ticket 4E-8: scenario coverage for {@link NormalizedGrammarCandidatePromotionService}.
+ * Mirrors {@code NormalizedVocabularyCandidatePromotionServiceTest}'s (Ticket 4E-1) own fixture
+ * conventions and scenario set exactly - the "unknown source / policy unresolved" slot is replaced by
+ * an explanation-too-long scenario, since Grammar has no meaning-language-policy axis but does have
+ * the {@code GRAMMAR_EXPLANATION_TOO_LONG} mapping-length axis instead.
  *
- * <p>Rejection scenarios each assert the exact production-write inventory (ContentItem/Word/Meaning/
- * Example/ImportedSourceRecord/Grammar counts) is unchanged, proving the rejection happened before
- * any write - not merely that the returned/thrown outcome looked like a rejection.
- *
- * <p>Post-hardening (MAJOR 1/2 fixes), every {@code promote(...)} call now takes a third
- * {@code expectedNormalizedAt} argument; scenarios that are not specifically testing staleness always
- * pass the candidate's own current {@code normalizedAt} so they still exercise exactly the rejection
- * reason each test name describes, not an incidental staleness rejection.
+ * <p>Rejection scenarios each assert the exact production-write inventory (ContentItem/Grammar/
+ * Example/ImportedSourceRecord counts, plus GrammarRelation/GrammarComparison, which this class must
+ * never create) is unchanged, proving the rejection happened before any write.
  */
 @SpringBootTest
 @ActiveProfiles("sample")
 @Transactional
-class NormalizedVocabularyCandidatePromotionServiceTest {
+class NormalizedGrammarCandidatePromotionServiceTest {
 
     @Autowired NormalizedCandidateStore store;
     @Autowired NormalizedCandidateConflictAnalyzer analyzer;
     @Autowired NormalizedCandidatePairReviewService reviewService;
-    @Autowired NormalizedVocabularyCandidatePromotionService promotion;
+    @Autowired NormalizedGrammarCandidatePromotionService promotion;
     @Autowired NormalizedContentCandidateRepository candidateRepository;
     @Autowired NormalizedCandidateMatchPairRepository pairRepository;
     @Autowired UserAccountRepository accounts;
@@ -74,23 +72,24 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
     @Autowired ContentItemRepository contentItems;
     @Autowired ImportedSourceRecordRepository importedSourceRecords;
     @Autowired LevelRepository levels;
+    @Autowired GrammarRelationRepository grammarRelations;
+    @Autowired GrammarComparisonRepository grammarComparisons;
     @Autowired JdbcClient jdbcClient;
     @Autowired ObjectMapper objectMapper;
 
-    /** Matches {@code ApkgVocabularyImporter.SOURCE_REF} / {@code NormalizedVocabularyMeaningLanguagePolicy}. */
+    /** Matches {@code ApkgVocabularyImporter.SOURCE_REF} - the same file-level source covers both note types. */
     private static final String CANONICAL_JLPT_MAX_SOURCE_REF = "JLPT-MAX-Deck-2.1.1.apkg";
-    private static final String VOCABULARY_NOTE_TYPE = "JLPT MAX덱 어휘";
+    private static final String GRAMMAR_NOTE_TYPE = "JLPT MAX덱 문법";
 
     private String ref() {
-        return "promotion-write-test-" + UUID.randomUUID();
+        return "grammar-promotion-write-test-" + UUID.randomUUID();
     }
 
     private UserAccount admin(String suffix) {
-        return accounts.save(new UserAccount("promotion-admin-" + suffix + "-" + UUID.randomUUID(), null, "hash",
-                "Admin " + suffix, UserRole.ADMIN));
+        return accounts.save(new UserAccount("grammar-promotion-admin-" + suffix + "-" + UUID.randomUUID(), null,
+                "hash", "Admin " + suffix, UserRole.ADMIN));
     }
 
-    /** See {@code NormalizedCandidatePromotionReadinessServiceTest.seedN5Level} for why this is idempotent. */
     private void seedN5Level() {
         levels.findBySystemAndCode("JLPT", "N5").orElseGet(() -> levels.save(new Level("JLPT", "N5", "JLPT N5")));
     }
@@ -101,7 +100,6 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
         source.reviewRights(ContentSourceRightsStatus.ALLOWED, "허용", false, null);
     }
 
-    /** See {@code NormalizedCandidatePromotionReadinessServiceTest.registerAllowedCanonicalSource} for the full rationale. */
     private void registerAllowedCanonicalSource() {
         ContentSource source = contentSources.findBySourceRef(CANONICAL_JLPT_MAX_SOURCE_REF).orElseThrow();
         if (source.getRightsStatus() == ContentSourceRightsStatus.UNKNOWN) {
@@ -115,33 +113,26 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
 
     private NormalizedContentCandidate onlyCandidate(String ref) {
         List<NormalizedContentCandidate> candidates = candidateRepository
-                .findByCandidateType(NormalizedCandidateType.VOCABULARY).stream()
+                .findByCandidateType(NormalizedCandidateType.GRAMMAR).stream()
                 .filter(c -> c.getSourceRef().equals(ref))
                 .toList();
         assertThat(candidates).hasSize(1);
         return candidates.get(0);
     }
 
-    /**
-     * Unlike {@link #onlyCandidate(String)}, also filters by {@code sourceNoteId} - required for the
-     * canonical JLPT-MAX sourceRef, which this class's own (non-{@code @Transactional}) atomicity/
-     * concurrency test classes in this same suite run also legitimately use (with different note ids)
-     * and permanently commit rows for, so more than one candidate can genuinely exist for that shared
-     * sourceRef across the whole test JVM run.
-     */
     private NormalizedContentCandidate onlyCandidate(String ref, long sourceNoteId) {
-        return candidateRepository.findByCandidateType(NormalizedCandidateType.VOCABULARY).stream()
+        return candidateRepository.findByCandidateType(NormalizedCandidateType.GRAMMAR).stream()
                 .filter(c -> c.getSourceRef().equals(ref) && c.getSourceNoteId() == sourceNoteId)
                 .findFirst()
                 .orElseThrow();
     }
 
     private NormalizedCandidateMatchPair seedDuplicatePair(String ref) {
-        store.saveVocabulary(vocab(ref, 1L, "E1", "語", "ご", "noun", "N5", "meaning"));
-        store.saveVocabulary(vocab(ref, 2L, "E2", "語", "ご", "noun", "N5", "meaning"));
-        analyzer.analyze(NormalizedCandidateType.VOCABULARY, ref);
+        store.saveGrammar(grammar(ref, 1L, "U1", "文型", "接続", "N5"));
+        store.saveGrammar(grammar(ref, 2L, "U1", "文型", "接続", "N5"));
+        analyzer.analyze(NormalizedCandidateType.GRAMMAR, ref);
         List<NormalizedCandidateMatchPair> pairs = pairRepository
-                .findByLeftCandidate_CandidateTypeAndLeftCandidate_SourceRef(NormalizedCandidateType.VOCABULARY, ref);
+                .findByLeftCandidate_CandidateTypeAndLeftCandidate_SourceRef(NormalizedCandidateType.GRAMMAR, ref);
         assertThat(pairs).hasSize(1);
         return pairs.get(0);
     }
@@ -151,23 +142,15 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
                 pair.getGeneratedAt(), pair.getAssessment(), null);
     }
 
-    private VocabularyNormalizationResult vocab(String ref, long noteId, String entryId, String expression,
-            String reading, String partOfSpeech, String level, String meaning) {
-        return new VocabularyNormalizationResult(
-                ref, noteId, entryId, expression, reading, partOfSpeech, null,
-                List.of(new NormalizedMeaning(1, meaning)),
-                List.of(new NormalizedExample(1, meaning, expression + "の例文です",
-                        reading + "のよみ", meaning + " translation")),
-                new NormalizedJlptLevel(level, level, "WordJLPT"), expression, reading, Map.of(),
-                List.of(), true);
+    private GrammarNormalizationResult grammar(String ref, long noteId, String unitId, String pattern,
+            String connection, String level) {
+        return new GrammarNormalizationResult(ref, noteId, unitId, pattern,
+                new NormalizedGrammarExample(1, pattern + "の前文です", null, pattern + "の번역"), "gloss", "nuance",
+                connection, List.of(new NormalizedConfusablePattern(1, "헷갈리는 문형", "설명")),
+                new NormalizedJlptLevel(level, level, "Level"), null, Map.of(), List.of(), true);
     }
 
-    /**
-     * Seeds a {@code private_apkg_notes} row with genuinely raw-shaped field names/values - the
-     * ground truth {@link NormalizedVocabularyCandidatePromotionService} must use (via
-     * {@link PrivateApkgNoteProvenanceReader}) instead of any normalized-candidate-derived synthetic
-     * substitute, whenever a promotion must create a brand-new {@code ImportedSourceRecord}.
-     */
+    /** Seeds a {@code private_apkg_notes} row with genuinely raw-shaped field names/values. */
     private void seedPrivateApkgNote(String sourceRef, long sourceNoteId, String tags,
             List<String> fieldNames, List<String> fieldValues) {
         jdbcClient.sql("insert into private_apkg_notes (source_ref, source_file, source_version, source_note_id, "
@@ -175,7 +158,7 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
                         + "field_values, normalized_values, audio_reference_count, extracted_at) "
                         + "values (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
                 .param(sourceRef).param("fixture.apkg").param("1").param(sourceNoteId).param(1L)
-                .param(VOCABULARY_NOTE_TYPE).param("VOCABULARY").param("guid-" + sourceNoteId)
+                .param(GRAMMAR_NOTE_TYPE).param("GRAMMAR").param("guid-" + sourceNoteId)
                 .param("[]").param("{}").param(tags)
                 .param(objectMapper.writeValueAsString(fieldNames))
                 .param(objectMapper.writeValueAsString(fieldValues))
@@ -186,68 +169,65 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
     private ProductionCounts productionCounts() {
         return new ProductionCounts(
                 contentItems.count(),
-                jdbcClient.sql("select count(*) from words").query(Long.class).single(),
-                jdbcClient.sql("select count(*) from meanings").query(Long.class).single(),
-                jdbcClient.sql("select count(*) from examples").query(Long.class).single(),
                 jdbcClient.sql("select count(*) from grammars").query(Long.class).single(),
-                importedSourceRecords.count());
+                jdbcClient.sql("select count(*) from examples").query(Long.class).single(),
+                importedSourceRecords.count(),
+                grammarRelations.count(),
+                grammarComparisons.count());
     }
 
-    private record ProductionCounts(long contentItems, long words, long meanings, long examples, long grammars,
-            long importedSourceRecords) {
+    private record ProductionCounts(long contentItems, long grammars, long examples, long importedSourceRecords,
+            long grammarRelations, long grammarComparisons) {
     }
 
     // ===================================================================================
-    // 1. successful clean canonical-source N5 Vocabulary promotion (also covers MAJOR-2
-    //    requirement 7: GET/render revision == current locked revision -> may proceed when READY)
+    // 1. successful clean canonical-source N5 Grammar promotion
     // ===================================================================================
 
     @Test
-    void cleanCanonicalSourceVocabularyCandidateIsPromotedToAProductionDraft() {
+    void cleanCanonicalSourceGrammarCandidateIsPromotedToAProductionDraft() {
         seedN5Level();
         registerAllowedCanonicalSource();
-        store.saveVocabulary(vocab(CANONICAL_JLPT_MAX_SOURCE_REF, 900001L, "E1", "本", "ほん", "noun", "N5", "책"));
+        store.saveGrammar(grammar(CANONICAL_JLPT_MAX_SOURCE_REF, 900001L, "U-N5-1", "〜てみる", "동사 て형 + みる", "N5"));
         NormalizedContentCandidate candidate = onlyCandidate(CANONICAL_JLPT_MAX_SOURCE_REF, 900001L);
         seedPrivateApkgNote(CANONICAL_JLPT_MAX_SOURCE_REF, 900001L, " jlpt::n5 raw::tag ",
-                List.of("EntryID", "Word", "Reading", "Meaning"), List.of("E1", "本", "ほん", "책"));
+                List.of("UnitID", "Pattern"), List.of("U-N5-1", "〜てみる"));
         // "sample" profile's SampleContentDataLoader already seeds a few ContentItem/Grammar rows at
         // startup (shared, committed state across this whole test JVM run) - so every assertion below
-        // is scoped to the one row this call itself created, or a before/after delta, never an
-        // absolute count.
+        // is scoped to a before/after delta, never an absolute count.
         ProductionCounts before = productionCounts();
 
-        NormalizedVocabularyCandidatePromotionResult result = promotion.promote(NormalizedCandidateType.VOCABULARY,
+        NormalizedGrammarCandidatePromotionResult result = promotion.promote(NormalizedCandidateType.GRAMMAR,
                 candidate.getId(), candidate.getNormalizedAt());
 
-        assertThat(result.slug()).matches("word-[0-9a-f-]{36}");
+        assertThat(result.slug()).matches("grammar-[0-9a-f-]{36}");
 
         ProductionCounts after = productionCounts();
         assertThat(after.contentItems()).isEqualTo(before.contentItems() + 1);
-        assertThat(after.words()).isEqualTo(before.words() + 1);
-        assertThat(after.meanings()).isEqualTo(before.meanings() + 1);
+        assertThat(after.grammars()).isEqualTo(before.grammars() + 1);
         assertThat(after.examples()).isEqualTo(before.examples() + 1);
         assertThat(after.importedSourceRecords()).isEqualTo(before.importedSourceRecords() + 1);
-        assertThat(after.grammars()).isEqualTo(before.grammars());
+        // confusablePatterns is present on this candidate, but must never be resolved into either.
+        assertThat(after.grammarRelations()).isEqualTo(before.grammarRelations());
+        assertThat(after.grammarComparisons()).isEqualTo(before.grammarComparisons());
 
         ContentItem item = contentItems.findById(result.contentItemId()).orElseThrow();
         assertThat(item.getSlug()).isEqualTo(result.slug());
-        assertThat(item.getType()).isEqualTo(ContentType.WORD);
+        assertThat(item.getType()).isEqualTo(ContentType.GRAMMAR);
         assertThat(item.isPublished()).isFalse();
         assertThat(item.getReviewStatus()).isEqualTo(ReviewStatus.PENDING);
         assertThat(item.getSourceRef()).isEqualTo(CANONICAL_JLPT_MAX_SOURCE_REF);
 
-        Word word = item.getWord();
-        assertThat(word).isNotNull();
-        assertThat(word.getExpression()).isEqualTo("本");
-        assertThat(word.getReading()).isEqualTo("ほん");
-        assertThat(word.getPartOfSpeech()).isEqualTo("noun");
-        assertThat(word.getMeanings()).hasSize(1);
-        assertThat(word.getMeanings().get(0).getText()).isEqualTo("책");
-        assertThat(word.getMeanings().get(0).getLanguageTag()).isEqualTo("ko");
+        Grammar grammar = item.getGrammar();
+        assertThat(grammar).isNotNull();
+        assertThat(grammar.getPattern()).isEqualTo("〜てみる");
+        assertThat(grammar.getExplanation()).isEqualTo("gloss\n\nnuance");
+        assertThat(grammar.getConnection()).isEqualTo("동사 て형 + みる");
 
         assertThat(item.getExamples()).hasSize(1);
-        assertThat(item.getExamples().get(0).getJapaneseText()).isEqualTo("本の例文です");
-        assertThat(item.getExamples().get(0).getMeaning()).isEqualTo(word.getMeanings().get(0));
+        assertThat(item.getExamples().get(0).getJapaneseText()).isEqualTo("〜てみるの前文です");
+        assertThat(item.getExamples().get(0).getTranslation()).isEqualTo("〜てみるの번역");
+        assertThat(item.getExamples().get(0).getReading()).isNull();
 
         assertThat(item.getLevels()).hasSize(1);
         assertThat(item.getLevels().iterator().next().getCode()).isEqualTo("N5");
@@ -256,38 +236,34 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
         assertThat(records).hasSize(1);
         ImportedSourceRecord record = records.get(0);
         assertThat(record.getSourceRef()).isEqualTo(CANONICAL_JLPT_MAX_SOURCE_REF);
-        assertThat(record.getNoteType()).isEqualTo(VOCABULARY_NOTE_TYPE);
+        assertThat(record.getNoteType()).isEqualTo(GRAMMAR_NOTE_TYPE);
         assertThat(record.getSourceNoteId()).isEqualTo(900001L);
         assertThat(record.getContentItem()).isEqualTo(item);
     }
 
     // ===================================================================================
-    // MAJOR 1 hardening: truthful provenance (test requirements 1-2)
+    // truthful provenance
     // ===================================================================================
 
     @Test
     void newlyCreatedImportedSourceRecordUsesGenuineRawSourceDataNotSyntheticNormalizedFields() {
         seedN5Level();
         registerAllowedCanonicalSource();
-        store.saveVocabulary(vocab(CANONICAL_JLPT_MAX_SOURCE_REF, 900010L, "E-truthful", "食べる", "たべる", "verb", "N5",
-                "먹다"));
+        store.saveGrammar(grammar(CANONICAL_JLPT_MAX_SOURCE_REF, 900010L, "U-truthful", "〜たことがある", "た형+ことがある",
+                "N5"));
         NormalizedContentCandidate candidate = onlyCandidate(CANONICAL_JLPT_MAX_SOURCE_REF, 900010L);
         seedPrivateApkgNote(CANONICAL_JLPT_MAX_SOURCE_REF, 900010L, " raw::provenance::tag ",
-                List.of("EntryID", "Word", "Reading", "PitchAccent", "Meaning"),
-                List.of("E-truthful", "食べる", "たべる", "0", "먹다 / to eat"));
+                List.of("UnitID", "Pattern", "Level"), List.of("U-truthful", "〜たことがある", "N5"));
 
-        promotion.promote(NormalizedCandidateType.VOCABULARY, candidate.getId(), candidate.getNormalizedAt());
+        promotion.promote(NormalizedCandidateType.GRAMMAR, candidate.getId(), candidate.getNormalizedAt());
 
         ImportedSourceRecord record = importedSourceRecords
-                .findBySourceRefAndNoteTypeAndSourceNoteId(CANONICAL_JLPT_MAX_SOURCE_REF, VOCABULARY_NOTE_TYPE, 900010L)
+                .findBySourceRefAndNoteTypeAndSourceNoteId(CANONICAL_JLPT_MAX_SOURCE_REF, GRAMMAR_NOTE_TYPE, 900010L)
                 .orElseThrow();
-        // Genuine raw payload from private_apkg_notes, verbatim (re-joined with the established
-        // U+001F delimiter) - never the old synthetic 6-field NormalizedCandidateId/.../LevelCode list.
         assertThat(record.getTags()).isEqualTo(" raw::provenance::tag ");
-        assertThat(record.getFieldNames()).isEqualTo("EntryIDWordReadingPitchAccentMeaning");
-        assertThat(record.getFieldValues()).isEqualTo("E-truthful食べるたべる0먹다 / to eat");
-        // Never falsely labeled as though it were the normalized candidate's own field set.
-        assertThat(record.getFieldNames()).doesNotContain("NormalizedCandidateId", "LevelCode");
+        assertThat(record.getFieldNames()).isEqualTo("UnitIDPatternLevel");
+        assertThat(record.getFieldValues()).isEqualTo("U-truthful〜たことがあるN5");
+        assertThat(record.getFieldNames()).doesNotContain("NormalizedCandidateId");
         assertThat(record.getFieldValues()).doesNotContain(candidate.getId().toString());
     }
 
@@ -295,21 +271,20 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
     void multipleRawFieldNamesAndValuesSurvivePromotionWithFieldBoundariesPreservedExactly() {
         seedN5Level();
         registerAllowedCanonicalSource();
-        store.saveVocabulary(vocab(CANONICAL_JLPT_MAX_SOURCE_REF, 900014L, "E-boundary", "選ぶ", "えらぶ", "verb",
-                "N5", "선택하다"));
-        NormalizedContentCandidate candidate = onlyCandidate(CANONICAL_JLPT_MAX_SOURCE_REF, 900014L);
+        store.saveGrammar(grammar(CANONICAL_JLPT_MAX_SOURCE_REF, 900013L, "U-boundary", "〜べきだ", "動詞普通形+べきだ", "N5"));
+        NormalizedContentCandidate candidate = onlyCandidate(CANONICAL_JLPT_MAX_SOURCE_REF, 900013L);
         // Chosen so a delimiter-less join is genuinely ambiguous on split: "ab"+"c" and "a"+"bc" both
         // naively concatenate to "abc" - only a real per-field delimiter can round-trip this back into
-        // the original five-element list, proving field boundaries (not just the whole joined string)
+        // the original four-element list, proving field boundaries (not just the whole joined string)
         // survive promotion.
-        List<String> fieldNames = List.of("EntryID", "ab", "c", "Reading", "Meaning");
-        List<String> fieldValues = List.of("E-boundary", "a", "bc", "えらぶ", "선택하다");
-        seedPrivateApkgNote(CANONICAL_JLPT_MAX_SOURCE_REF, 900014L, "", fieldNames, fieldValues);
+        List<String> fieldNames = List.of("UnitID", "ab", "c", "Level");
+        List<String> fieldValues = List.of("U-boundary", "a", "bc", "N5");
+        seedPrivateApkgNote(CANONICAL_JLPT_MAX_SOURCE_REF, 900013L, "", fieldNames, fieldValues);
 
-        promotion.promote(NormalizedCandidateType.VOCABULARY, candidate.getId(), candidate.getNormalizedAt());
+        promotion.promote(NormalizedCandidateType.GRAMMAR, candidate.getId(), candidate.getNormalizedAt());
 
         ImportedSourceRecord record = importedSourceRecords
-                .findBySourceRefAndNoteTypeAndSourceNoteId(CANONICAL_JLPT_MAX_SOURCE_REF, VOCABULARY_NOTE_TYPE, 900014L)
+                .findBySourceRefAndNoteTypeAndSourceNoteId(CANONICAL_JLPT_MAX_SOURCE_REF, GRAMMAR_NOTE_TYPE, 900013L)
                 .orElseThrow();
         assertThat(record.getFieldNames().split("\\u001f", -1)).containsExactlyElementsOf(fieldNames);
         assertThat(record.getFieldValues().split("\\u001f", -1)).containsExactlyElementsOf(fieldValues);
@@ -317,17 +292,14 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
 
     @Test
     void missingTruthfulProvenanceBlocksPromotionWithNoProductionWrites() {
-        // READY_FOR_DRAFT_PROMOTION in every other respect, but deliberately NO private_apkg_notes row
-        // seeded and no pre-existing ImportedSourceRecord - the exact "information genuinely missing"
-        // case the hardening instructions require blocking rather than fabricating a substitute for.
         seedN5Level();
         registerAllowedCanonicalSource();
-        store.saveVocabulary(vocab(CANONICAL_JLPT_MAX_SOURCE_REF, 900011L, "E-missing", "語", "ご", "noun", "N5",
-                "meaning"));
+        store.saveGrammar(grammar(CANONICAL_JLPT_MAX_SOURCE_REF, 900011L, "U-missing", "〜ようにする", "동사 기본형+ようにする",
+                "N5"));
         NormalizedContentCandidate candidate = onlyCandidate(CANONICAL_JLPT_MAX_SOURCE_REF, 900011L);
         ProductionCounts before = productionCounts();
 
-        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.VOCABULARY, candidate.getId(),
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, candidate.getId(),
                 candidate.getNormalizedAt()))
                 .isInstanceOf(NormalizedCandidatePromotionRejectedException.class)
                 .hasMessageContaining("private_apkg_notes");
@@ -336,18 +308,59 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
     }
 
     // ===================================================================================
-    // 2. candidate not READY
+    // not ready / rights
     // ===================================================================================
 
     @Test
     void notReadyCandidateIsRejectedWithNoProductionWrites() {
         String ref = ref();
         // No Level seeded, no ContentSource registered - definitely BLOCKED.
-        store.saveVocabulary(vocab(ref, 1L, "E1", "語", "ご", "noun", "N5", "meaning"));
+        store.saveGrammar(grammar(ref, 1L, "U1", "文型", "接続", "N5"));
         NormalizedContentCandidate candidate = onlyCandidate(ref);
         ProductionCounts before = productionCounts();
 
-        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.VOCABULARY, candidate.getId(),
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, candidate.getId(),
+                candidate.getNormalizedAt()))
+                .isInstanceOf(NormalizedCandidatePromotionRejectedException.class)
+                .hasMessageContaining("READY_FOR_DRAFT_PROMOTION");
+
+        assertThat(productionCounts()).isEqualTo(before);
+    }
+
+    @Test
+    void sourceRightsBlockedCandidateIsRejectedWithNoProductionWrites() {
+        String ref = ref();
+        seedN5Level();
+        store.saveGrammar(grammar(ref, 1L, "U1", "文型", "接続", "N5"));
+        NormalizedContentCandidate candidate = onlyCandidate(ref);
+        ContentSource source = contentSources.save(new ContentSource(ref, "test source", "1", null, null, null, null));
+        source.reviewRights(ContentSourceRightsStatus.MANUAL_REVIEW_REQUIRED, "검토 시작", false, null);
+        source.reviewRights(ContentSourceRightsStatus.BLOCKED, "허용 불가", false, null);
+        ProductionCounts before = productionCounts();
+
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, candidate.getId(),
+                candidate.getNormalizedAt()))
+                .isInstanceOf(NormalizedCandidatePromotionRejectedException.class);
+
+        assertThat(productionCounts()).isEqualTo(before);
+    }
+
+    // ===================================================================================
+    // explanation too long (Grammar's mapping-length axis - no meaning-language equivalent exists)
+    // ===================================================================================
+
+    @Test
+    void explanationTooLongCandidateIsRejectedWithNoProductionWrites() {
+        String ref = ref();
+        seedN5Level();
+        registerAllowedSource(ref);
+        store.saveGrammar(new GrammarNormalizationResult(ref, 1L, "U1", "文型",
+                new NormalizedGrammarExample(1, "前文です", null, "번역"), "g".repeat(1000), "n".repeat(1000),
+                "接続", List.of(), new NormalizedJlptLevel("N5", "N5", "Level"), null, Map.of(), List.of(), true));
+        NormalizedContentCandidate candidate = onlyCandidate(ref);
+        ProductionCounts before = productionCounts();
+
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, candidate.getId(),
                 candidate.getNormalizedAt()))
                 .isInstanceOf(NormalizedCandidatePromotionRejectedException.class)
                 .hasMessageContaining("READY_FOR_DRAFT_PROMOTION");
@@ -356,63 +369,102 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
     }
 
     // ===================================================================================
-    // 3. rights not allowed
+    // frontExample too long for production Example (Ticket 4E-8 hardening, MAJOR 1)
     // ===================================================================================
 
     @Test
-    void sourceRightsBlockedCandidateIsRejectedWithNoProductionWrites() {
+    void frontExampleJapaneseTextOverTheProductionExampleMaxIsRejectedWithNoProductionWrites() {
         String ref = ref();
         seedN5Level();
-        store.saveVocabulary(vocab(ref, 1L, "E1", "語", "ご", "noun", "N5", "meaning"));
-        NormalizedContentCandidate candidate = onlyCandidate(ref);
-        ContentSource source = contentSources.save(new ContentSource(ref, "test source", "1", null, null, null, null));
-        source.reviewRights(ContentSourceRightsStatus.MANUAL_REVIEW_REQUIRED, "검토 시작", false, null);
-        source.reviewRights(ContentSourceRightsStatus.BLOCKED, "허용 불가", false, null);
-        ProductionCounts before = productionCounts();
-
-        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.VOCABULARY, candidate.getId(),
-                candidate.getNormalizedAt()))
-                .isInstanceOf(NormalizedCandidatePromotionRejectedException.class);
-
-        assertThat(productionCounts()).isEqualTo(before);
-    }
-
-    // ===================================================================================
-    // 4. unknown Vocabulary source / unresolved meaning language
-    // ===================================================================================
-
-    @Test
-    void unknownSourceMeaningLanguageUnresolvedCandidateIsRejectedWithNoProductionWrites() {
-        String ref = ref();
-        seedN5Level();
-        store.saveVocabulary(vocab(ref, 1L, "E1", "語", "ご", "noun", "N5", "meaning"));
-        NormalizedContentCandidate candidate = onlyCandidate(ref);
         registerAllowedSource(ref);
+        store.saveGrammar(new GrammarNormalizationResult(ref, 1L, "U1", "文型",
+                new NormalizedGrammarExample(1, "あ".repeat(1001), null, "번역"), "gloss", "nuance",
+                "接続", List.of(), new NormalizedJlptLevel("N5", "N5", "Level"), null, Map.of(), List.of(), true));
+        NormalizedContentCandidate candidate = onlyCandidate(ref);
         ProductionCounts before = productionCounts();
 
-        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.VOCABULARY, candidate.getId(),
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, candidate.getId(),
                 candidate.getNormalizedAt()))
-                .isInstanceOf(NormalizedCandidatePromotionRejectedException.class);
+                .isInstanceOf(NormalizedCandidatePromotionRejectedException.class)
+                .hasMessageContaining("READY_FOR_DRAFT_PROMOTION");
+
+        assertThat(productionCounts()).isEqualTo(before);
+    }
+
+    @Test
+    void frontExampleTranslationOverTheProductionExampleMaxIsRejectedWithNoProductionWrites() {
+        String ref = ref();
+        seedN5Level();
+        registerAllowedSource(ref);
+        store.saveGrammar(new GrammarNormalizationResult(ref, 1L, "U1", "文型",
+                new NormalizedGrammarExample(1, "前文です", null, "번".repeat(1001)), "gloss", "nuance",
+                "接続", List.of(), new NormalizedJlptLevel("N5", "N5", "Level"), null, Map.of(), List.of(), true));
+        NormalizedContentCandidate candidate = onlyCandidate(ref);
+        ProductionCounts before = productionCounts();
+
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, candidate.getId(),
+                candidate.getNormalizedAt()))
+                .isInstanceOf(NormalizedCandidatePromotionRejectedException.class)
+                .hasMessageContaining("READY_FOR_DRAFT_PROMOTION");
+
+        assertThat(productionCounts()).isEqualTo(before);
+    }
+
+    @Test
+    void frontExampleReadingOverTheProductionExampleMaxIsRejectedWithNoProductionWrites() {
+        String ref = ref();
+        seedN5Level();
+        registerAllowedSource(ref);
+        store.saveGrammar(new GrammarNormalizationResult(ref, 1L, "U1", "文型",
+                new NormalizedGrammarExample(1, "前文です", "ま".repeat(1001), "번역"), "gloss", "nuance",
+                "接続", List.of(), new NormalizedJlptLevel("N5", "N5", "Level"), null, Map.of(), List.of(), true));
+        NormalizedContentCandidate candidate = onlyCandidate(ref);
+        ProductionCounts before = productionCounts();
+
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, candidate.getId(),
+                candidate.getNormalizedAt()))
+                .isInstanceOf(NormalizedCandidatePromotionRejectedException.class)
+                .hasMessageContaining("READY_FOR_DRAFT_PROMOTION");
 
         assertThat(productionCounts()).isEqualTo(before);
     }
 
     // ===================================================================================
-    // 5. unmappable Level
+    // frontExample reading preservation (Ticket 4E-8 hardening, MAJOR 2)
+    // ===================================================================================
+
+    @Test
+    void frontExampleReadingIsPreservedVerbatimOnTheProductionExampleWhenPresent() {
+        seedN5Level();
+        registerAllowedCanonicalSource();
+        store.saveGrammar(new GrammarNormalizationResult(CANONICAL_JLPT_MAX_SOURCE_REF, 900020L, "U-reading", "文型",
+                new NormalizedGrammarExample(1, "前文です", "ぜんぶんです", "번역"), "gloss", "nuance",
+                "接続", List.of(), new NormalizedJlptLevel("N5", "N5", "Level"), null, Map.of(), List.of(), true));
+        NormalizedContentCandidate candidate = onlyCandidate(CANONICAL_JLPT_MAX_SOURCE_REF, 900020L);
+        seedPrivateApkgNote(CANONICAL_JLPT_MAX_SOURCE_REF, 900020L, "", List.of("UnitID"), List.of("U-reading"));
+
+        NormalizedGrammarCandidatePromotionResult result = promotion.promote(NormalizedCandidateType.GRAMMAR,
+                candidate.getId(), candidate.getNormalizedAt());
+
+        ContentItem item = contentItems.findById(result.contentItemId()).orElseThrow();
+        assertThat(item.getExamples()).hasSize(1);
+        assertThat(item.getExamples().get(0).getReading()).isEqualTo("ぜんぶんです");
+    }
+
+    // ===================================================================================
+    // unmappable Level
     // ===================================================================================
 
     @Test
     void unmappableLevelCandidateIsRejectedWithNoProductionWrites() {
         seedN5Level();
         registerAllowedCanonicalSource();
-        // N9 is never seeded by anything (see NormalizedCandidatePromotionReadinessServiceTest.r_unmappableJlptLevelIsBlocked).
-        store.saveVocabulary(new VocabularyNormalizationResult(CANONICAL_JLPT_MAX_SOURCE_REF, 900002L, "E1", "語", "ご",
-                "noun", null, List.of(new NormalizedMeaning(1, "meaning")), List.of(),
-                new NormalizedJlptLevel("N9", "N9", "WordJLPT"), "語", "ご", Map.of(), List.of(), true));
+        // N9 is never seeded by anything.
+        store.saveGrammar(grammar(CANONICAL_JLPT_MAX_SOURCE_REF, 900002L, "U1", "文型", "接続", "N9"));
         NormalizedContentCandidate candidate = onlyCandidate(CANONICAL_JLPT_MAX_SOURCE_REF, 900002L);
         ProductionCounts before = productionCounts();
 
-        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.VOCABULARY, candidate.getId(),
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, candidate.getId(),
                 candidate.getNormalizedAt()))
                 .isInstanceOf(NormalizedCandidatePromotionRejectedException.class);
 
@@ -420,25 +472,24 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
     }
 
     // ===================================================================================
-    // 6. normalization fatal / field mapping blocker
+    // normalization fatal
     // ===================================================================================
 
     @Test
     void fatalNormalizationCandidateIsRejectedWithNoProductionWrites() {
         String ref = ref();
         seedN5Level();
-        VocabularyNormalizationResult base = vocab(ref, 1L, "E1", "語", "ご", "noun", "N5", "meaning");
-        store.saveVocabulary(new VocabularyNormalizationResult(base.sourceRef(), base.sourceNoteId(), base.entryId(),
-                base.expression(), base.reading(), base.partOfSpeech(), base.pitchAccent(), base.meanings(),
-                base.examples(), base.level(), base.normalizedSearchExpression(), base.normalizedSearchReading(),
-                base.preservedExtraFields(),
-                List.of(new VocabularyNormalizationWarning(VocabularyNormalizationIssue.MISSING_ENTRY_ID, "fatal")),
-                base.validForPromotion()));
+        GrammarNormalizationResult base = grammar(ref, 1L, "U1", "文型", "接続", "N5");
+        store.saveGrammar(new GrammarNormalizationResult(base.sourceRef(), base.sourceNoteId(), base.unitId(),
+                base.pattern(), base.frontExample(), base.meaningGloss(), base.nuance(), base.connection(),
+                base.confusablePatterns(), base.level(), base.rawKind(), base.unknownFields(),
+                List.of(new GrammarNormalizationWarning(GrammarNormalizationIssue.MISSING_MEANING_GLOSS, "fatal")),
+                false));
         NormalizedContentCandidate candidate = onlyCandidate(ref);
         registerAllowedSource(ref);
         ProductionCounts before = productionCounts();
 
-        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.VOCABULARY, candidate.getId(),
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, candidate.getId(),
                 candidate.getNormalizedAt()))
                 .isInstanceOf(NormalizedCandidatePromotionRejectedException.class);
 
@@ -446,7 +497,7 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
     }
 
     // ===================================================================================
-    // 7. unresolved pair
+    // unresolved / SAME_CONTENT pair
     // ===================================================================================
 
     @Test
@@ -457,16 +508,12 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
         registerAllowedSource(ref);
         ProductionCounts before = productionCounts();
 
-        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.VOCABULARY, pair.getLeftCandidate().getId(),
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, pair.getLeftCandidate().getId(),
                 pair.getLeftCandidate().getNormalizedAt()))
                 .isInstanceOf(NormalizedCandidatePromotionRejectedException.class);
 
         assertThat(productionCounts()).isEqualTo(before);
     }
-
-    // ===================================================================================
-    // 8. SAME_CONTENT canonical-selection-required candidate
-    // ===================================================================================
 
     @Test
     void sameContentPairCandidateIsRejectedWithNoProductionWrites() {
@@ -474,14 +521,14 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
         seedN5Level();
         NormalizedCandidateMatchPair pair = seedDuplicatePair(ref);
         registerAllowedSource(ref);
-        reviewService.submitDecision(NormalizedCandidateType.VOCABULARY, submission(pair, HumanReviewDecision.SAME_CONTENT),
+        reviewService.submitDecision(NormalizedCandidateType.GRAMMAR, submission(pair, HumanReviewDecision.SAME_CONTENT),
                 admin("same-content"));
         ProductionCounts before = productionCounts();
 
-        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.VOCABULARY, pair.getLeftCandidate().getId(),
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, pair.getLeftCandidate().getId(),
                 pair.getLeftCandidate().getNormalizedAt()))
                 .isInstanceOf(NormalizedCandidatePromotionRejectedException.class);
-        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.VOCABULARY, pair.getRightCandidate().getId(),
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, pair.getRightCandidate().getId(),
                 pair.getRightCandidate().getNormalizedAt()))
                 .isInstanceOf(NormalizedCandidatePromotionRejectedException.class);
 
@@ -489,30 +536,25 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
     }
 
     // ===================================================================================
-    // 9. already-promoted candidate / linked provenance -> no duplicate ContentItem
+    // already-promoted / unlinked-record-reuse
     // ===================================================================================
 
     @Test
     void alreadyPromotedCandidateIsRejectedAndNeverDuplicatesTheContentItem() {
         String ref = ref();
         seedN5Level();
-        store.saveVocabulary(vocab(ref, 42L, "E1", "語", "ご", "noun", "N5", "meaning"));
+        store.saveGrammar(grammar(ref, 42L, "U1", "文型", "接続", "N5"));
         NormalizedContentCandidate candidate = onlyCandidate(ref);
         registerAllowedSource(ref);
 
         ContentItem existingItem = contentItems.save(new ContentItem("already-promoted-" + UUID.randomUUID(),
-                ContentType.WORD, ref, false));
-        ImportedSourceRecord existingRecord = new ImportedSourceRecord(ref, VOCABULARY_NOTE_TYPE, 42L, "N5", "", "f", "v");
+                ContentType.GRAMMAR, ref, false));
+        ImportedSourceRecord existingRecord = new ImportedSourceRecord(ref, GRAMMAR_NOTE_TYPE, 42L, "N5", "", "f", "v");
         existingRecord.linkContentItem(existingItem);
         importedSourceRecords.save(existingRecord);
         long contentItemsBefore = contentItems.count();
 
-        // ALREADY_PROMOTED short-circuits readiness's own overallStatus regardless of any other
-        // issue (see NormalizedCandidatePromotionReadinessService.evaluate's `overall` ternary), so
-        // this rejection is caught by promote()'s general "not exactly READY_FOR_DRAFT_PROMOTION"
-        // check - the exact same generic message every BLOCKED rejection uses, just with this
-        // overallStatus value inside it.
-        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.VOCABULARY, candidate.getId(),
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, candidate.getId(),
                 candidate.getNormalizedAt()))
                 .isInstanceOf(NormalizedCandidatePromotionRejectedException.class)
                 .hasMessageContaining("ALREADY_PROMOTED");
@@ -523,99 +565,75 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
 
     @Test
     void anUnlinkedExistingImportedSourceRecordIsReusedNotDuplicatedOnPromotion() {
-        // Must be the canonical sourceRef so this candidate can actually reach
-        // READY_FOR_DRAFT_PROMOTION (an unlinked record alone does not set ALREADY_PROMOTED - see
-        // NormalizedCandidatePromotionReadinessService's ExistingProductionLinkStatus logic - so every
-        // other axis, including meaning-language, must still resolve for promote() to succeed here).
-        // No private_apkg_notes row is seeded here on purpose: an existing (even unlinked)
-        // ImportedSourceRecord must never trigger a private-staging lookup at all - see
-        // NormalizedVocabularyCandidatePromotionService's own "Provenance" javadoc.
         seedN5Level();
         registerAllowedCanonicalSource();
-        store.saveVocabulary(vocab(CANONICAL_JLPT_MAX_SOURCE_REF, 900003L, "E1", "語", "ご", "noun", "N5", "meaning"));
+        store.saveGrammar(grammar(CANONICAL_JLPT_MAX_SOURCE_REF, 900003L, "U1", "文型", "接続", "N5"));
         NormalizedContentCandidate candidate = onlyCandidate(CANONICAL_JLPT_MAX_SOURCE_REF, 900003L);
 
         ImportedSourceRecord bareRecord = importedSourceRecords.save(
-                new ImportedSourceRecord(CANONICAL_JLPT_MAX_SOURCE_REF, VOCABULARY_NOTE_TYPE, 900003L, "N5", "", "f", "v"));
+                new ImportedSourceRecord(CANONICAL_JLPT_MAX_SOURCE_REF, GRAMMAR_NOTE_TYPE, 900003L, "N5", "", "f", "v"));
         Long bareRecordId = bareRecord.getId();
         long recordsBefore = importedSourceRecords.count();
         long itemsBefore = contentItems.count();
 
-        promotion.promote(NormalizedCandidateType.VOCABULARY, candidate.getId(), candidate.getNormalizedAt());
+        promotion.promote(NormalizedCandidateType.GRAMMAR, candidate.getId(), candidate.getNormalizedAt());
 
-        // Exactly one new row, not two - the bare row above must have been reused/linked, never
-        // left in place alongside a second, freshly-inserted ImportedSourceRecord for the same
-        // (sourceRef, noteType, sourceNoteId) identity (which uk_imported_source_record would reject
-        // anyway, but this proves the code path never even attempts that insert).
         assertThat(importedSourceRecords.count()).isEqualTo(recordsBefore);
         assertThat(contentItems.count()).isEqualTo(itemsBefore + 1);
         ImportedSourceRecord reused = importedSourceRecords.findById(bareRecordId).orElseThrow();
         assertThat(reused.getContentItem()).isNotNull();
-        // Untouched - still the placeholder "f"/"v" seeded above, never overwritten by any lookup.
         assertThat(reused.getFieldNames()).isEqualTo("f");
         assertThat(reused.getFieldValues()).isEqualTo("v");
     }
 
     // ===================================================================================
-    // 10. wrong candidate type / Grammar
+    // wrong candidate type / missing candidate
     // ===================================================================================
 
     @Test
-    void grammarCandidateIsRejectedSafelyWithoutAnyRepositoryAccess() {
-        // Deliberately an id that does not exist at all: promote() must reject on candidateType
-        // alone, before ever attempting to look the id up - proving no Grammar mapping is attempted.
+    void vocabularyCandidateIsRejectedSafelyWithoutAnyRepositoryAccess() {
         ProductionCounts before = productionCounts();
 
-        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, -1L, Instant.now()))
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.VOCABULARY, -1L, Instant.now()))
                 .isInstanceOf(NormalizedCandidatePromotionRejectedException.class)
-                .hasMessageContaining("VOCABULARY");
+                .hasMessageContaining("GRAMMAR");
 
         assertThat(productionCounts()).isEqualTo(before);
     }
-
-    // ===================================================================================
-    // 11. missing candidate
-    // ===================================================================================
 
     @Test
     void missingCandidateIsRejectedCleanly() {
         ProductionCounts before = productionCounts();
 
-        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.VOCABULARY, -1L, Instant.now()))
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, -1L, Instant.now()))
                 .isInstanceOf(java.util.NoSuchElementException.class);
 
         assertThat(productionCounts()).isEqualTo(before);
     }
 
     // ===================================================================================
-    // MAJOR 2 hardening: stale admin intent (test requirements 8-11)
+    // stale admin intent
     // ===================================================================================
 
     @Test
     void staleCandidateRevisionIsRejectedWithNoProductionWritesEvenWhenStillReady() {
         seedN5Level();
         registerAllowedCanonicalSource();
-        store.saveVocabulary(vocab(CANONICAL_JLPT_MAX_SOURCE_REF, 900012L, "E-stale", "語", "ご", "noun", "N5", "meaning"));
+        store.saveGrammar(grammar(CANONICAL_JLPT_MAX_SOURCE_REF, 900012L, "U-stale", "文型", "接続", "N5"));
         NormalizedContentCandidate candidate = onlyCandidate(CANONICAL_JLPT_MAX_SOURCE_REF, 900012L);
         Instant renderedNormalizedAt = candidate.getNormalizedAt();
 
-        // Re-normalize the SAME (sourceRef, sourceNoteId, VOCABULARY) candidate in place - simulates
-        // another process re-normalizing it after the admin's GET render, but before their POST. The
-        // new content is deliberately ALSO fully READY_FOR_DRAFT_PROMOTION-eligible (still N5, still
-        // has a meaning) - this must still be rejected on staleness alone, proving readiness passing
-        // is never sufficient by itself.
-        store.saveVocabulary(vocab(CANONICAL_JLPT_MAX_SOURCE_REF, 900012L, "E-stale", "変わった語", "かわったご", "noun",
-                "N5", "meaning"));
+        store.saveGrammar(grammar(CANONICAL_JLPT_MAX_SOURCE_REF, 900012L, "U-stale", "変わった文型", "変わった接続", "N5"));
         NormalizedContentCandidate reNormalized = onlyCandidate(CANONICAL_JLPT_MAX_SOURCE_REF, 900012L);
         assertThat(reNormalized.getId()).isEqualTo(candidate.getId());
         assertThat(reNormalized.getNormalizedAt())
                 .as("this test's premise requires normalizedAt to actually change on re-save - if this "
                         + "fails, the test environment's clock resolution is too coarse to prove staleness here")
                 .isNotEqualTo(renderedNormalizedAt);
-        seedPrivateApkgNote(CANONICAL_JLPT_MAX_SOURCE_REF, 900012L, "", List.of("Word"), List.of("変わった語"));
+        seedPrivateApkgNote(CANONICAL_JLPT_MAX_SOURCE_REF, 900012L, "", List.of("Pattern"), List.of("変わった文型"));
         ProductionCounts before = productionCounts();
 
-        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.VOCABULARY, candidate.getId(),
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, candidate.getId(),
                 renderedNormalizedAt))
                 .isInstanceOf(NormalizedCandidatePromotionStaleException.class);
 
@@ -624,15 +642,13 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
 
     @Test
     void freshnessPassingAloneDoesNotBypassReadinessRecomputation() {
-        // normalizedAt matches (freshness passes) but the candidate is otherwise BLOCKED (no rights
-        // registered) - must still be rejected via the readiness path, not silently promoted.
         String ref = ref();
         seedN5Level();
-        store.saveVocabulary(vocab(ref, 1L, "E1", "語", "ご", "noun", "N5", "meaning"));
+        store.saveGrammar(grammar(ref, 1L, "U1", "文型", "接続", "N5"));
         NormalizedContentCandidate candidate = onlyCandidate(ref);
         ProductionCounts before = productionCounts();
 
-        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.VOCABULARY, candidate.getId(),
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, candidate.getId(),
                 candidate.getNormalizedAt()))
                 .isInstanceOf(NormalizedCandidatePromotionRejectedException.class)
                 .hasMessageContaining("READY_FOR_DRAFT_PROMOTION");
@@ -642,18 +658,13 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
 
     @Test
     void pairReviewStateChangeBetweenRenderAndPostIsCaughtByFreshReadinessRecomputationNotAFreshnessToken() {
-        // A NEEDS_FOLLOWUP decision submitted on this candidate's pair between "render" and "POST"
-        // never touches the candidate's own normalizedAt - so the freshness token this hardening adds
-        // still matches (proving that token is NOT what catches this), and the rejection instead comes
-        // purely from readiness's own always-fresh (never GET-cached) pair/review recomputation - see
-        // NormalizedVocabularyCandidatePromotionService's class javadoc "Freshness" section.
         String ref = ref();
         seedN5Level();
         NormalizedCandidateMatchPair pair = seedDuplicatePair(ref);
         registerAllowedSource(ref);
         Instant renderedNormalizedAt = pair.getLeftCandidate().getNormalizedAt();
 
-        reviewService.submitDecision(NormalizedCandidateType.VOCABULARY, submission(pair, HumanReviewDecision.NEEDS_FOLLOWUP),
+        reviewService.submitDecision(NormalizedCandidateType.GRAMMAR, submission(pair, HumanReviewDecision.NEEDS_FOLLOWUP),
                 admin("pair-change"));
         NormalizedContentCandidate afterReview = candidateRepository.findById(pair.getLeftCandidate().getId()).orElseThrow();
         assertThat(afterReview.getNormalizedAt())
@@ -662,7 +673,7 @@ class NormalizedVocabularyCandidatePromotionServiceTest {
                 .isEqualTo(renderedNormalizedAt);
         ProductionCounts before = productionCounts();
 
-        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.VOCABULARY, pair.getLeftCandidate().getId(),
+        assertThatThrownBy(() -> promotion.promote(NormalizedCandidateType.GRAMMAR, pair.getLeftCandidate().getId(),
                 renderedNormalizedAt))
                 .isInstanceOf(NormalizedCandidatePromotionRejectedException.class)
                 .hasMessageContaining("PAIR_NEEDS_FOLLOWUP");

@@ -463,15 +463,109 @@ class NormalizedCandidatePromotionReadinessServiceTest {
     }
 
     @Test
-    void v_grammarExplanationMappingIsAlwaysUnresolved() {
+    void v_grammarExplanationIsComposedFromMeaningGlossAndNuance() {
         String ref = ref();
         seedN5Level();
         store.saveGrammar(grammar(ref, 1L, "U1", "pattern", "connection", "N5"));
         var detail = readiness.detail(NormalizedCandidateType.GRAMMAR, onlyCandidate(ref).getId());
 
-        assertThat(codesOf(detail.result())).contains(PromotionReadinessIssueCode.GRAMMAR_MAPPING_POLICY_UNRESOLVED);
+        assertThat(codesOf(detail.result())).doesNotContain(PromotionReadinessIssueCode.GRAMMAR_EXPLANATION_TOO_LONG);
+        assertThat(detail.result().mappingStatus()).isEqualTo(MappingStatus.READY);
+        // "gloss"/"nuance" are the grammar() fixture's own hardcoded meaningGloss/nuance values.
+        assertThat(detail.mappingPreview().grammar().explanationPreview()).isEqualTo("gloss\n\nnuance");
+    }
+
+    @Test
+    void v2_grammarExplanationOverTheProductionMaxIsTooLong() {
+        String ref = ref();
+        seedN5Level();
+        store.saveGrammar(new GrammarNormalizationResult(ref, 1L, "U1", "pattern",
+                new NormalizedGrammarExample(1, "前文pattern", null, "번역"), "g".repeat(1000), "n".repeat(1000),
+                "connection", List.of(), new NormalizedJlptLevel("N5", "N5", "Level"), null, Map.of(), List.of(),
+                true));
+        var result = readiness.detail(NormalizedCandidateType.GRAMMAR, onlyCandidate(ref).getId()).result();
+
+        assertThat(codesOf(result)).contains(PromotionReadinessIssueCode.GRAMMAR_EXPLANATION_TOO_LONG);
+        assertThat(result.mappingStatus()).isEqualTo(MappingStatus.BLOCKED);
+    }
+
+    @Test
+    void v3_grammarFrontExampleJapaneseTextOverTheProductionExampleMaxIsTooLong() {
+        String ref = ref();
+        seedN5Level();
+        store.saveGrammar(new GrammarNormalizationResult(ref, 1L, "U1", "pattern",
+                new NormalizedGrammarExample(1, "あ".repeat(1001), null, "번역"), "gloss", "nuance",
+                "connection", List.of(), new NormalizedJlptLevel("N5", "N5", "Level"), null, Map.of(), List.of(),
+                true));
+        var result = readiness.detail(NormalizedCandidateType.GRAMMAR, onlyCandidate(ref).getId()).result();
+
+        assertThat(codesOf(result)).contains(PromotionReadinessIssueCode.GRAMMAR_EXAMPLE_TEXT_TOO_LONG);
+        assertThat(result.mappingStatus()).isEqualTo(MappingStatus.BLOCKED);
+        assertThat(result.overallStatus()).isNotEqualTo(OverallStatus.READY_FOR_DRAFT_PROMOTION);
+    }
+
+    @Test
+    void v4_grammarFrontExampleTranslationOverTheProductionExampleMaxIsTooLong() {
+        String ref = ref();
+        seedN5Level();
+        store.saveGrammar(new GrammarNormalizationResult(ref, 1L, "U1", "pattern",
+                new NormalizedGrammarExample(1, "前文", null, "번".repeat(1001)), "gloss", "nuance",
+                "connection", List.of(), new NormalizedJlptLevel("N5", "N5", "Level"), null, Map.of(), List.of(),
+                true));
+        var result = readiness.detail(NormalizedCandidateType.GRAMMAR, onlyCandidate(ref).getId()).result();
+
+        assertThat(codesOf(result)).contains(PromotionReadinessIssueCode.GRAMMAR_EXAMPLE_TEXT_TOO_LONG);
+        assertThat(result.mappingStatus()).isEqualTo(MappingStatus.BLOCKED);
+        assertThat(result.overallStatus()).isNotEqualTo(OverallStatus.READY_FOR_DRAFT_PROMOTION);
+    }
+
+    @Test
+    void v5_grammarFrontExampleReadingOverTheProductionExampleMaxIsTooLong() {
+        String ref = ref();
+        seedN5Level();
+        store.saveGrammar(new GrammarNormalizationResult(ref, 1L, "U1", "pattern",
+                new NormalizedGrammarExample(1, "前文", "ま".repeat(1001), "번역"), "gloss", "nuance",
+                "connection", List.of(), new NormalizedJlptLevel("N5", "N5", "Level"), null, Map.of(), List.of(),
+                true));
+        var result = readiness.detail(NormalizedCandidateType.GRAMMAR, onlyCandidate(ref).getId()).result();
+
+        assertThat(codesOf(result)).contains(PromotionReadinessIssueCode.GRAMMAR_EXAMPLE_TEXT_TOO_LONG);
+        assertThat(result.mappingStatus()).isEqualTo(MappingStatus.BLOCKED);
+        assertThat(result.overallStatus()).isNotEqualTo(OverallStatus.READY_FOR_DRAFT_PROMOTION);
+    }
+
+    @Test
+    void v6_grammarNullMeaningGlossDoesNotFabricateAnExplanationAndIsBlocked() {
+        String ref = ref();
+        seedN5Level();
+        store.saveGrammar(new GrammarNormalizationResult(ref, 1L, "U1", "pattern",
+                new NormalizedGrammarExample(1, "前文pattern", null, "번역"), null, "nuance",
+                "connection", List.of(), new NormalizedJlptLevel("N5", "N5", "Level"), null, Map.of(), List.of(),
+                false));
+        var detail = readiness.detail(NormalizedCandidateType.GRAMMAR, onlyCandidate(ref).getId());
+
+        assertThat(detail.mappingPreview().grammar().explanationPreview()).isNull();
+        assertThat(codesOf(detail.result())).contains(PromotionReadinessIssueCode.GRAMMAR_EXPLANATION_SOURCE_MISSING);
+        assertThat(codesOf(detail.result())).doesNotContain(PromotionReadinessIssueCode.GRAMMAR_EXPLANATION_TOO_LONG);
         assertThat(detail.result().mappingStatus()).isEqualTo(MappingStatus.BLOCKED);
-        assertThat(detail.mappingPreview().grammar().explanationMappingUnresolved()).isTrue();
+        assertThat(detail.result().overallStatus()).isNotEqualTo(OverallStatus.READY_FOR_DRAFT_PROMOTION);
+    }
+
+    @Test
+    void v7_grammarNullNuanceDoesNotFabricateAnExplanationAndIsBlocked() {
+        String ref = ref();
+        seedN5Level();
+        store.saveGrammar(new GrammarNormalizationResult(ref, 1L, "U1", "pattern",
+                new NormalizedGrammarExample(1, "前文pattern", null, "번역"), "gloss", null,
+                "connection", List.of(), new NormalizedJlptLevel("N5", "N5", "Level"), null, Map.of(), List.of(),
+                false));
+        var detail = readiness.detail(NormalizedCandidateType.GRAMMAR, onlyCandidate(ref).getId());
+
+        assertThat(detail.mappingPreview().grammar().explanationPreview()).isNull();
+        assertThat(codesOf(detail.result())).contains(PromotionReadinessIssueCode.GRAMMAR_EXPLANATION_SOURCE_MISSING);
+        assertThat(codesOf(detail.result())).doesNotContain(PromotionReadinessIssueCode.GRAMMAR_EXPLANATION_TOO_LONG);
+        assertThat(detail.result().mappingStatus()).isEqualTo(MappingStatus.BLOCKED);
+        assertThat(detail.result().overallStatus()).isNotEqualTo(OverallStatus.READY_FOR_DRAFT_PROMOTION);
     }
 
     @Test

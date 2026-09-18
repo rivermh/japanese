@@ -76,10 +76,13 @@ public final class PromotionReadinessModels {
     }
 
     /**
-     * Grammar-only preview. {@code explanationMappingUnresolved} is always {@code true} today (see
-     * {@link PromotionReadinessIssueCode#GRAMMAR_MAPPING_POLICY_UNRESOLVED}); {@code meaningGloss}/
-     * {@code nuance}/{@code frontExample*}/{@code confusablePatterns} are shown for human context
-     * only and are never themselves mapped onto a production field/entity by this ticket.
+     * Grammar-only preview. {@code explanationPreview} is the exact {@code Grammar.explanation} value
+     * a promotion would write ({@code meaningGloss + "\n\n" + nuance} - Ticket 4E-8's ratified
+     * mapping), or {@code null} (Ticket 4E-8 hardening, MINOR 1) when {@code meaningGloss}/{@code nuance}
+     * is blank/missing and no real explanation can be composed yet.
+     * {@code meaningGloss}/{@code nuance}/{@code frontExample*}/{@code confusablePatterns}
+     * are still shown individually for human context; {@code confusablePatterns} is never itself
+     * mapped onto {@code GrammarRelation}/{@code GrammarComparison} by any ticket.
      */
     public record GrammarMappingPreview(
             String pattern,
@@ -92,7 +95,7 @@ public final class PromotionReadinessModels {
             List<ConfusablePatternPreview> confusablePatterns,
             String rawKind,
             String levelCode,
-            boolean explanationMappingUnresolved) {
+            String explanationPreview) {
     }
 
     /** Exactly one of {@code vocabulary}/{@code grammar} is non-null, matching the candidate's type. */

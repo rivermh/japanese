@@ -16,13 +16,13 @@
       <h1 th:text="${'Candidate ' + r.candidateId}"></h1>
       <p class="subtle" th:text="${'sourceRef: ' + r.sourceRef + ' · sourceNoteId: ' + r.sourceNoteId}"></p>
       <p class="subtle">이 화면 자체는 여전히 읽기 전용 dry-run 결과입니다 (아래 목록/blocker/mapping preview는 어떤 production/private row도 변경하지 않습니다).
-        production 승격은 아래 "Vocabulary 승격" 버튼을 눌러야만 실행됩니다 (Ticket 4E-1, VOCABULARY만 가능, Grammar는 대상 아님).</p>
-      <form th:if="${r.candidateType.name() == 'VOCABULARY'}"
-            th:action="@{/admin/normalized-candidates/promotion-readiness/{type}/{id}/promote(type=${r.candidateType},id=${r.candidateId})}"
+        production 승격은 아래 버튼을 눌러야만 실행됩니다 (Ticket 4E-1: Vocabulary, Ticket 4E-8: Grammar).</p>
+      <form th:action="@{/admin/normalized-candidates/promotion-readiness/{type}/{id}/promote(type=${r.candidateType},id=${r.candidateId})}"
             method="post">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
         <input type="hidden" name="expectedNormalizedAt" th:value="${f.normalizedAt}"/>
-        <button type="submit" th:disabled="${r.overallStatus.name() != 'READY_FOR_DRAFT_PROMOTION'}">Vocabulary 승격 (production DRAFT 생성)</button>
+        <button type="submit" th:disabled="${r.overallStatus.name() != 'READY_FOR_DRAFT_PROMOTION'}"
+                th:text="${(r.candidateType.name() == 'VOCABULARY' ? 'Vocabulary' : 'Grammar') + ' 승격 (production DRAFT 생성)'}"></button>
       </form>
     </header>
 
@@ -86,10 +86,10 @@
       <dl class="admin-facts" th:if="${mp.grammar != null}" th:with="g=${mp.grammar}">
         <div><dt>Grammar.pattern</dt><dd th:text="${g.pattern}"></dd></div>
         <div th:if="${g.connectionPreview}"><dt>Grammar.connection</dt><dd th:text="${g.connectionPreview}"></dd></div>
-        <div><dt>Grammar.explanation</dt><dd>UNRESOLVED - meaningGloss/nuance/frontExample 중 ratified 매핑 없음</dd></div>
+        <div><dt>Grammar.explanation</dt><dd th:text="${g.explanationPreview}"></dd></div>
         <div th:if="${g.levelCode}"><dt>Level.code (JLPT)</dt><dd th:text="${g.levelCode}"></dd></div>
       </dl>
-      <p th:if="${mp.grammar != null}" class="subtle">meaningGloss/nuance/frontExample/confusablePatterns는 참고용으로만 표시되며, GrammarEnrichment/GrammarRelation/GrammarComparison으로 자동 매핑되지 않습니다.</p>
+      <p th:if="${mp.grammar != null}" class="subtle">frontExample은 Example 1건으로 승격되며, confusablePatterns는 참고용으로만 표시되고 GrammarEnrichment/GrammarRelation/GrammarComparison으로 자동 매핑되지 않습니다.</p>
     </section>
 
     <section>

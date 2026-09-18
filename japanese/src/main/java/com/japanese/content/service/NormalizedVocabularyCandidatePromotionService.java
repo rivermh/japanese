@@ -34,8 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
  * draft ({@code ContentItem}/{@code Word}/{@code Meaning}/{@code Example}, {@code published = false}).
  *
  * <p><b>Grammar is out of scope</b>: {@link #promote} rejects any non-{@code VOCABULARY} candidate
- * before touching any repository - {@code GRAMMAR_MAPPING_POLICY_UNRESOLVED} is never weakened, and
- * no Grammar row is ever written here (Ticket 4E-2).
+ * before touching any repository - Grammar candidates are promoted separately by
+ * {@code NormalizedGrammarCandidatePromotionService} (Ticket 4E-8), never by this class.
  *
  * <p><b>One authoritative readiness policy</b>: this class never duplicates any promotion-readiness
  * business rule. It delegates the actual pass/fail decision entirely to
@@ -131,8 +131,11 @@ import org.springframework.transaction.annotation.Transactional;
  * candidate already carries as its own provenance pointer, and the same unique key that staging table
  * already enforces) and uses ITS genuine raw {@code tags}/{@code field_names}/{@code field_values} -
  * never a normalized-candidate-derived synthetic substitute. {@code field_names}/{@code field_values}
- * are re-encoded from that table's JSON-array storage format into the U+001F-joined form
- * every other reader/writer of this column already expects (see
+ * are re-encoded from that table's JSON-array storage format into the U+001F-joined form every other
+ * reader/writer of this column already expects, via {@code RawProvenance.joinedFieldNames()}/
+ * {@code joinedFieldValues()} (Ticket 4E-8 hardening, MAJOR 1: this class and
+ * {@code NormalizedGrammarCandidatePromotionService} now share that single encoding implementation, so
+ * the two can never drift onto two different delimiter conventions - see
  * {@link PrivateApkgNoteProvenanceReader}'s own javadoc for why this re-encoding does not change the
  * truthfulness of the data, only its delimiter). If no matching {@code private_apkg_notes} row exists
  * (that staging row is independent of a candidate and may have been reprocessed/removed - see
@@ -295,7 +298,7 @@ public class NormalizedVocabularyCandidatePromotionService {
         // provenance resolved in step 7) provenance in the same transaction.
         ImportedSourceRecord record = existingRecord.orElseGet(() -> new ImportedSourceRecord(
                 sourceRef, VOCABULARY_NOTE_TYPE, sourceNoteId, vocab.getLevelCode(), rawProvenance.tags(),
-                String.join("", rawProvenance.fieldNames()), String.join("", rawProvenance.fieldValues())));
+                rawProvenance.joinedFieldNames(), rawProvenance.joinedFieldValues()));
         record.linkContentItem(savedItem);
         importedSourceRecordRepository.save(record);
 

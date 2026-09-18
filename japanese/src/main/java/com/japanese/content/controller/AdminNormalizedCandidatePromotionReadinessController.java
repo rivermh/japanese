@@ -6,6 +6,8 @@ import com.japanese.content.entity.NormalizedCandidateType;
 import com.japanese.content.service.NormalizedCandidatePromotionRejectedException;
 import com.japanese.content.service.NormalizedCandidatePromotionReadinessService;
 import com.japanese.content.service.NormalizedCandidatePromotionStaleException;
+import com.japanese.content.service.NormalizedGrammarCandidatePromotionResult;
+import com.japanese.content.service.NormalizedGrammarCandidatePromotionService;
 import com.japanese.content.service.NormalizedVocabularyCandidatePromotionResult;
 import com.japanese.content.service.NormalizedVocabularyCandidatePromotionService;
 import com.japanese.content.service.PromotionReadinessIssueCode;
@@ -25,12 +27,15 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
  * read-only boundary that service itself still keeps).
  *
  * <p>JLPT-MAX Ticket 4E-1 adds exactly one write action to this controller: {@link #promote}, a
- * single-Vocabulary-candidate production draft promotion. It follows the same
- * POST-then-redirect-with-flash-message shape as {@code AdminNormalizedCandidateReviewController}'s
- * {@code submitDecision}/{@code reanalyze} - errors are caught inline as a flash message rather than
- * surfaced through {@link AdminNormalizedCandidatePromotionReadinessExceptionHandler} (that advice
- * remains scoped to the GET list/detail path-parameter-resolution failures it already handled before
- * this ticket).
+ * single-candidate production draft promotion. It follows the same POST-then-redirect-with-flash-
+ * message shape as {@code AdminNormalizedCandidateReviewController}'s {@code submitDecision}/
+ * {@code reanalyze} - errors are caught inline as a flash message rather than surfaced through
+ * {@link AdminNormalizedCandidatePromotionReadinessExceptionHandler} (that advice remains scoped to
+ * the GET list/detail path-parameter-resolution failures it already handled before this ticket).
+ * Ticket 4E-8 extends the same single route/action to Grammar candidates - {@link #promote} dispatches
+ * to {@link NormalizedVocabularyCandidatePromotionService} or
+ * {@link NormalizedGrammarCandidatePromotionService} by {@code candidateType}, rather than adding a
+ * separate admin workflow.
  *
  * <p>Every path here is under {@code /admin/**}, which {@code SecurityConfig} already restricts to
  * {@code ROLE_ADMIN} - no security configuration change was needed for this ticket, mirroring
@@ -41,12 +46,15 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class AdminNormalizedCandidatePromotionReadinessController {
 
     private final NormalizedCandidatePromotionReadinessService readiness;
-    private final NormalizedVocabularyCandidatePromotionService promotion;
+    private final NormalizedVocabularyCandidatePromotionService vocabularyPromotion;
+    private final NormalizedGrammarCandidatePromotionService grammarPromotion;
 
     public AdminNormalizedCandidatePromotionReadinessController(NormalizedCandidatePromotionReadinessService readiness,
-            NormalizedVocabularyCandidatePromotionService promotion) {
+            NormalizedVocabularyCandidatePromotionService vocabularyPromotion,
+            NormalizedGrammarCandidatePromotionService grammarPromotion) {
         this.readiness = readiness;
-        this.promotion = promotion;
+        this.vocabularyPromotion = vocabularyPromotion;
+        this.grammarPromotion = grammarPromotion;
     }
 
     @GetMapping
@@ -75,10 +83,12 @@ public class AdminNormalizedCandidatePromotionReadinessController {
     }
 
     /**
-     * JLPT-MAX Ticket 4E-1: promotes exactly one Vocabulary candidate to a production draft. See
-     * {@link NormalizedVocabularyCandidatePromotionService}'s class javadoc for the full
-     * transaction/lock/mapping contract - this controller method only routes the request and turns
-     * its outcome into a flash message, matching the existing admin PRG convention.
+     * JLPT-MAX Ticket 4E-1 (Vocabulary) / 4E-8 (Grammar): promotes exactly one candidate to a
+     * production draft. See {@link NormalizedVocabularyCandidatePromotionService}'s and
+     * {@link NormalizedGrammarCandidatePromotionService}'s class javadocs for the full
+     * transaction/lock/mapping contract each follows - this controller method only routes the request
+     * by {@code candidateType} and turns the outcome into a flash message, matching the existing admin
+     * PRG convention.
      *
      * <p>Ticket 4E-1 hardening: {@code expectedNormalizedAt} carries the candidate revision the admin
      * actually saw on the GET detail page (rendered from {@code detail.candidateFields.normalizedAt} -
@@ -90,10 +100,17 @@ public class AdminNormalizedCandidatePromotionReadinessController {
             @RequestParam Instant expectedNormalizedAt, RedirectAttributes flash) {
         String redirect = "redirect:/admin/normalized-candidates/promotion-readiness/" + candidateType + "/" + candidateId;
         try {
-            NormalizedVocabularyCandidatePromotionResult result =
-                    promotion.promote(candidateType, candidateId, expectedNormalizedAt);
-            flash.addFlashAttribute("adminMessage",
-                    "production draft로 승격되었습니다 (slug=" + result.slug() + ").");
+            String slug;
+            if (candidateType == NormalizedCandidateType.GRAMMAR) {
+                NormalizedGrammarCandidatePromotionResult result =
+                        grammarPromotion.promote(candidateType, candidateId, expectedNormalizedAt);
+                slug = result.slug();
+            } else {
+                NormalizedVocabularyCandidatePromotionResult result =
+                        vocabularyPromotion.promote(candidateType, candidateId, expectedNormalizedAt);
+                slug = result.slug();
+            }
+            flash.addFlashAttribute("adminMessage", "production draft로 승격되었습니다 (slug=" + slug + ").");
         } catch (NormalizedCandidatePromotionStaleException | NormalizedCandidatePromotionRejectedException e) {
             flash.addFlashAttribute("adminError", e.getMessage());
         }

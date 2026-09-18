@@ -152,11 +152,16 @@ class NormalizedCandidatePromotionReadinessRealApkgReport {
         //  - the source is registered (ContentSourceCatalog seeds it), just not rights-cleared
         //    (rightsStatus stays UNKNOWN - this test never mutates it), so every candidate is blocked by
         //    SOURCE_RIGHTS_MANUAL_REVIEW instead of the old SOURCE_NOT_REGISTERED.
-        //  - Grammar mapping remains unconditionally unresolved (Ticket 3B/4D's deliberate deferral,
-        //    untouched by 4E-0), so GRAMMAR_MAPPING_POLICY_UNRESOLVED still equals every Grammar candidate.
+        //  - Grammar mapping is now ratified (Ticket 4E-8: Grammar.explanation = meaningGloss +
+        //    "\n\n" + nuance) - GRAMMAR_MAPPING_POLICY_UNRESOLVED no longer exists; only
+        //    GRAMMAR_EXPLANATION_TOO_LONG remains, and is expected to be zero against the real deck
+        //    (MISSING_MEANING_GLOSS/MISSING_NUANCE are FATAL, so every non-fatal real candidate has
+        //    both fields non-blank, and no real v2.1.1 note's composed length has been observed to
+        //    exceed the 2000-char column limit - unverified by this change against the actual file;
+        //    see this ticket's final report).
         //  - READY_FOR_DRAFT_PROMOTION is therefore still zero against the real deck - not because
-        //    identity or Vocabulary meaning-language are unresolved (they are now resolved), but because
-        //    rights are never auto-cleared here and Grammar mapping is still unconditionally blocked.
+        //    identity, Vocabulary meaning-language, or Grammar mapping are unresolved (they are now all
+        //    resolved), but because rights are never auto-cleared here.
         assertThat(vocabulary.readyForDraftPromotion()).isZero();
         assertThat(grammar.readyForDraftPromotion()).isZero();
         assertThat(vocabulary.blockedByIssueCode().get("PRODUCTION_IDENTITY_POLICY_UNRESOLVED")).isZero();
@@ -168,8 +173,7 @@ class NormalizedCandidatePromotionReadinessRealApkgReport {
                 .isEqualTo(vocabulary.totalCandidates());
         assertThat(grammar.blockedByIssueCode().get("SOURCE_RIGHTS_MANUAL_REVIEW"))
                 .isEqualTo(grammar.totalCandidates());
-        assertThat(grammar.blockedByIssueCode().get("GRAMMAR_MAPPING_POLICY_UNRESOLVED"))
-                .isEqualTo(grammar.totalCandidates());
+        assertThat(grammar.blockedByIssueCode().get("GRAMMAR_EXPLANATION_TOO_LONG")).isZero();
         assertThat(vocabulary.totalCandidates()).isEqualTo(9160);
         assertThat(grammar.totalCandidates()).isEqualTo(1078);
     }

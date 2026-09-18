@@ -2,7 +2,9 @@ package com.japanese.content.service;
 
 import static com.japanese.content.service.PromotionReadinessIssueCode.ALREADY_PROMOTED;
 import static com.japanese.content.service.PromotionReadinessIssueCode.GRAMMAR_CONNECTION_TOO_LONG;
-import static com.japanese.content.service.PromotionReadinessIssueCode.GRAMMAR_MAPPING_POLICY_UNRESOLVED;
+import static com.japanese.content.service.PromotionReadinessIssueCode.GRAMMAR_EXAMPLE_TEXT_TOO_LONG;
+import static com.japanese.content.service.PromotionReadinessIssueCode.GRAMMAR_EXPLANATION_SOURCE_MISSING;
+import static com.japanese.content.service.PromotionReadinessIssueCode.GRAMMAR_EXPLANATION_TOO_LONG;
 import static com.japanese.content.service.PromotionReadinessIssueCode.GRAMMAR_PATTERN_MISSING;
 import static com.japanese.content.service.PromotionReadinessIssueCode.GRAMMAR_PATTERN_TOO_LONG;
 import static com.japanese.content.service.PromotionReadinessIssueCode.JLPT_LEVEL_UNMAPPABLE;
@@ -117,15 +119,18 @@ import org.springframework.transaction.annotation.Transactional;
  * rare against the real v2.1.1 deck - see the Ticket 4D report for the pre-4E-0 measured numbers and
  * the Ticket 4E-0 report for what changed.
  *
- * <p><b>Grammar mapping is deliberately conservative</b>: production {@code Grammar.explanation} is
- * {@code NOT NULL}, but no normalized Grammar candidate field ({@code meaningGloss}/{@code nuance}/
- * {@code frontExample.translation}) has a ratified mapping onto it (see
- * {@code GrammarNormalizationResult}'s class javadoc, and Ticket 3B's own deferral of this exact
- * decision) - so every Grammar candidate also unconditionally carries
- * {@link PromotionReadinessIssueCode#GRAMMAR_MAPPING_POLICY_UNRESOLVED}. Only {@code pattern} and
- * {@code connection} (renamed from the normalized {@code connectionForm}, the "접속" reference-card
- * field - the one Grammar field with an unambiguous, label-identified production counterpart) are
- * ever shown as mapped in {@link GrammarMappingPreview}.
+ * <p><b>Grammar mapping (Ticket 4E-8, ratified)</b>: {@code Grammar.pattern} is the candidate's
+ * {@code pattern} verbatim; {@code Grammar.connection} is the candidate's {@code connectionForm}
+ * verbatim (may be null); {@code Grammar.explanation} (NOT NULL, max 2000) is
+ * {@code meaningGloss + "\n\n" + nuance} - see {@link #composeGrammarExplanation} for the single
+ * shared implementation both this readiness check and
+ * {@code NormalizedGrammarCandidatePromotionService} use, so the two can never drift. This
+ * composition is truthful without fabrication because {@code MISSING_MEANING_GLOSS}/
+ * {@code MISSING_NUANCE} are FATAL {@code GrammarNormalizationIssue} severities - any candidate that
+ * reaches this check already has both fields non-blank. {@code frontExample}/
+ * {@code confusablePatterns} are shown in {@link GrammarMappingPreview} for human context only;
+ * {@code confusablePatterns} is never resolved into a {@code GrammarRelation}/{@code GrammarComparison}
+ * by any ticket (that would require inferring another production Grammar's identity from free text).
  *
  * <p><b>Vocabulary mapping is resolved</b> for {@code expression}/{@code reading}/{@code partOfSpeech}
  * (verbatim {@code AnkiFieldTextNormalizer.text(...)} copies, exactly like the sole existing
@@ -186,6 +191,7 @@ public class NormalizedCandidatePromotionReadinessService {
     private static final int EXAMPLE_TEXT_MAX = 1000;
     private static final int GRAMMAR_PATTERN_MAX = 200;
     private static final int GRAMMAR_CONNECTION_MAX = 500;
+    private static final int GRAMMAR_EXPLANATION_MAX = 2000;
     private static final String JLPT_LEVEL_SYSTEM = "JLPT";
 
     /** See this class's javadoc ("Existing production provenance") for why these two are correct. */
@@ -576,7 +582,8 @@ public class NormalizedCandidatePromotionReadinessService {
                     VOCAB_PART_OF_SPEECH_TOO_LONG, VOCAB_PITCH_ACCENT_TOO_LONG, VOCAB_MEANING_MISSING,
                     VOCAB_MEANING_TOO_LONG, VOCABULARY_MEANING_LANGUAGE_POLICY_UNRESOLVED,
                     VOCAB_EXAMPLE_TEXT_TOO_LONG, GRAMMAR_PATTERN_MISSING,
-                    GRAMMAR_PATTERN_TOO_LONG, GRAMMAR_CONNECTION_TOO_LONG, GRAMMAR_MAPPING_POLICY_UNRESOLVED,
+                    GRAMMAR_PATTERN_TOO_LONG, GRAMMAR_CONNECTION_TOO_LONG, GRAMMAR_EXAMPLE_TEXT_TOO_LONG,
+                    GRAMMAR_EXPLANATION_TOO_LONG, GRAMMAR_EXPLANATION_SOURCE_MISSING,
                     JLPT_LEVEL_UNMAPPABLE -> true;
             default -> false;
         };
@@ -637,8 +644,39 @@ public class NormalizedCandidatePromotionReadinessService {
             addIssue(issuesByCode, GRAMMAR_CONNECTION_TOO_LONG,
                     "connection 길이가 production Grammar.connection 제한(" + GRAMMAR_CONNECTION_MAX + ")을 초과합니다.");
         }
-        addIssue(issuesByCode, GRAMMAR_MAPPING_POLICY_UNRESOLVED,
-                "production Grammar.explanation(및 frontExample/confusablePatterns 매핑)에 대한 ratified 정책이 없습니다.");
+        boolean frontExampleTooLong = tooLong(grammar.getFrontExampleJapaneseText())
+                || tooLong(grammar.getFrontExampleReading()) || tooLong(grammar.getFrontExampleTranslation());
+        if (frontExampleTooLong) {
+            addIssue(issuesByCode, GRAMMAR_EXAMPLE_TEXT_TOO_LONG,
+                    "frontExample 필드 길이가 production Example 제한(" + EXAMPLE_TEXT_MAX + ")을 초과합니다.");
+        }
+        String explanation = composeGrammarExplanation(grammar);
+        if (explanation == null) {
+            addIssue(issuesByCode, GRAMMAR_EXPLANATION_SOURCE_MISSING,
+                    "meaningGloss 또는 nuance가 없어 production Grammar.explanation을 구성할 수 없습니다.");
+        } else if (explanation.length() > GRAMMAR_EXPLANATION_MAX) {
+            addIssue(issuesByCode, GRAMMAR_EXPLANATION_TOO_LONG,
+                    "meaningGloss+nuance 조합 길이가 production Grammar.explanation 제한(" + GRAMMAR_EXPLANATION_MAX
+                            + ")을 초과합니다.");
+        }
+    }
+
+    /**
+     * Package-private (not {@code private}) so {@code NormalizedGrammarCandidatePromotionService}
+     * (Ticket 4E-8) can reuse this exact composition when actually writing {@code Grammar.explanation} -
+     * the single shared implementation of the ratified {@code meaningGloss + "\n\n" + nuance} mapping,
+     * mirroring {@link #pitchAccentPreview}'s existing precedent for Vocabulary. Returns {@code null}
+     * (Ticket 4E-8 hardening, MINOR 1) rather than fabricating a {@code "null\n\n..."}-shaped string
+     * when {@code meaningGloss} or {@code nuance} is blank/missing - an incomplete/FATAL candidate
+     * snapshot never has a real composed explanation, and {@link #evaluateGrammarMapping} surfaces that
+     * via {@link PromotionReadinessIssueCode#GRAMMAR_EXPLANATION_SOURCE_MISSING} instead of running the
+     * {@code GRAMMAR_EXPLANATION_TOO_LONG} length check against a fabricated value.
+     */
+    static String composeGrammarExplanation(NormalizedGrammarCandidateDetail grammar) {
+        if (blank(grammar.getMeaningGloss()) || blank(grammar.getNuance())) {
+            return null;
+        }
+        return grammar.getMeaningGloss() + "\n\n" + grammar.getNuance();
     }
 
     private static void addIssue(Map<PromotionReadinessIssueCode, PromotionReadinessIssue> issuesByCode,
@@ -759,7 +797,7 @@ public class NormalizedCandidatePromotionReadinessService {
         GrammarMappingPreview preview = new GrammarMappingPreview(grammar.getPattern(), grammar.getConnectionForm(),
                 grammar.getMeaningGloss(), grammar.getNuance(), grammar.getFrontExampleJapaneseText(),
                 grammar.getFrontExampleReading(), grammar.getFrontExampleTranslation(), confusables,
-                grammar.getRawKind(), grammar.getLevelCode(), true);
+                grammar.getRawKind(), grammar.getLevelCode(), composeGrammarExplanation(grammar));
         return new MappingPreview(null, preview);
     }
 

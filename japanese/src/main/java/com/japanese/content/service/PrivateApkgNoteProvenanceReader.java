@@ -63,5 +63,29 @@ class PrivateApkgNoteProvenanceReader {
 
     /** The genuine raw Anki payload for one private-staging note, decoded but not otherwise altered. */
     record RawProvenance(String tags, List<String> fieldNames, List<String> fieldValues) {
+
+        /**
+         * The delimiter every {@code ImportedSourceRecord.fieldNames}/{@code fieldValues}
+         * writer/reader in this codebase already uses (see this class's own javadoc) - the single
+         * shared encoding both Vocabulary and Grammar promotion must use so they can never drift
+         * apart (Ticket 4E-8 hardening, MAJOR 1).
+         */
+        private static final String FIELD_DELIMITER = "\u001f";
+
+        /**
+         * {@code fieldNames} re-joined with the established {@link #FIELD_DELIMITER} - field
+         * boundaries are preserved exactly, unlike a delimiter-less join.
+         */
+        String joinedFieldNames() {
+            return String.join(FIELD_DELIMITER, fieldNames);
+        }
+
+        /**
+         * {@code fieldValues} re-joined with the established {@link #FIELD_DELIMITER} - field
+         * boundaries are preserved exactly, unlike a delimiter-less join.
+         */
+        String joinedFieldValues() {
+            return String.join(FIELD_DELIMITER, fieldValues);
+        }
     }
 }

@@ -77,15 +77,29 @@ public enum PromotionReadinessIssueCode {
     GRAMMAR_CONNECTION_TOO_LONG,
 
     /**
-     * Production {@code Grammar.explanation} (NOT NULL, max 2000) has no defined source mapping from
-     * a normalized Grammar candidate's {@code meaningGloss}/{@code nuance}/{@code frontExample}
-     * fields - Ticket 3B-1 deliberately left this a promotion-time decision (see
-     * {@code GrammarNormalizationResult}'s class javadoc), and this ticket does not invent one. Also
-     * covers the equally-undecided {@code frontExample}/{@code confusablePatterns} -&gt; production
-     * {@code Example}/{@code GrammarRelation}/{@code GrammarComparison} mapping. Every Grammar
-     * candidate carries this code today - that is an expected finding, not a bug.
+     * The candidate's {@code frontExample} maps onto production {@code Example} (Ticket 4E-8
+     * hardening - see {@code NormalizedGrammarCandidatePromotionService}'s javadoc): one of
+     * {@code frontExampleJapaneseText}, {@code frontExampleReading}, {@code frontExampleTranslation}
+     * is non-null and would exceed production {@code Example}'s 1000-char column limit. Distinct from
+     * {@link #VOCAB_EXAMPLE_TEXT_TOO_LONG}, which only ever applies to Vocabulary candidates.
      */
-    GRAMMAR_MAPPING_POLICY_UNRESOLVED,
+    GRAMMAR_EXAMPLE_TEXT_TOO_LONG,
+
+    /**
+     * Production {@code Grammar.explanation} (NOT NULL, max 2000) is composed as
+     * {@code meaningGloss + "\n\n" + nuance} (Ticket 4E-8's ratified mapping - see
+     * {@code NormalizedCandidatePromotionReadinessService.composeGrammarExplanation}) and that
+     * composed value would exceed the 2000-char column limit.
+     */
+    GRAMMAR_EXPLANATION_TOO_LONG,
+
+    /**
+     * {@code meaningGloss} or {@code nuance} is blank/missing, so the ratified
+     * {@code meaningGloss + "\n\n" + nuance} composition cannot produce a real
+     * {@code Grammar.explanation} value at all (Ticket 4E-8 hardening). Distinct from
+     * {@link #GRAMMAR_EXPLANATION_TOO_LONG}, which only ever applies once a composed value exists.
+     */
+    GRAMMAR_EXPLANATION_SOURCE_MISSING,
 
     /**
      * No JLPT level code, no matching {@code Level(system="JLPT", code=...)} row exists yet, or more

@@ -11,13 +11,18 @@ import com.japanese.account.entity.UserRole;
 import com.japanese.account.repository.UserAccountRepository;
 import com.japanese.content.entity.NormalizedCandidateMatchPair;
 import com.japanese.content.entity.NormalizedCandidateType;
+import com.japanese.content.entity.NormalizedContentCandidate;
+import com.japanese.content.importer.GrammarNormalizationResult;
+import com.japanese.content.importer.NormalizedGrammarExample;
 import com.japanese.content.importer.NormalizedJlptLevel;
 import com.japanese.content.importer.NormalizedMeaning;
 import com.japanese.content.importer.VocabularyNormalizationResult;
 import com.japanese.content.repository.NormalizedCandidateMatchPairRepository;
+import com.japanese.content.repository.NormalizedContentCandidateRepository;
 import com.japanese.content.service.NormalizedCandidateConflictAnalyzer;
 import com.japanese.content.service.NormalizedCandidateStore;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -44,6 +49,7 @@ class AdminNormalizedCandidatePromotionReadinessControllerTest {
     @Autowired NormalizedCandidateStore store;
     @Autowired NormalizedCandidateConflictAnalyzer analyzer;
     @Autowired NormalizedCandidateMatchPairRepository pairRepository;
+    @Autowired NormalizedContentCandidateRepository candidateRepository;
 
     UserAccount admin;
     String ref;
@@ -88,6 +94,31 @@ class AdminNormalizedCandidatePromotionReadinessControllerTest {
                 .andExpect(status().isOk());
     }
 
+    /**
+     * Ticket 4E-8 hardening: proves the single existing admin route/template renders the correct
+     * type-specific promotion button label for each candidate type (see
+     * {@code normalized-candidate-promotion-readiness-detail.html}), rather than a new/separate Grammar
+     * admin workflow having been introduced.
+     */
+    @Test
+    void detailRendersTheTypeSpecificPromotionActionForBothCandidateTypes() throws Exception {
+        Long vocabId = pair.getLeftCandidate().getId();
+        mvc.perform(get("/admin/normalized-candidates/promotion-readiness/VOCABULARY/" + vocabId)
+                        .with(user(admin.getLoginId()).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Vocabulary 승격")));
+
+        String grammarRef = "readiness-controller-grammar-test-" + UUID.randomUUID();
+        store.saveGrammar(grammar(grammarRef, 1L, "U1", "文型", "接続", "N5"));
+        NormalizedContentCandidate grammarCandidate = candidateRepository
+                .findByCandidateTypeAndSourceRef(NormalizedCandidateType.GRAMMAR, grammarRef).get(0);
+
+        mvc.perform(get("/admin/normalized-candidates/promotion-readiness/GRAMMAR/" + grammarCandidate.getId())
+                        .with(user(admin.getLoginId()).roles("ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Grammar 승격")));
+    }
+
     @Test
     void detailForMissingCandidateIsNotFound() throws Exception {
         mvc.perform(get("/admin/normalized-candidates/promotion-readiness/VOCABULARY/999999")
@@ -114,5 +145,12 @@ class AdminNormalizedCandidatePromotionReadinessControllerTest {
                 List.of(new NormalizedMeaning(1, meaning)),
                 List.of(), new NormalizedJlptLevel(level, level, "WordJLPT"), expression, reading, java.util.Map.of(),
                 List.of(), true);
+    }
+
+    private GrammarNormalizationResult grammar(String ref, long noteId, String unitId, String pattern,
+            String connection, String level) {
+        return new GrammarNormalizationResult(ref, noteId, unitId, pattern,
+                new NormalizedGrammarExample(1, pattern + "の前文です", null, pattern + "の번역"), "gloss", "nuance",
+                connection, List.of(), new NormalizedJlptLevel(level, level, "Level"), null, Map.of(), List.of(), true);
     }
 }
