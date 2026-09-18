@@ -5,11 +5,15 @@ import com.japanese.content.dto.NormalizedCandidateCanonicalGroupModels.Canonica
 import com.japanese.content.dto.NormalizedCandidateCanonicalGroupModels.CanonicalGroupCreationResult;
 import com.japanese.content.dto.NormalizedCandidateCanonicalGroupModels.EdgeExpectation;
 import com.japanese.content.dto.NormalizedCandidateCanonicalGroupModels.ParticipantExpectation;
+import com.japanese.content.dto.NormalizedCandidateGroupPromotionModels.GroupPromotionResult;
 import com.japanese.content.entity.NormalizedCandidateCanonicalGroupStatus;
 import com.japanese.content.entity.NormalizedCandidateType;
 import com.japanese.content.service.NormalizedCandidateCanonicalGroupRejectedException;
 import com.japanese.content.service.NormalizedCandidateCanonicalGroupService;
 import com.japanese.content.service.NormalizedCandidateCanonicalGroupStaleException;
+import com.japanese.content.service.NormalizedCandidateGroupPromotionRejectedException;
+import com.japanese.content.service.NormalizedCandidateGroupPromotionService;
+import com.japanese.content.service.NormalizedCandidateGroupPromotionStaleException;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Controller;
@@ -42,11 +46,13 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 public class AdminNormalizedCandidateCanonicalGroupController {
 
     private final NormalizedCandidateCanonicalGroupService groups;
+    private final NormalizedCandidateGroupPromotionService promotion;
     private final CurrentUserService current;
 
     public AdminNormalizedCandidateCanonicalGroupController(NormalizedCandidateCanonicalGroupService groups,
-            CurrentUserService current) {
+            NormalizedCandidateGroupPromotionService promotion, CurrentUserService current) {
         this.groups = groups;
+        this.promotion = promotion;
         this.current = current;
     }
 
@@ -60,8 +66,34 @@ public class AdminNormalizedCandidateCanonicalGroupController {
 
     @GetMapping("/{groupId}")
     public String detail(@PathVariable Long groupId, Model model) {
-        model.addAttribute("detail", groups.detail(groupId));
+        var detail = groups.detail(groupId);
+        model.addAttribute("detail", detail);
+        if (detail.active()) {
+            model.addAttribute("eligibility", promotion.previewEligibility(groupId));
+        }
         return "admin/normalized-candidate-canonical-group-detail";
+    }
+
+    /**
+     * JLPT-MAX Ticket 4E-3B: promotes exactly one ACTIVE, fresh canonical group to a production draft.
+     * See {@link NormalizedCandidateGroupPromotionService}'s class javadoc for the full transaction/
+     * lock/mapping contract - this controller method only routes the request and turns its outcome
+     * into a flash message, matching the existing PRG convention
+     * {@code AdminNormalizedCandidatePromotionReadinessController#promote} already uses for Ticket
+     * 4E-1's own single-candidate promotion.
+     */
+    @PostMapping("/{groupId}/promote")
+    public String promote(@PathVariable Long groupId, @RequestParam long expectedGroupVersion,
+            RedirectAttributes flash) {
+        String redirect = "redirect:/admin/normalized-candidates/canonical-groups/" + groupId;
+        try {
+            GroupPromotionResult result = promotion.promote(groupId, expectedGroupVersion, current.currentAccount());
+            flash.addFlashAttribute("adminMessage",
+                    "group이 production draft로 승격되었습니다 (slug=" + result.slug() + ").");
+        } catch (NormalizedCandidateGroupPromotionRejectedException | NormalizedCandidateGroupPromotionStaleException e) {
+            flash.addFlashAttribute("adminError", e.getMessage());
+        }
+        return redirect;
     }
 
     /**

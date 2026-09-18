@@ -87,4 +87,19 @@ public interface NormalizedContentCandidateRepository extends JpaRepository<Norm
     @Query("select c from NormalizedContentCandidate c where c.id = :id and c.candidateType = :candidateType")
     Optional<NormalizedContentCandidate> findByIdAndCandidateTypeForCanonicalGroupCreation(
             @Param("id") Long id, @Param("candidateType") NormalizedCandidateType candidateType);
+
+    /**
+     * JLPT-MAX Ticket 4E-3B: single-row {@code PESSIMISTIC_WRITE} lock used only by
+     * {@code NormalizedCandidateGroupPromotionService} - acquired once per member candidate id
+     * (canonical included), in ascending order, after the group header row is already locked and
+     * before any review/provenance lock. Kept separate from
+     * {@link #findByIdAndCandidateTypeForCanonicalGroupCreation} (Ticket 4E-3A's own group-creation
+     * lock) and {@link #findByIdAndCandidateTypeForPromotion} (Ticket 4E-1's own single-candidate
+     * promotion lock) for the same naming-clarity reason those two are already kept separate from each
+     * other.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from NormalizedContentCandidate c where c.id = :id and c.candidateType = :candidateType")
+    Optional<NormalizedContentCandidate> findByIdAndCandidateTypeForGroupPromotion(
+            @Param("id") Long id, @Param("candidateType") NormalizedCandidateType candidateType);
 }

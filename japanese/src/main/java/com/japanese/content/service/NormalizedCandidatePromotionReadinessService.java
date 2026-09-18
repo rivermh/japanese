@@ -561,7 +561,16 @@ public class NormalizedCandidatePromotionReadinessService {
                 linkStatus, overall, issues);
     }
 
-    private static boolean isMappingIssue(PromotionReadinessIssueCode code) {
+    /**
+     * Package-private (not {@code private}) so {@code NormalizedCandidateGroupPromotionService}
+     * (Ticket 4E-3B) can reuse this exact classification when deciding which readiness issues a
+     * non-canonical group member is exempt from (its own {@code Word}/{@code Meaning}/{@code Example}
+     * field mapping is never written to production, since only the canonical candidate supplies
+     * production content) - this is the same "content-mapping vs. everything else" split
+     * {@link MappingStatus} already exposes read-only for a single candidate; sharing it here is not
+     * new readiness-policy duplication, only reuse of an existing, already-reviewed classification.
+     */
+    static boolean isMappingIssue(PromotionReadinessIssueCode code) {
         return switch (code) {
             case VOCAB_EXPRESSION_MISSING, VOCAB_EXPRESSION_TOO_LONG, VOCAB_READING_MISSING, VOCAB_READING_TOO_LONG,
                     VOCAB_PART_OF_SPEECH_TOO_LONG, VOCAB_PITCH_ACCENT_TOO_LONG, VOCAB_MEANING_MISSING,

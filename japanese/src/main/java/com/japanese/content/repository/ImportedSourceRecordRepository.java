@@ -33,6 +33,21 @@ public interface ImportedSourceRecordRepository extends JpaRepository<ImportedSo
             @Param("sourceNoteId") long sourceNoteId);
 
     /**
+     * JLPT-MAX Ticket 4E-3B: the same {@code PESSIMISTIC_WRITE} identity lock as
+     * {@link #findBySourceRefAndNoteTypeAndSourceNoteIdForPromotion}, kept as its own dedicated method
+     * (not reused) so this table's lock methods stay self-documenting about which write path actually
+     * holds the lock at any given time - {@code NormalizedCandidateGroupPromotionService} calls this
+     * once per group member, in deterministic member-candidate-id order, after every candidate/review
+     * lock in that same transaction is already held.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from ImportedSourceRecord r where r.sourceRef = :sourceRef and r.noteType = :noteType "
+            + "and r.sourceNoteId = :sourceNoteId")
+    Optional<ImportedSourceRecord> findBySourceRefAndNoteTypeAndSourceNoteIdForGroupPromotion(
+            @Param("sourceRef") String sourceRef, @Param("noteType") String noteType,
+            @Param("sourceNoteId") long sourceNoteId);
+
+    /**
      * JLPT-MAX Ticket 4D: batch existing-production-provenance check for a whole
      * {@code (sourceRef, noteType)} scope in one query - never called once per candidate (see
      * {@code NormalizedCandidatePromotionReadinessService}'s N+1 policy).

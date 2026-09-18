@@ -32,6 +32,20 @@ public interface NormalizedCandidatePairReviewRepository extends JpaRepository<N
             @Param("leftCandidateId") Long leftCandidateId, @Param("rightCandidateId") Long rightCandidateId);
 
     /**
+     * JLPT-MAX Ticket 4E-3B: the same {@code PESSIMISTIC_WRITE} identity lock as
+     * {@link #findByLeftCandidateIdAndRightCandidateIdForCanonicalGroupCreation}, kept as its own
+     * dedicated method (not reused) for the same naming-clarity reason - acquired by
+     * {@code NormalizedCandidateGroupPromotionService} for every one of the group's historical C(N,2)
+     * edges, in the same deterministic (lowerCandidateId, higherCandidateId) order, after every member
+     * candidate row is already locked.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from NormalizedCandidatePairReview r "
+            + "where r.leftCandidate.id = :leftCandidateId and r.rightCandidate.id = :rightCandidateId")
+    Optional<NormalizedCandidatePairReview> findByLeftCandidateIdAndRightCandidateIdForGroupPromotion(
+            @Param("leftCandidateId") Long leftCandidateId, @Param("rightCandidateId") Long rightCandidateId);
+
+    /**
      * Fetch-joins {@code leftCandidate}/{@code rightCandidate}/{@code reviewer} so an admin review
      * list page (JLPT-MAX Ticket 4C) can look up every review for a
      * {@code (candidateType, sourceRef)} scope in one query and join it in memory against the

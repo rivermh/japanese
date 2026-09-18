@@ -43,6 +43,23 @@
     </section>
 
     <section th:if="${d.active()}">
+      <h2>Production Draft 승격 (Ticket 4E-3B)</h2>
+      <p th:if="${eligibility.eligible()}" class="admin-message">이 group은 현재 승격 가능합니다 - canonical candidate의 필드만 production 콘텐츠로 사용됩니다.</p>
+      <div th:unless="${eligibility.eligible()}">
+        <p class="admin-error">아직 승격할 수 없습니다:</p>
+        <ul>
+          <li th:each="reason:${eligibility.blockingReasons()}" th:text="${reason}"></li>
+        </ul>
+      </div>
+      <form th:if="${eligibility.eligible()}" method="post"
+            th:action="@{/admin/normalized-candidates/canonical-groups/{id}/promote(id=${d.id})}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <input type="hidden" name="expectedGroupVersion" th:value="${d.version}">
+        <button>production draft로 승격</button>
+      </form>
+    </section>
+
+    <section th:if="${d.active()}">
       <h2>Group 해체</h2>
       <form method="post" th:action="@{/admin/normalized-candidates/canonical-groups/{id}/dissolve(id=${d.id})}">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
