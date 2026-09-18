@@ -17,7 +17,7 @@
     <a href="/admin/contents?level=N5&amp;type=WORD&amp;qualityIssue=true"><span>N5 WORD 품질</span><strong th:text="${dashboard.n5Words.total}">0</strong><small th:text="${'정상 '+dashboard.n5Words.clean+' · 경고 '+dashboard.n5Words.warning+' · 오류 '+dashboard.n5Words.error}"></small></a>
     <a href="/admin/contents?level=N5&amp;type=GRAMMAR&amp;qualityIssue=true"><span>N5 GRAMMAR 품질</span><strong th:text="${dashboard.n5Grammars.total}">0</strong><small th:text="${'정상 '+dashboard.n5Grammars.clean+' · 경고 '+dashboard.n5Grammars.warning+' · 오류 '+dashboard.n5Grammars.error}"></small></a>
   </section>
-  <nav class="admin-shortcuts"><a class="button" href="/admin/contents?status=PENDING">일반 콘텐츠 검수</a><a class="button-secondary" href="/admin/grammars/curation?status=PENDING">Curated 문법 검수</a><a class="button-secondary" href="/admin/normalized-candidates/reviews?candidateType=VOCABULARY">정규화 후보 페어 검토</a><a class="button-secondary" href="/admin/normalized-candidates/promotion-readiness?candidateType=VOCABULARY">Promotion Readiness (dry-run)</a></nav>
+  <nav class="admin-shortcuts"><a class="button" href="/admin/contents?status=PENDING">일반 콘텐츠 검수</a><a class="button-secondary" href="/admin/grammars/curation?status=PENDING">Curated 문법 검수</a><a class="button-secondary" href="/admin/normalized-candidates/reviews?candidateType=VOCABULARY">정규화 후보 페어 검토</a><a class="button-secondary" href="/admin/normalized-candidates/promotion-readiness?candidateType=VOCABULARY">Promotion Readiness (dry-run)</a><a class="button-secondary" href="/admin/content-sources">출처 권리 검토</a></nav>
 </main>
 <footer th:replace="~{fragments/layout :: footer}"></footer>
 </body>

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('출처 권리 검토')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('admin')}"></header>
+<main id="main-content" class="page-shell admin-shell">
+  <header class="page-heading"><div><p class="eyebrow">CONTENT SOURCE RIGHTS</p><h1>출처 권리 검토</h1><p class="subtle">각 콘텐츠 출처의 재배포 권리 상태를 사람이 직접 검토·기록합니다. 이 화면 자체는 어떤 상태도 변경하지 않습니다 - 상태 변경은 상세 화면의 명시적 제출을 통해서만 일어납니다.</p></div><a href="/admin">관리자 홈</a></header>
+  <p class="admin-message" th:if="${adminMessage}" th:text="${adminMessage}"></p>
+  <p class="admin-error" th:if="${adminError}" th:text="${adminError}"></p>
+  <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>이름</th><th>sourceRef</th><th>버전</th><th>Rights 상태</th><th>Attribution</th><th>공개 가능</th><th></th></tr></thead><tbody>
+    <tr th:each="row:${result}">
+      <td th:text="${row.displayName}"></td>
+      <td><code th:text="${row.sourceRef}"></code></td>
+      <td th:text="${row.version}"></td>
+      <td><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(row.rightsStatus.name())}" th:text="${row.rightsStatus}"></span></td>
+      <td th:text="${row.attributionRequired ? '필수' : '불필요'}"></td>
+      <td><span class="status-pill" th:classappend="${row.allowedForRelease ? ' status-allowed' : ' status-blocked'}" th:text="${row.allowedForRelease ? 'ALLOWED_FOR_RELEASE' : 'NOT_RELEASABLE'}"></span></td>
+      <td><a th:href="@{/admin/content-sources/{id}(id=${row.id})}">상세/검토</a></td>
+    </tr>
+  </tbody></table></div>
+  <p class="empty-state" th:if="${result.empty}">등록된 출처가 없습니다.</p>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

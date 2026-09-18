@@ -9,6 +9,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.EnumSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "content_sources")
@@ -121,6 +123,17 @@ public class ContentSource {
         return usageNote;
     }
 
+    /**
+     * JLPT-MAX Ticket 4E-6: read-only view of which target statuses are currently valid from this
+     * source's own current status - reuses {@link #allowedTransitionsFrom} (the SAME authoritative set
+     * {@link #canTransition} itself checks), so an admin UI can present only legal transition controls
+     * without maintaining a second, independently-drifting copy of this policy. Never mutates anything;
+     * safe to call from a read-only request.
+     */
+    public Set<ContentSourceRightsStatus> allowedNextStatuses() {
+        return Set.copyOf(allowedTransitionsFrom(getRightsStatus()));
+    }
+
     public void reviewRights(ContentSourceRightsStatus target, String note,
                              Boolean attributionRequired, String attributionText) {
         if (target == null) {
@@ -153,12 +166,16 @@ public class ContentSource {
     }
 
     private static boolean canTransition(ContentSourceRightsStatus current, ContentSourceRightsStatus target) {
+        return allowedTransitionsFrom(current).contains(target);
+    }
+
+    private static Set<ContentSourceRightsStatus> allowedTransitionsFrom(ContentSourceRightsStatus current) {
         return switch (current) {
-            case UNKNOWN -> target == ContentSourceRightsStatus.MANUAL_REVIEW_REQUIRED;
-            case MANUAL_REVIEW_REQUIRED -> target == ContentSourceRightsStatus.ALLOWED
-                    || target == ContentSourceRightsStatus.BLOCKED;
-            case ALLOWED -> target == ContentSourceRightsStatus.BLOCKED;
-            case BLOCKED -> target == ContentSourceRightsStatus.MANUAL_REVIEW_REQUIRED;
+            case UNKNOWN -> EnumSet.of(ContentSourceRightsStatus.MANUAL_REVIEW_REQUIRED);
+            case MANUAL_REVIEW_REQUIRED ->
+                    EnumSet.of(ContentSourceRightsStatus.ALLOWED, ContentSourceRightsStatus.BLOCKED);
+            case ALLOWED -> EnumSet.of(ContentSourceRightsStatus.BLOCKED);
+            case BLOCKED -> EnumSet.of(ContentSourceRightsStatus.MANUAL_REVIEW_REQUIRED);
         };
     }
 

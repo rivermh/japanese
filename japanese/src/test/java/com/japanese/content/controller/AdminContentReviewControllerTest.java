@@ -51,13 +51,23 @@ class AdminContentReviewControllerTest {
 
         mvc.perform(get("/api/v1/admin/content-sources/"+source.getId()).with(a))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").exists())
+                .andExpect(jsonPath("$.sourceRef").value(source.getSourceRef()))
+                .andExpect(jsonPath("$.displayName").exists())
                 .andExpect(jsonPath("$.rightsStatus").value("UNKNOWN"))
-                .andExpect(jsonPath("$.allowedForRelease").value(false));
+                .andExpect(jsonPath("$.allowedForRelease").value(false))
+                // JLPT-MAX Ticket 4E-6 hardening: the HTML-only admin UI fields (usageNote,
+                // allowedNextStatuses) must never leak into this JSON API contract - they live on a
+                // separate HTML-only view record (SourceRightsAdminView), not on SourceRightsView.
+                .andExpect(jsonPath("$.usageNote").doesNotExist())
+                .andExpect(jsonPath("$.allowedNextStatuses").doesNotExist());
         mvc.perform(post("/api/v1/admin/content-sources/"+source.getId()+"/rights").with(a).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"MANUAL_REVIEW_REQUIRED\",\"note\":\"자료 확인\",\"attributionRequired\":true}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.rightsStatus").value("MANUAL_REVIEW_REQUIRED"));
+                .andExpect(jsonPath("$.rightsStatus").value("MANUAL_REVIEW_REQUIRED"))
+                .andExpect(jsonPath("$.usageNote").doesNotExist())
+                .andExpect(jsonPath("$.allowedNextStatuses").doesNotExist());
         mvc.perform(post("/api/v1/admin/content-sources/"+source.getId()+"/rights").with(a).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"ALLOWED\",\"note\":\"허용 근거 확인\",\"attributionRequired\":true,\"attributionText\":\"Source authors\"}"))
@@ -65,7 +75,16 @@ class AdminContentReviewControllerTest {
                 .andExpect(jsonPath("$.rightsStatus").value("ALLOWED"))
                 .andExpect(jsonPath("$.rightsReviewNote").value("허용 근거 확인"))
                 .andExpect(jsonPath("$.attributionText").value("Source authors"))
-                .andExpect(jsonPath("$.allowedForRelease").value(true));
+                .andExpect(jsonPath("$.allowedForRelease").value(true))
+                .andExpect(jsonPath("$.usageNote").doesNotExist())
+                .andExpect(jsonPath("$.allowedNextStatuses").doesNotExist());
+
+        // This API path (no expectedCurrentStatus concept) must remain unaffected by the HTML
+        // controller's stale-intent protection - it keeps using the pre-existing 5-arg reviewRights
+        // overload, which always skips the staleness check.
+        mvc.perform(get("/api/v1/admin/content-sources").with(a))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id=="+source.getId()+")]").exists());
     }
 
     @Test void protectsWebAndApiByRoleAndCsrf() throws Exception {

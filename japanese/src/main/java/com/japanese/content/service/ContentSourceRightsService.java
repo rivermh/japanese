@@ -52,8 +52,31 @@ public class ContentSourceRightsService {
     @Transactional
     public ContentSource reviewRights(Long id, ContentSourceRightsStatus target, String note,
                                       Boolean attributionRequired, String attributionText) {
+        return reviewRights(id, null, target, note, attributionRequired, attributionText);
+    }
+
+    /**
+     * JLPT-MAX Ticket 4E-6 hardening: an expected-state-aware overload for callers (the HTML admin
+     * form) that must guard against a stale browser render silently overwriting a NEWER rights decision
+     * made by someone else since the page was loaded. {@code expectedCurrentStatus} - when non-null -
+     * is compared against the persisted status only AFTER the {@code PESSIMISTIC_WRITE} lock below is
+     * acquired, so the comparison always sees the true latest value, never a value some other
+     * in-flight transaction might still change. A mismatch rejects the whole request with no mutation
+     * at all (not even a partial one) - the entity's {@code reviewRights} is never invoked. Passing
+     * {@code null} (as the existing 5-arg overload above does, preserving the JSON API's pre-existing,
+     * unchanged behavior) skips this check entirely; both overloads share this single locked mutation
+     * path, so there is exactly one place that performs the actual write.
+     */
+    @Transactional
+    public ContentSource reviewRights(Long id, ContentSourceRightsStatus expectedCurrentStatus,
+                                      ContentSourceRightsStatus target, String note,
+                                      Boolean attributionRequired, String attributionText) {
         ContentSource source = sources.findByIdForRightsReview(id)
                 .orElseThrow(() -> new NoSuchElementException("ContentSource not found: " + id));
+        if (expectedCurrentStatus != null && source.getRightsStatus() != expectedCurrentStatus) {
+            throw new IllegalStateException(
+                    "출처 권리 상태가 화면을 연 뒤 변경되었습니다. 최신 상태를 확인한 후 다시 검토해 주세요.");
+        }
         source.reviewRights(target, note, attributionRequired, attributionText);
         return source;
     }

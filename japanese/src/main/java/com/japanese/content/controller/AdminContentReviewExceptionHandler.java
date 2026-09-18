@@ -12,7 +12,8 @@ import com.japanese.content.service.ContentReleaseBatchException;
         AdminContentReviewApiController.class,
         AdminContentReviewController.class,
         AdminContentReleaseController.class,
-        AdminContentSourceRightsApiController.class
+        AdminContentSourceRightsApiController.class,
+        AdminContentSourceRightsController.class
 })
 public class AdminContentReviewExceptionHandler {
 

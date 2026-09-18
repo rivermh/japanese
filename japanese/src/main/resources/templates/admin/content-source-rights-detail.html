@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('출처 권리 상세')}"></head>
+<body>
+<header th:replace="~{fragments/layout :: header('admin')}"></header>
+<main id="main-content" class="page-shell detail-shell admin-shell" th:with="s=${source}">
+  <a href="/admin/content-sources">목록</a>
+  <p class="admin-message" th:if="${adminMessage}" th:text="${adminMessage}"></p>
+  <p class="admin-error" th:if="${adminError}" th:text="${adminError}"></p>
+  <article class="admin-detail">
+    <header>
+      <div class="card-meta">
+        <span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(s.rightsStatus.name())}" th:text="${s.rightsStatus}"></span>
+        <span class="status-pill" th:classappend="${s.allowedForRelease ? ' status-allowed' : ' status-blocked'}" th:text="${s.allowedForRelease ? 'ALLOWED_FOR_RELEASE' : 'NOT_RELEASABLE'}"></span>
+      </div>
+      <h1 th:text="${s.displayName}"></h1>
+      <p class="subtle" th:text="${'sourceRef: ' + s.sourceRef + (s.version != null ? (' · version: ' + s.version) : '')}"></p>
+    </header>
+
+    <section>
+      <h2>라이선스</h2>
+      <dl class="admin-facts">
+        <div><dt>License summary</dt><dd th:text="${s.licenseSummary ?: '(등록되지 않음)'}"></dd></div>
+        <div th:if="${s.licenseUrl}">
+          <dt>License URL</dt>
+          <dd><a th:href="${s.licenseUrl}" th:text="${s.licenseUrl}" target="_blank" rel="noopener noreferrer nofollow"></a>
+            <small class="subtle">이 링크를 보유·열람했다는 사실 자체가 재배포 권리를 증명하지 않습니다 - 실제 라이선스 조건을 직접 확인한 뒤 아래에서 사람이 직접 판단을 기록하세요.</small></dd>
+        </div>
+      </dl>
+    </section>
+
+    <section>
+      <h2>사용 메모</h2>
+      <p th:text="${s.usageNote ?: '(등록된 사용 메모가 없습니다)'}"></p>
+    </section>
+
+    <section>
+      <h2>Attribution (표시 의무)</h2>
+      <dl class="admin-facts">
+        <div><dt>현재 attribution 필요 여부</dt><dd th:text="${s.attributionRequired ? '필수' : '불필요'}"></dd></div>
+        <div><dt>현재 attribution 문구</dt><dd th:text="${s.attributionText ?: '(없음)'}"></dd></div>
+      </dl>
+    </section>
+
+    <section>
+      <h2>Rights 검토 이력</h2>
+      <dl class="admin-facts">
+        <div><dt>현재 상태</dt><dd><span class="status-pill" th:classappend="${' status-'+#strings.toLowerCase(s.rightsStatus.name())}" th:text="${s.rightsStatus}"></span></dd></div>
+        <div><dt>마지막 검토 시각</dt><dd th:text="${s.rightsReviewedAt ?: '(아직 검토되지 않음)'}"></dd></div>
+        <div><dt>마지막 검토 메모</dt><dd th:text="${s.rightsReviewNote ?: '(없음)'}"></dd></div>
+      </dl>
+    </section>
+
+    <section>
+      <h2>공개(release) 가능 여부</h2>
+      <p th:if="${s.allowedForRelease}" class="admin-message">이 출처는 현재 공개 가능 상태입니다 (release 시점에 다시 한 번 실시간으로 재검증됩니다).</p>
+      <p th:unless="${s.allowedForRelease}" class="admin-error" th:text="${'현재 공개 불가: ' + (s.blockingReason ?: 'rights 상태가 ALLOWED가 아닙니다.')}"></p>
+    </section>
+
+    <section class="rights-review-form">
+      <h2>사람의 rights 판단 기록</h2>
+      <p class="admin-error">
+        아래 판단은 이 출처로부터 승격/공개될 모든 콘텐츠의 향후 공개 가능 여부에 영향을 줍니다.
+        단, 이 화면에서의 승인(ALLOWED) 자체가 어떤 콘텐츠를 즉시 공개(publish)하거나 승격하지는 않습니다 -
+        공개는 항상 별도의 명시적 검수 절차를 거칩니다.
+      </p>
+      <form th:if="${!s.allowedNextStatuses.empty}" method="post"
+            th:action="@{/admin/content-sources/{id}/rights(id=${s.id})}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <input type="hidden" name="expectedCurrentStatus" th:value="${s.rightsStatus}">
+        <fieldset>
+          <legend>새 상태 선택 (현재 상태에서 허용되는 전환만 표시됩니다)</legend>
+          <label th:each="target:${s.allowedNextStatuses}">
+            <input type="radio" name="status" th:value="${target}" required>
+            <span th:text="${target}"></span>
+            <span th:if="${target.name() == 'ALLOWED'}" class="admin-error"> - 재배포를 허용합니다. 신중하게 선택하세요.</span>
+          </label>
+        </fieldset>
+        <label>검토 메모 (필수)<textarea name="note" required maxlength="2000"
+              placeholder="이 판단의 근거를 반드시 남기세요 (예: 라이선스 조항 확인 결과, 담당자 연락 결과 등)"></textarea></label>
+        <label><input type="checkbox" name="attributionRequired" value="true" th:checked="${s.attributionRequired}"> attribution 표시 필수</label>
+        <input type="hidden" name="attributionRequired" value="false">
+        <label>attribution 문구 (attribution 필수 상태로 ALLOWED 전환 시 반드시 채워야 합니다 - 비워두면 attribution이 지워집니다)
+          <input type="text" name="attributionText" maxlength="2000" th:value="${s.attributionText}">
+        </label>
+        <button type="submit">rights 판단 저장</button>
+      </form>
+      <p th:if="${s.allowedNextStatuses.empty}" class="admin-error">이 상태에서는 더 이상 가능한 전환이 없습니다.</p>
+    </section>
+  </article>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>
