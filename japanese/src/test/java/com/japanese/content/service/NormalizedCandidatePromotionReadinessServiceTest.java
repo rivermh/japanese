@@ -411,12 +411,15 @@ class NormalizedCandidatePromotionReadinessServiceTest {
     @Test
     void r3_duplicateProductionLevelRowsForTheSameCodeMakeTheLevelUnmappable() {
         String ref = ref();
-        // levels 테이블에는 (system, code) unique constraint가 없다 - 두 row가 동시에 존재하는 상태를
-        // 직접 재현해, 어느 한쪽을 임의로 골라 매핑하지 않고 unmappable로 처리되는지 검증한다. N4는
-        // SampleContentDataLoader가 seed하지 않는 code라서 이 테스트 트랜잭션 안에서 정확히 두 개의
-        // row만 존재함이 보장된다.
-        levels.save(new Level("JLPT", "N4", "JLPT N4"));
-        levels.save(new Level("JLPT", "N4", "JLPT N4 (duplicate)"));
+        // levels 테이블에는 (system, code) unique constraint가 없다 - 두 개 이상의 row가 동시에
+        // 존재하는 상태를 직접 재현해, 어느 한쪽을 임의로 골라 매핑하지 않고 unmappable로 처리되는지
+        // 검증한다. Ticket 4E-5의 V10 마이그레이션이 JLPT/N4 row를 이미 하나 seed했을 수 있으므로
+        // (실제로는 정확히 하나 존재), 이 테스트가 직접 추가하는 두 개의 row까지 합쳐 최종적으로는
+        // 최소 두 개, 보통 세 개의 row가 존재하게 된다 - "정확히 몇 개"가 아니라 "1개보다 많다"는
+        // 조건 자체가 검증 대상이므로 이 차이는 안전하다 (readiness 로직은 matchingLevelCount != 1
+        // 로만 판단한다).
+        levels.save(new Level("JLPT", "N4", "JLPT N4 (duplicate 1)"));
+        levels.save(new Level("JLPT", "N4", "JLPT N4 (duplicate 2)"));
         store.saveVocabulary(vocab(ref, 1L, "E1", "語", "ご", "noun", "N4", "meaning"));
         var result = readiness.detail(NormalizedCandidateType.VOCABULARY, onlyCandidate(ref).getId()).result();
         assertThat(codesOf(result)).contains(PromotionReadinessIssueCode.JLPT_LEVEL_UNMAPPABLE);
@@ -767,9 +770,13 @@ class NormalizedCandidatePromotionReadinessServiceTest {
     @Test
     void issueOrderWithinACandidateIsDeterministicByDeclaredEnumOrder() {
         String ref = ref();
-        // No Level seeded (JLPT_LEVEL_UNMAPPABLE) and no ContentSource registered (SOURCE_NOT_REGISTERED),
-        // so this candidate always carries at least these two plus PRODUCTION_IDENTITY_POLICY_UNRESOLVED.
-        store.saveVocabulary(vocab(ref, 1L, "E1", "語", "ご", "noun", "N5", "meaning"));
+        // Ticket 4E-5 seeds the standard JLPT N5-N1 catalog via migration, so a plain N5 candidate can
+        // no longer rely on global level absence to reach JLPT_LEVEL_UNMAPPABLE - "N9" is not one of the
+        // seeded codes, so it explicitly and locally recreates the missing-level condition this test
+        // needs, exactly like r_unmappableJlptLevelIsBlocked does. No ContentSource is registered either
+        // (SOURCE_NOT_REGISTERED), so this candidate always carries at least these two plus
+        // PRODUCTION_IDENTITY_POLICY_UNRESOLVED.
+        store.saveVocabulary(vocab(ref, 1L, "E1", "語", "ご", "noun", "N9", "meaning"));
         var result = readiness.detail(NormalizedCandidateType.VOCABULARY, onlyCandidate(ref).getId()).result();
 
         List<Integer> ordinals = result.issues().stream().map(i -> i.code().ordinal()).toList();

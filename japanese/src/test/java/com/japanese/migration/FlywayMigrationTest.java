@@ -25,9 +25,9 @@ class FlywayMigrationTest {
         MigrateResult first = flyway.migrate();
         MigrateResult second = flyway.migrate();
 
-        assertThat(first.migrationsExecuted).isEqualTo(9);
+        assertThat(first.migrationsExecuted).isEqualTo(10);
         assertThat(second.migrationsExecuted).isZero();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("9");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("10");
         assertThat(tableExists(url, "private_apkg_notes")).isTrue();
         assertThat(tableExists(url, "content_items")).isTrue();
         assertThat(tableExists(url, "today_study_sessions")).isTrue();
@@ -50,6 +50,14 @@ class FlywayMigrationTest {
         assertThat(tableExists(url, "normalized_candidate_canonical_groups")).isTrue();
         assertThat(tableExists(url, "normalized_candidate_canonical_group_members")).isTrue();
         assertThat(tableExists(url, "normalized_candidate_canonical_group_edges")).isTrue();
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            assertThat(singleInt(sql, "select count(*) from levels where level_system='JLPT'")).isEqualTo(5);
+            assertThat(singleText(sql, "select name from levels where level_system='JLPT' and code='N5'")).isEqualTo("JLPT N5");
+            assertThat(singleText(sql, "select name from levels where level_system='JLPT' and code='N4'")).isEqualTo("JLPT N4");
+            assertThat(singleText(sql, "select name from levels where level_system='JLPT' and code='N3'")).isEqualTo("JLPT N3");
+            assertThat(singleText(sql, "select name from levels where level_system='JLPT' and code='N2'")).isEqualTo("JLPT N2");
+            assertThat(singleText(sql, "select name from levels where level_system='JLPT' and code='N1'")).isEqualTo("JLPT N1");
+        }
     }
 
     @Test
@@ -93,7 +101,7 @@ class FlywayMigrationTest {
 
         Flyway upgraded = Flyway.configure().dataSource(url, "sa", "")
                 .locations("classpath:db/migration/h2").cleanDisabled(true).load();
-        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(8);
+        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(9);
         assertThat(upgraded.migrate().migrationsExecuted).isZero();
 
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
@@ -137,7 +145,7 @@ class FlywayMigrationTest {
         }
 
         Flyway upgraded = flyway(url, false);
-        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(7);
+        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(8);
         assertThat(upgraded.migrate().migrationsExecuted).isZero();
 
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
@@ -184,7 +192,7 @@ class FlywayMigrationTest {
             sql.executeUpdate("insert into learning_progress (id, consecutive_correct, lapse_count, review_count, content_item_id, learner_profile_id, last_studied_at, next_review_at, last_result, learning_state) values (1, 0, 0, 1, 1, 1, current_timestamp, current_timestamp, 'CORRECT', 'REVIEW')");
         }
         Flyway upgraded = flyway(url, false);
-        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(6);
+        assertThat(upgraded.migrate().migrationsExecuted).isEqualTo(7);
         assertThat(upgraded.migrate().migrationsExecuted).isZero();
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
             assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'")).isEqualTo(1);
@@ -216,7 +224,7 @@ class FlywayMigrationTest {
                     + "values (1,false,'existing-private','private-source','WORD','PENDING')");
         }
         Flyway upgrade = flyway(url, false);
-        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(5);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(6);
         assertThat(upgrade.migrate().migrationsExecuted).isZero();
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
             assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'"))
@@ -251,7 +259,7 @@ class FlywayMigrationTest {
                     + "1,1,'note','VOCABULARY','guid-1','[]','[]','','[]','[]','{}',0,current_timestamp)");
         }
         Flyway upgrade = flyway(url, false);
-        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(4);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(5);
         assertThat(upgrade.migrate().migrationsExecuted).isZero();
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
             assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'"))
@@ -295,7 +303,7 @@ class FlywayMigrationTest {
                     + "(2,'VOCABULARY','private-source',2,'E-2','CLEAN',current_timestamp)");
         }
         Flyway upgrade = flyway(url, false);
-        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(3);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(4);
         assertThat(upgrade.migrate().migrationsExecuted).isZero();
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
             assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'"))
@@ -352,7 +360,7 @@ class FlywayMigrationTest {
                     + "field_name,detail) values (1,1,1,'SAME_EXPRESSION','expression','だぶる')");
         }
         Flyway upgrade = flyway(url, false);
-        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(3);
         assertThat(upgrade.migrate().migrationsExecuted).isZero();
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
             assertThat(singleInt(sql, "select count(*) from content_items where id=1 and published=false and review_status='PENDING'"))
@@ -422,7 +430,7 @@ class FlywayMigrationTest {
                     + "current_timestamp,current_timestamp,'POSSIBLE_DUPLICATE',0)");
         }
         Flyway upgrade = flyway(url, false);
-        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(2);
         assertThat(upgrade.migrate().migrationsExecuted).isZero();
         try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
             // Pre-existing candidate/pair/review rows must be completely untouched.
@@ -484,6 +492,98 @@ class FlywayMigrationTest {
                 .doesNotContain("update normalized_content_candidates")
                 .doesNotContain("update normalized_candidate_match_pairs")
                 .doesNotContain("update normalized_candidate_pair_reviews");
+    }
+
+    @Test
+    void v10SeedsMissingJlptLevelsButPreservesAnExistingNoncanonicalRowAndUnrelatedSystem() throws Exception {
+        String url = databaseUrl("jlpt_level_seed_partial");
+        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration/h2")
+                .target("9").cleanDisabled(true).load().migrate();
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            sql.executeUpdate("insert into levels (id,level_system,code,name) values (1,'JLPT','N5','Legacy N5 Name')");
+            sql.executeUpdate("insert into levels (id,level_system,code,name) values (2,'CEFR','A1','CEFR A1')");
+        }
+        Flyway upgrade = flyway(url, false);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(upgrade.migrate().migrationsExecuted).isZero();
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            // The pre-existing JLPT/N5 row must be completely untouched - same id, same (noncanonical) name.
+            assertThat(singleInt(sql, "select id from levels where level_system='JLPT' and code='N5'")).isEqualTo(1);
+            assertThat(singleText(sql, "select name from levels where level_system='JLPT' and code='N5'"))
+                    .isEqualTo("Legacy N5 Name");
+            assertThat(singleInt(sql, "select count(*) from levels where level_system='JLPT' and code='N5'")).isEqualTo(1);
+            // The four missing JLPT rows must now exist, with canonical names.
+            assertThat(singleText(sql, "select name from levels where level_system='JLPT' and code='N4'")).isEqualTo("JLPT N4");
+            assertThat(singleText(sql, "select name from levels where level_system='JLPT' and code='N3'")).isEqualTo("JLPT N3");
+            assertThat(singleText(sql, "select name from levels where level_system='JLPT' and code='N2'")).isEqualTo("JLPT N2");
+            assertThat(singleText(sql, "select name from levels where level_system='JLPT' and code='N1'")).isEqualTo("JLPT N1");
+            assertThat(singleInt(sql, "select count(*) from levels where level_system='JLPT'")).isEqualTo(5);
+            // The unrelated CEFR level system must be completely untouched.
+            assertThat(singleInt(sql, "select id from levels where level_system='CEFR' and code='A1'")).isEqualTo(2);
+            assertThat(singleText(sql, "select name from levels where level_system='CEFR' and code='A1'")).isEqualTo("CEFR A1");
+            assertThat(singleInt(sql, "select count(*) from levels")).isEqualTo(6);
+        }
+    }
+
+    @Test
+    void v10IsAnNoOpWhenAllFiveJlptLevelsAlreadyExist() throws Exception {
+        String url = databaseUrl("jlpt_level_seed_complete");
+        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration/h2")
+                .target("9").cleanDisabled(true).load().migrate();
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            sql.executeUpdate("insert into levels (id,level_system,code,name) values (1,'JLPT','N5','N5')");
+            sql.executeUpdate("insert into levels (id,level_system,code,name) values (2,'JLPT','N4','N4')");
+            sql.executeUpdate("insert into levels (id,level_system,code,name) values (3,'JLPT','N3','N3')");
+            sql.executeUpdate("insert into levels (id,level_system,code,name) values (4,'JLPT','N2','N2')");
+            sql.executeUpdate("insert into levels (id,level_system,code,name) values (5,'JLPT','N1','N1')");
+        }
+        Flyway upgrade = flyway(url, false);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(1);
+        assertThat(upgrade.migrate().migrationsExecuted).isZero();
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            // No duplicate key rows were created, and every pre-existing id/name is untouched.
+            assertThat(singleInt(sql, "select count(*) from levels where level_system='JLPT'")).isEqualTo(5);
+            for (int i = 1; i <= 5; i++) {
+                assertThat(singleInt(sql, "select count(*) from levels where id=" + i)).isEqualTo(1);
+            }
+        }
+    }
+
+    @Test
+    void v10NeverCreatesAThirdRowForAPreExistingDuplicateJlptKey() throws Exception {
+        String url = databaseUrl("jlpt_level_seed_duplicate");
+        Flyway.configure().dataSource(url, "sa", "").locations("classpath:db/migration/h2")
+                .target("9").cleanDisabled(true).load().migrate();
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            sql.executeUpdate("insert into levels (id,level_system,code,name) values (1,'JLPT','N3','N3 first')");
+            sql.executeUpdate("insert into levels (id,level_system,code,name) values (2,'JLPT','N3','N3 second')");
+        }
+        Flyway upgrade = flyway(url, false);
+        assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(1);
+        try (Connection connection = connection(url); Statement sql = connection.createStatement()) {
+            // The migration must not attempt to repair the duplicate - still exactly two N3 rows, both
+            // pre-existing ids untouched, and no third row added.
+            assertThat(singleInt(sql, "select count(*) from levels where level_system='JLPT' and code='N3'")).isEqualTo(2);
+            assertThat(singleInt(sql, "select count(*) from levels where id=1")).isEqualTo(1);
+            assertThat(singleInt(sql, "select count(*) from levels where id=2")).isEqualTo(1);
+            // The other four canonical keys must still have been seeded normally.
+            assertThat(singleInt(sql, "select count(*) from levels where level_system='JLPT' and code='N5'")).isEqualTo(1);
+            assertThat(singleInt(sql, "select count(*) from levels where level_system='JLPT' and code='N4'")).isEqualTo(1);
+            assertThat(singleInt(sql, "select count(*) from levels where level_system='JLPT' and code='N2'")).isEqualTo(1);
+            assertThat(singleInt(sql, "select count(*) from levels where level_system='JLPT' and code='N1'")).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void mysqlV10IsDataOnlyAdditiveAndTouchesOnlyLevels() throws Exception {
+        String migration = new ClassPathResource("db/migration/mysql/V10__seed_jlpt_levels.sql")
+                .getContentAsString(StandardCharsets.UTF_8).toLowerCase();
+        assertThat(migration).contains("insert into levels", "not exists", "'jlpt'", "'n5'", "'n4'", "'n3'", "'n2'", "'n1'")
+                .doesNotContain("create table").doesNotContain("alter table")
+                .doesNotContain("drop ").doesNotContain("delete ").doesNotContain("truncate").doesNotContain("update ")
+                .doesNotContain("content_items").doesNotContain("normalized_content_candidates")
+                .doesNotContain("normalized_candidate").doesNotContain("content_sources")
+                .doesNotContain("imported_source_records");
     }
 
     private int singleInt(Statement sql, String query) throws Exception {
