@@ -21,7 +21,7 @@
             <details class="today-review-reveal" th:if="${todaySession.currentActivityType.name() == 'REVIEW'}">
                 <summary>답 보기</summary>
                 <div class="today-answer-content">
-                    <header class="today-answer-heading"><h2 lang="ja" th:text="${lesson.summary.title}">する</h2><p class="today-reading" lang="ja" th:if="${lesson.summary.reading != null and !lesson.summary.reading.isBlank()}" th:text="${lesson.summary.reading}">する</p></header>
+                    <header class="today-answer-heading"><h2><span th:replace="~{fragments/content :: headword(${lesson.summary.title}, ${lesson.summary.reading}, ${lesson.summary.type})}">する</span></h2><p class="today-reading" lang="ja" th:if="${lesson.summary.type.name() != 'WORD' and lesson.summary.reading != null and !lesson.summary.reading.isBlank()}" th:text="${lesson.summary.reading}"></p></header>
                     <p class="today-core-meaning" th:if="${lesson.summary.type.name() == 'WORD' and !#lists.isEmpty(lesson.meanings)}" th:text="${lesson.meanings[0].text}">하다</p>
                     <p class="today-core-meaning" th:if="${lesson.summary.type.name() == 'WORD' and #lists.isEmpty(lesson.meanings) and lesson.summary.description != null}" th:text="${lesson.summary.description}">핵심 의미</p>
                     <p class="today-core-meaning" th:if="${lesson.grammar != null}" th:text="${lesson.grammar.explanation}">핵심 문법 설명</p>
@@ -35,7 +35,7 @@
             </details>
 
             <section class="today-new-content" th:if="${todaySession.currentActivityType.name() != 'REVIEW'}" aria-labelledby="today-new-title">
-                <header class="today-answer-heading"><h1 id="today-new-title" lang="ja" th:text="${lesson.summary.title}">なる</h1><p class="today-reading" lang="ja" th:if="${lesson.summary.reading != null and !lesson.summary.reading.isBlank()}" th:text="${lesson.summary.reading}">なる</p></header>
+                <header class="today-answer-heading"><h1 id="today-new-title"><span th:replace="~{fragments/content :: headword(${lesson.summary.title}, ${lesson.summary.reading}, ${lesson.summary.type})}">なる</span></h1><p class="today-reading" lang="ja" th:if="${lesson.summary.type.name() != 'WORD' and lesson.summary.reading != null and !lesson.summary.reading.isBlank()}" th:text="${lesson.summary.reading}"></p></header>
                 <p class="today-kind" th:if="${lesson.partOfSpeech != null}" th:text="${lesson.partOfSpeech}">동사</p>
                 <p class="today-core-meaning" th:if="${lesson.summary.type.name() == 'WORD' and !#lists.isEmpty(lesson.meanings)}" th:text="${lesson.meanings[0].text}">되다</p>
                 <p class="today-core-meaning" th:if="${lesson.summary.type.name() == 'WORD' and #lists.isEmpty(lesson.meanings) and lesson.summary.description != null}" th:text="${lesson.summary.description}">핵심 의미</p>

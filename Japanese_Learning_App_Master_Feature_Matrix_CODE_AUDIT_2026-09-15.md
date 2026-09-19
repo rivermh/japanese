@@ -8,11 +8,11 @@
 
 - 현재 검증 기준일: **2026-09-19**
 - 현재 branch: `ui/japanese-ui-consolidation`
-- 현재 HEAD: `b356700878d0f4039fdf1ad7e42359b10233562e`
-- 계정 삭제 구현과 hardening rollback 테스트는 현재 **미커밋 working tree**에 존재하며, 위 HEAD에 포함된 것으로 간주하지 않는다.
+- 현재 검증 baseline HEAD: `f6a0427e4b9bf6ba282928dc0dabbf49d4e3f287`
+- 계정 삭제 구현과 hardening rollback 테스트 및 이전 Matrix update는 `f6a0427e4b9bf6ba282928dc0dabbf49d4e3f287`에 이미 commit/push 완료되어 baseline에 포함된다. ruby/furigana P0 구현은 이 baseline 위의 현재 미커밋 change set이다.
 - 기존 `a0006565a2ff54b221f372455e32f5d4dfd49e53` 및 `da789116dd9f26692360379064f3d5c48bf9152c` 기준 서술은 각각 역사적 기준으로 유지한다.
 
-현재 P0 요약: 학습·검색·복습·진도·기기간 이어하기의 사용자 흐름은 구현되어 있다. 다만 공개 N5~N1 콘텐츠의 실제 release, ruby/후리가나 표시, 운영 backup/restore·SMTP·migration rehearsal 및 대표 브라우저 E2E 검증이 남아 있다.
+현재 P0 요약: 학습·검색·복습·진도·기기간 이어하기의 사용자 흐름과 단어 headword ruby/후리가나 presentation은 구현되어 있다. 다만 공개 N5~N1 콘텐츠의 실제 release, 운영 backup/restore·SMTP·migration rehearsal 및 대표 브라우저 E2E 검증이 남아 있다.
 
 이 문서는 구현하면서 체크를 지워 나가는 **실전 백로그**입니다.
 
@@ -49,7 +49,7 @@
 | 우리 | 우선 | 기능 | iroiro | renshuu | Anki | Migii | Duo | Bunpro | 메모 |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|---|
 | [~] | P0 | JLPT N5~N1 레벨별 어휘 | ✅ | ✅ | △ | ✅ | △ | ✅ | 현재: JLPT-MAX linked WORD 9,159건이 있고 전체 linked production record는 12,764건이다. verified published+APPROVED는 전체 12건이며 대부분은 PENDING·비공개라 출시 체급으로는 부분 완료. WORD/GRAMMAR별 공개 split은 현재 검증하지 않았다. / 기존 메모: 출시 기본 체급 |
-| [~] | P0 | 단어 뜻·읽기·품사·후리가나 | ✅ | ✅ | △ | ✅ | ✅ | ✅ | 현재: 뜻·읽기·품사와 상세 표시는 구현. 읽기는 제공하지만 독립적인 ruby/후리가나 제어 기능까지는 확인되지 않음. / 기존 메모: 단어 상세 기본 |
+| [x] | P0 | 단어 뜻·읽기·품사·후리가나 | ✅ | ✅ | △ | ✅ | ✅ | ✅ | 현재: 뜻·읽기·품사와 상세 표시, 저장된 reading 기반의 semantic `<ruby>/<rt>` headword presentation이 content detail·Today·free Study/SRS에서 구현됨. surface와 reading이 다를 때만 ruby를 표시하고, kana-only·null/blank reading은 일반 표기로 fallback한다. / 기존 메모: 단어 상세 기본 |
 | [x] | P0 | 예문 + 번역 | ✅ | ✅ | △ | ✅ | ✅ | ✅ | 현재: Example에 일본어·읽기·번역이 있고 단어/문법 상세에서 표시. / 기존 메모: 콘텐츠 품질 중요 |
 | [ ] | P1 | 단어/예문 음성 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: 음성/TTS 재생 경로를 확인하지 못함. / 기존 메모: 가능하면 네이티브, 초기엔 고품질 TTS도 현실적 |
 | [ ] | P1 | 단어 활용형/동사·형용사 활용 | ✅ | ✅ | △ | ✅ | ✅ | ✅ | 현재: 활용형 전용 모델/표시 기능을 확인하지 못함. / 기존 메모: iroiro 0.39.x에서 강화 |
@@ -199,7 +199,7 @@
 | [ ] | P3 | 결제 복원/구매 상태 동기화 | ✅ | ✅ | △ | ✅ | ✅ | ✅ | 현재: 결제 시스템 미구현; 유료화 시점에 필요. |
 | [ ] | P1 | 사용자 피드백/오류 신고 | ✅ | ✅ | △ | ✅ | △ | ✅ | 현재: 사용자 제출형 피드백/콘텐츠 오류 신고 흐름 확인되지 않음. / 기존 메모: 콘텐츠 개선 루프 |
 | [~] | P2 | 학습 이벤트 로그/퍼널 분석 | △ | △ | △ | △ | ✅ | △ | 현재: StudyRecord/QuizAttempt 등 학습 로그는 풍부하지만 제품 analytics funnel/이벤트 계층은 없음. / 기존 메모: 리텐션 개선 |
-| [x] | P0 | 데이터 삭제/계정 탈퇴 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: 미커밋 working tree에 일반 USER용 전용 확인 화면, 현재 비밀번호 재확인, POST+CSRF, 소유 학습 데이터·검증/재설정 token의 transactional hard delete, LearnerProfile/UserAccount 삭제, 현재 세션 무효화와 SecurityContext 정리가 구현·hardening 검증됨. 다른 사용자·공유 콘텐츠는 보존된다. ADMIN/검수 계정은 의도적으로 일반 learner self-delete에서 제외된다. 다른 기기 세션의 즉시 전역 무효화는 session registry 부재로 지원하지 않지만, 일반 learner 요청은 DB 계정 재조회에서 실패한다. / 기존 메모: 정책/스토어 필수 |
+| [x] | P0 | 데이터 삭제/계정 탈퇴 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: account deletion + hardening이 `f6a0427e4b9bf6ba282928dc0dabbf49d4e3f287`에 commit/push 완료되어 baseline HEAD에 포함됨. 전용 확인, 비밀번호 재확인, POST+CSRF, transactional learner-data/token hard delete, 세션 무효화와 rollback 검증이 완료되었다. 다른 사용자·공유 콘텐츠는 보존되며 ADMIN/검수 계정은 일반 learner self-delete에서 제외된다. 다른 기기 세션의 즉시 전역 무효화는 session registry 부재로 지원하지 않지만 일반 learner 요청은 DB 계정 재조회에서 실패한다. / 기존 메모: 정책/스토어 필수 |
 | [ ] | P2 | 기능 플래그/점진 배포 | △ | △ | △ | △ | ✅ | △ | 현재: 미구현. / 기존 메모: 업데이트 리스크 감소 |
 
 ## 우리만의 승부수
@@ -254,7 +254,7 @@
 | 운영 migration 안전성 | **PARTIALLY RESOLVED** | Flyway V1~V4, `ddl-auto=validate`, clean-disabled, 명시적 기존 DB baseline 및 backup/restore 절차 문서가 있다. 실제 MySQL backup/restore·migration rehearsal과 EXPLAIN은 배포 전 남아 있다. |
 | 공개 콘텐츠 승인/품질 | **PARTIALLY RESOLVED** | Source rights, Word/Grammar Release Gate, publication invariant, read-only dry-run, stale digest 검증, atomic batch execution, immutable rollback manifest 및 관리자 개별 확인·실행·이력·rollback UX까지 현재 HEAD에 포함되어 있다. 실제 source license 검증, actual N5 dry-run, duplicate adjudication, production-like rehearsal, N5 Word/Grammar pilot은 남아 있다. |
 | 서버 backup/restore 자동화 | **PARTIALLY RESOLVED** | 운영 절차 문서와 persistent dev MySQL backup 수행은 있으나 scheduler, retention policy, 검증 restore rehearsal 및 production-like recovery evidence는 남아 있다. |
-| 계정/학습 데이터 삭제 | **RESOLVED IN CURRENT WORKING TREE** | 전용 확인·현재 비밀번호·POST+CSRF·transactional learner-data hard delete·token 삭제·세션 무효화·rollback test가 현재 미커밋 working tree에 구현됐다. 현재 HEAD에는 아직 포함되지 않았다. |
+| 계정/학습 데이터 삭제 | **RESOLVED** | 비밀번호 재확인·POST+CSRF·transactional learner-data 삭제·토큰 삭제·세션 무효화가 구현·검증되었고, account deletion + hardening은 `f6a0427e4b9bf6ba282928dc0dabbf49d4e3f287`에 commit/push되어 baseline HEAD에 포함된다. |
 | queue가 selected scope를 override하는 정책 | **REVIEW NEEDED** | Today에서 명시적 queue가 일반 level/category scope보다 우선하는 기존 정책이다. 코드 버그로 단정하지 않고 제품 정책 확인 대상으로 남긴다. |
 | due/candidate query 운영 성능 | **REVIEW NEEDED** | query는 DB 필터와 제한을 사용하지만 실제 MySQL EXPLAIN 및 대량 데이터 실행 계획은 아직 확인하지 않았다. |
 
@@ -272,7 +272,7 @@
 
 - 대량 PENDING 콘텐츠의 출처·라이선스·품질 검수와 공개 정책
 - 운영 DB backup/restore 실행 및 rehearsal
-- 계정 탈퇴와 학습 데이터 삭제 (2026-09-15 당시 미완료; 2026-09-19 현재 미커밋 working tree에서 해결)
+- 계정 탈퇴와 학습 데이터 삭제 (2026-09-15 당시 미완료; 2026-09-19 `f6a0427e4b9bf6ba282928dc0dabbf49d4e3f287`에서 구현·hardening 후 commit/push 완료)
 - 이메일 계정 복구의 production 운영 검증 및 social login 여부 결정
 - 핵심 사용자 흐름의 실제 E2E/mobile/대량 콘텐츠 검증
 
@@ -323,7 +323,7 @@ Content release infrastructure는 source-rights model/service, release gate, pub
 
 ### Code / product UX
 
-- P0 요구사항으로 유지한다면 ruby/후리가나 표시를 구현·검증한다.
+- P0 ruby/후리가나 headword presentation은 2026-09-19 ruby/furigana change set에서 구현·focused web test 검증 완료. 사용자 설정형 `후리가나 표시 on/off`는 별도 P1로 유지한다.
 
 ### Operations / verification
 
@@ -343,11 +343,10 @@ Social login, FSRS, audio/TTS, Kanji, mock JLPT exams, Flutter는 현재 Web V1 
 
 ## Web V1 closure sequence — 2026-09-19
 
-1. ruby/후리가나가 V1 요구사항인지 결정하고, 유지할 경우 구현한다.
-2. source-rights와 대표 콘텐츠 품질 승인을 완료한다.
-3. N5 Word/Grammar release pilot과 rollback rehearsal을 수행한다.
-4. backup/restore, Flyway, SMTP 운영 rehearsal을 수행한다.
-5. 대규모 콘텐츠 및 대표 브라우저 E2E를 최종 검증한다.
+1. source-rights와 대표 콘텐츠 품질 승인을 완료한다.
+2. N5 Word/Grammar release pilot과 rollback rehearsal을 수행한다.
+3. backup/restore, Flyway, SMTP 운영 rehearsal을 수행한다.
+4. 대규모 콘텐츠 및 대표 브라우저 E2E를 최종 검증한다.
 
 ## Phase 1 추천 우선순위 — dependency 기준
 

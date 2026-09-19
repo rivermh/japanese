@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <body>
+<span th:fragment="headword(surface, reading, type)" th:with="ruby=${@wordHeadword.shouldRenderRuby(type, surface, reading)}" class="headword" lang="ja">
+    <ruby class="headword-ruby" th:if="${ruby}"><span th:text="${surface}">食べる</span><rt th:text="${reading}">たべる</rt></ruby>
+    <span th:unless="${ruby}" th:text="${surface}">食べる</span>
+</span>
 <div th:fragment="lessonBody(content)" class="learning-body">
     <dl class="inline-facts" th:if="${content.partOfSpeech != null or (content.pitchAccentDisplay != null and !content.pitchAccentDisplay.rawOnly)}">
         <div th:if="${content.partOfSpeech != null}"><dt>품사</dt><dd th:text="${content.partOfSpeech}"></dd></div>

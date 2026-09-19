@@ -1597,3 +1597,4 @@ a.content-row:hover { background:#f7f5ef; text-decoration:none; }
 .destructive-settings { border-top:2px solid var(--danger); }
 .destructive-confirmation { border-top:3px solid var(--danger); }
 .destructive-confirmation > p { margin:12px 0; }
+.headword-ruby rt { font-size: .55em; line-height: 1; }
