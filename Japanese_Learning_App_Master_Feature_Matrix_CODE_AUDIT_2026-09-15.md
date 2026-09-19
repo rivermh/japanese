@@ -1,6 +1,19 @@
 # Japanese Learning App — Master Feature Matrix
 기준일: 2026-09-15
 
+## CURRENT 상태 동기화 — 2026-09-19
+
+이 문서는 2026-09-15 코드 감사와 이후 변경을 함께 보존하는 역사 문서다. 아래 내용은
+현재 Web V1 상태를 별도로 동기화한 것이다.
+
+- 현재 검증 기준일: **2026-09-19**
+- 현재 branch: `ui/japanese-ui-consolidation`
+- 현재 HEAD: `b356700878d0f4039fdf1ad7e42359b10233562e`
+- 계정 삭제 구현과 hardening rollback 테스트는 현재 **미커밋 working tree**에 존재하며, 위 HEAD에 포함된 것으로 간주하지 않는다.
+- 기존 `a0006565a2ff54b221f372455e32f5d4dfd49e53` 및 `da789116dd9f26692360379064f3d5c48bf9152c` 기준 서술은 각각 역사적 기준으로 유지한다.
+
+현재 P0 요약: 학습·검색·복습·진도·기기간 이어하기의 사용자 흐름은 구현되어 있다. 다만 공개 N5~N1 콘텐츠의 실제 release, ruby/후리가나 표시, 운영 backup/restore·SMTP·migration rehearsal 및 대표 브라우저 E2E 검증이 남아 있다.
+
 이 문서는 구현하면서 체크를 지워 나가는 **실전 백로그**입니다.
 
 ## 범례
@@ -16,7 +29,7 @@
 ### 코드 감사 기준
 - 기준 브랜치: `ui/japanese-ui-consolidation`
 - 기준 HEAD: `a0006565a2ff54b221f372455e32f5d4dfd49e53` (`fix(core): harden phase 0 learning infrastructure`)
-- Phase 0 HEAD는 production baseline이며, Phase 1A Ticket A~F의 source rights, Release Gate, publication safety, dry-run, batch execution/immutable manifest 및 Admin Batch UX는 현재 미커밋 working tree에 반영되어 있다.
+- 2026-09-15 당시 Phase 0 HEAD는 production baseline이었고, Phase 1A Ticket A~F의 source rights, Release Gate, publication safety, dry-run, batch execution/immutable manifest 및 Admin Batch UX는 당시 미커밋 working tree에 반영된 것으로 기록됐다.
 - 상태 판정은 엔티티/서비스/API/템플릿/CSS·JS/테스트/현재 기능 문서를 함께 보고 **실제로 사용자 흐름으로 이어지는지**를 우선했습니다.
 - 최신 UI 통합에서 authenticated 상단 navigation, Guest Index, Login, Home, `/today` recall player, `/haru` 전용 화면과 정보 페이지 정렬이 반영된 상태를 기준으로 재검사했습니다.
 - 콘텐츠 import가 존재하더라도 대량 데이터가 PENDING·비공개이면 전체 코스 관점에서는 `[~]`로 표시했습니다.
@@ -35,7 +48,7 @@
 ## 콘텐츠/데이터
 | 우리 | 우선 | 기능 | iroiro | renshuu | Anki | Migii | Duo | Bunpro | 메모 |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|---|
-| [~] | P0 | JLPT N5~N1 레벨별 어휘 | ✅ | ✅ | △ | ✅ | △ | ✅ | 현재: N5~N1 import WORD 9,159건이 있고 사용자 공개는 승인된 8건뿐이다. 나머지 9,151건은 PENDING·비공개라 출시 체급으로는 부분 완료. / 기존 메모: 출시 기본 체급 |
+| [~] | P0 | JLPT N5~N1 레벨별 어휘 | ✅ | ✅ | △ | ✅ | △ | ✅ | 현재: JLPT-MAX linked WORD 9,159건이 있고 전체 linked production record는 12,764건이다. verified published+APPROVED는 전체 12건이며 대부분은 PENDING·비공개라 출시 체급으로는 부분 완료. WORD/GRAMMAR별 공개 split은 현재 검증하지 않았다. / 기존 메모: 출시 기본 체급 |
 | [~] | P0 | 단어 뜻·읽기·품사·후리가나 | ✅ | ✅ | △ | ✅ | ✅ | ✅ | 현재: 뜻·읽기·품사와 상세 표시는 구현. 읽기는 제공하지만 독립적인 ruby/후리가나 제어 기능까지는 확인되지 않음. / 기존 메모: 단어 상세 기본 |
 | [x] | P0 | 예문 + 번역 | ✅ | ✅ | △ | ✅ | ✅ | ✅ | 현재: Example에 일본어·읽기·번역이 있고 단어/문법 상세에서 표시. / 기존 메모: 콘텐츠 품질 중요 |
 | [ ] | P1 | 단어/예문 음성 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: 음성/TTS 재생 경로를 확인하지 못함. / 기존 메모: 가능하면 네이티브, 초기엔 고품질 TTS도 현실적 |
@@ -44,7 +57,7 @@
 | [ ] | P2 | 동음이의/동음어·복합어 | ✅ | ✅ | △ | △ | △ | △ | 현재: 전용 관계/탐색 기능을 확인하지 못함. / 기존 메모: 검색/연결 탐색에 유용 |
 | [x] | P1 | 억양/피치 악센트 | ✅ | ✅ | △ | — | — | — | 현재: Word.pitchAccent와 상세 표시/숫자 피치 해석 경로가 구현됨. / 기존 메모: 고급 학습자 가치 큼 |
 | [ ] | P2 | 히라가나/가타카나 학습 | ✅ | ✅ | △ | ✅ | ✅ | — | 현재: 검색 정규화는 있으나 문자 학습 코스는 없음. / 기존 메모: 초보 유입용 |
-| [~] | P0 | 문법 N5~N1 | △ | ✅ | △ | ✅ | ✅ | ✅ | 현재: GRAMMAR 3,605건과 레벨 관계/상세/예문 구조가 있고 사용자 공개는 승인된 5건뿐이다. 나머지 3,600건은 PENDING·비공개라 전체 사용자 노출은 부분 완료. / 기존 메모: 앱 범위를 넓힐 때 |
+| [~] | P0 | 문법 N5~N1 | △ | ✅ | △ | ✅ | ✅ | ✅ | 현재: JLPT-MAX linked GRAMMAR 3,605건과 레벨 관계/상세/예문 구조가 있다. verified published+APPROVED는 전체 12건이며 대부분은 PENDING·비공개라 전체 사용자 노출은 부분 완료. WORD/GRAMMAR별 공개 split은 현재 검증하지 않았다. / 기존 메모: 앱 범위를 넓힐 때 |
 | [ ] | P2 | 독해 콘텐츠 | — | ✅ | △ | ✅ | ✅ | ✅ | 현재: 독해 전용 콘텐츠/세션 확인되지 않음. / 기존 메모: V2 확장 후보 |
 | [ ] | P2 | 듣기 콘텐츠 | △ | ✅ | △ | ✅ | ✅ | △ | 현재: 듣기 전용 콘텐츠/세션 확인되지 않음. / 기존 메모: JLPT 대비 확장 |
 
@@ -163,7 +176,7 @@
 | 우리 | 우선 | 기능 | iroiro | renshuu | Anki | Migii | Duo | Bunpro | 메모 |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|---|
 | [ ] | P2 | 다크 모드 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: 현재 별도 theme/dark mode 구현을 확인하지 못함. / 기존 메모: 기본 |
-| [~] | P0 | 클라우드 동기화/백업 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: 계정 기반 서버 DB에 상태가 저장되므로 동기화 기반은 있으나 운영 백업/복구 체계는 별도 확인되지 않음. / 기존 메모: 필수 |
+| [~] | P0 | 클라우드 동기화/백업 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: 계정 기반 서버 persistence/sync는 동작한다. 다만 운영 backup/restore의 자동화·보존·rehearsal은 미완료다. / 기존 메모: 필수 |
 | [x] | P0 | 기기간 이어하기 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: 계정 기반 서버 상태 + persisted Today/Quiz session으로 동일 계정 이어하기 가능. / 기존 메모: 필수 |
 | [ ] | P1 | 후리가나 표시 on/off | ✅ | ✅ | △ | △ | ✅ | ✅ | 현재: 표시 preference 없음. / 기존 메모: 레벨별 자동도 고려 |
 | [ ] | P2 | 뜻/번역 표시 on/off | ✅ | ✅ | ✅ | △ | △ | ✅ | 현재: 복습 reveal은 있으나 사용자 설정형 표시 on/off는 없음. / 기존 메모: 난이도 조절 |
@@ -180,13 +193,13 @@
 ## 운영/품질
 | 우리 | 우선 | 기능 | iroiro | renshuu | Anki | Migii | Duo | Bunpro | 메모 |
 |---|---|---|:---:|:---:|:---:|:---:|:---:|:---:|---|
-| [~] | P0 | 이메일/소셜 로그인 및 계정 복구 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: 이메일 가입·검증·비밀번호 재설정은 구현, 소셜 로그인은 확인되지 않음. / 기존 메모: 서비스 기본 |
-| [ ] | P0 | 학습 데이터 서버 백업 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: 서버 DB 저장은 구현됐지만 운영 backup/restore 체계는 코드에서 확인되지 않음. / 기존 메모: 유실 금지 |
-| [x] | P0 | 콘텐츠 버전/마이그레이션 설계 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: source/version/import 추적과 Flyway V1~V4 versioned migration, runtime Hibernate validate가 구현됨. V3는 source rights, V4는 immutable release batch/manifest를 추가한다. 기존 DB는 명시적 baseline 절차를 사용하며 실제 production rehearsal은 운영 배포 전 작업으로 남아 있다. / 기존 메모: 대규모 단어 DB 필수 |
+| [~] | P0 | 이메일/소셜 로그인 및 계정 복구 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: 이메일 가입·로그인·검증·비밀번호 재설정과 SMTP adapter, token 만료/재사용 방지가 구현됨. production SMTP·sender domain/public URL·실제 delivery/recovery 검증은 남아 있다. social login은 V1 필수로 결정되지 않았다. / 기존 메모: 서비스 기본 |
+| [~] | P0 | 학습 데이터 서버 백업 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: backup/restore 절차가 문서화되고 persistent dev MySQL backup 및 migration 작업이 수행되었으나, 자동/예약 backup, retention policy, 검증 restore rehearsal, production-like recovery evidence는 남아 있다. / 기존 메모: 유실 금지 |
+| [x] | P0 | 콘텐츠 버전/마이그레이션 설계 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: Flyway V1~V10 versioned migration, Hibernate validate, Flyway clean 보호, 기존 DB baseline policy와 migration safety tests가 구현됨. production-like migration/restore rehearsal은 운영 검증으로 남아 있다. / 기존 메모: 대규모 단어 DB 필수 |
 | [ ] | P3 | 결제 복원/구매 상태 동기화 | ✅ | ✅ | △ | ✅ | ✅ | ✅ | 현재: 결제 시스템 미구현; 유료화 시점에 필요. |
 | [ ] | P1 | 사용자 피드백/오류 신고 | ✅ | ✅ | △ | ✅ | △ | ✅ | 현재: 사용자 제출형 피드백/콘텐츠 오류 신고 흐름 확인되지 않음. / 기존 메모: 콘텐츠 개선 루프 |
 | [~] | P2 | 학습 이벤트 로그/퍼널 분석 | △ | △ | △ | △ | ✅ | △ | 현재: StudyRecord/QuizAttempt 등 학습 로그는 풍부하지만 제품 analytics funnel/이벤트 계층은 없음. / 기존 메모: 리텐션 개선 |
-| [ ] | P0 | 데이터 삭제/계정 탈퇴 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: AccountManagementService에서 사용자 셀프 탈퇴/전체 학습 데이터 삭제 경로를 확인하지 못함. / 기존 메모: 정책/스토어 필수 |
+| [x] | P0 | 데이터 삭제/계정 탈퇴 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 현재: 미커밋 working tree에 일반 USER용 전용 확인 화면, 현재 비밀번호 재확인, POST+CSRF, 소유 학습 데이터·검증/재설정 token의 transactional hard delete, LearnerProfile/UserAccount 삭제, 현재 세션 무효화와 SecurityContext 정리가 구현·hardening 검증됨. 다른 사용자·공유 콘텐츠는 보존된다. ADMIN/검수 계정은 의도적으로 일반 learner self-delete에서 제외된다. 다른 기기 세션의 즉시 전역 무효화는 session registry 부재로 지원하지 않지만, 일반 learner 요청은 DB 계정 재조회에서 실패한다. / 기존 메모: 정책/스토어 필수 |
 | [ ] | P2 | 기능 플래그/점진 배포 | △ | △ | △ | △ | ✅ | △ | 현재: 미구현. / 기존 메모: 업데이트 리스크 감소 |
 
 ## 우리만의 승부수
@@ -201,7 +214,19 @@
 | [ ] | P2 | 단어/한자 선행지식 그래프 기반 추천 순서 | △ | ✅ | — | — | △ | — | 현재: knowledge graph/kanji domain이 아직 없음. / 기존 메모: iroiro 리뷰의 약점 공략 |
 | [~] | P2 | Haru와 함께 보는 학습 회고/주간 리포트 | — | △ | — | — | — | — | 현재: `/report/weekly`와 `/haru`가 각각 존재하지만 하나의 Haru 회고 경험으로 연결되지는 않는다. / 남은 것: 주간 성과를 Haru 성장 맥락에서 보여 주는 선택적 회고. / 기존 메모: 통계를 감정적 보상으로 변환 |
 
-## 코드 감사 요약 — 최신 production 기준
+## CURRENT matrix summary — 2026-09-19
+
+현재 매트릭스의 실제 행 marker를 다시 계산한 결과:
+
+- 전체 기능: **125개**
+- `[x]` 구현 완료: **31개**
+- `[~]` 부분 구현: **30개**
+- `[ ]` 미구현/미확인: **64개**
+- 우선순위: **P0 25 / P1 36 / P2 46 / P3 18**
+
+변경분은 P0 `학습 데이터 서버 백업`을 `[ ] → [~]`, `데이터 삭제/계정 탈퇴`를 `[ ] → [x]`로 반영한 것이다. 나머지 P1/P2/P3 상태는 이 문서의 역사적 범위를 보존하기 위해 변경하지 않았다.
+
+## 2026-09-15 코드 감사 요약 — historical
 
 - 감사 기준: `ui/japanese-ui-consolidation` / `a0006565a2ff54b221f372455e32f5d4dfd49e53`
 - 전체 기능: **125개**
@@ -210,13 +235,13 @@
 - `[ ]` 미구현/미확인: **66개**
 - 우선순위: **P0 25 / P1 36 / P2 46 / P3 18**
 - 최신 코드에서 Phase 0의 migration, quiz scope, provenance, due, Today allocation 변경을 반영했다.
-- `[ ]`가 많은 것은 한자·시험·게임화·모바일 부가 기능이 포함되어 있기 때문이며, P0의 `[~]`/`[ ]`는 출시 전 별도 확인 대상으로 유지한다.
+- `[ ]`가 많은 것은 한자·시험·게임화·모바일 부가 기능이 포함되어 있기 때문이라는 2026-09-15 당시 판단이다. 현재 P0 상태는 위 `CURRENT` 섹션을 우선한다.
 ### 이번 감사의 주요 상태 변경
 
 - `[~] P0` 콘텐츠 버전/마이그레이션 설계 → `[x]`: Flyway V1~V4, Hibernate validate, baseline 절차가 production code와 운영 문서에 반영됨. 실제 production rehearsal은 운영 체크리스트로 분리.
 - `[~] P1` 퀴즈 이력/정오답 기록은 `[~]` 유지: provenance namespace 문제는 해결됐지만 사용자용 이력 상세 UX가 제한적임.
 - Quiz candidate scope/limit, due/filter consistency, Today word-first allocation, QuizAttempt namespace mixing은 최신 코드에서 **RESOLVED**로 이동.
-- 운영 backup 자동화, 계정/학습 데이터 삭제, 공개 콘텐츠 품질/승인, 실제 배포 rehearsal은 여전히 P0 또는 별도 운영 위험으로 유지.
+- 운영 backup 자동화, 공개 콘텐츠 품질/승인, 실제 배포 rehearsal은 여전히 P0 또는 별도 운영 위험으로 유지한다. 계정/학습 데이터 삭제는 2026-09-19 현재 구현·hardening 완료로 갱신됐다.
 
 ### 이번 감사에서 확인한 구조적 위험
 
@@ -227,9 +252,9 @@
 | Today 신규 word-first 편향 | **RESOLVED** | `TodayNewContentAllocator`가 due 우선, 최소 보장, 진행률 기반 배분, 후보 부족 재배분을 수행한다. cap, queue, scope, persisted session을 유지한다. |
 | Today/Weekly/Statistics due 불일치 | **RESOLVED** | `DueReviewCriteria`/`DueReviewQueryService`가 published·not SUSPENDED·scope·asOf 기준을 공유한다. MASTERED due와 legacy null state도 포함한다. |
 | 운영 migration 안전성 | **PARTIALLY RESOLVED** | Flyway V1~V4, `ddl-auto=validate`, clean-disabled, 명시적 기존 DB baseline 및 backup/restore 절차 문서가 있다. 실제 MySQL backup/restore·migration rehearsal과 EXPLAIN은 배포 전 남아 있다. |
-| 공개 콘텐츠 승인/품질 | **PARTIALLY RESOLVED** | Source rights, Word/Grammar Release Gate, publication invariant, read-only dry-run, stale digest 검증, atomic batch execution, immutable rollback manifest 및 관리자 개별 확인·실행·이력·rollback UX까지 working tree에 구현됐다. 실제 source license 검증, actual N5 dry-run, duplicate adjudication, production-like rehearsal, N5 Word/Grammar pilot은 남아 있다. |
-| 서버 backup/restore 자동화 | **ACTIVE** | 운영 절차 문서는 있으나 scheduler, 자동 backup 검증, 자동 restore 기능은 코드에서 확인되지 않는다. |
-| 계정/학습 데이터 삭제 | **ACTIVE** | 셀프 탈퇴와 전체 학습 데이터 삭제 사용자 흐름을 확인하지 못했다. |
+| 공개 콘텐츠 승인/품질 | **PARTIALLY RESOLVED** | Source rights, Word/Grammar Release Gate, publication invariant, read-only dry-run, stale digest 검증, atomic batch execution, immutable rollback manifest 및 관리자 개별 확인·실행·이력·rollback UX까지 현재 HEAD에 포함되어 있다. 실제 source license 검증, actual N5 dry-run, duplicate adjudication, production-like rehearsal, N5 Word/Grammar pilot은 남아 있다. |
+| 서버 backup/restore 자동화 | **PARTIALLY RESOLVED** | 운영 절차 문서와 persistent dev MySQL backup 수행은 있으나 scheduler, retention policy, 검증 restore rehearsal 및 production-like recovery evidence는 남아 있다. |
+| 계정/학습 데이터 삭제 | **RESOLVED IN CURRENT WORKING TREE** | 전용 확인·현재 비밀번호·POST+CSRF·transactional learner-data hard delete·token 삭제·세션 무효화·rollback test가 현재 미커밋 working tree에 구현됐다. 현재 HEAD에는 아직 포함되지 않았다. |
 | queue가 selected scope를 override하는 정책 | **REVIEW NEEDED** | Today에서 명시적 queue가 일반 level/category scope보다 우선하는 기존 정책이다. 코드 버그로 단정하지 않고 제품 정책 확인 대상으로 남긴다. |
 | due/candidate query 운영 성능 | **REVIEW NEEDED** | query는 DB 필터와 제한을 사용하지만 실제 MySQL EXPLAIN 및 대량 데이터 실행 계획은 아직 확인하지 않았다. |
 
@@ -247,7 +272,7 @@
 
 - 대량 PENDING 콘텐츠의 출처·라이선스·품질 검수와 공개 정책
 - 운영 DB backup/restore 실행 및 rehearsal
-- 계정 탈퇴와 학습 데이터 삭제
+- 계정 탈퇴와 학습 데이터 삭제 (2026-09-15 당시 미완료; 2026-09-19 현재 미커밋 working tree에서 해결)
 - 이메일 계정 복구의 production 운영 검증 및 social login 여부 결정
 - 핵심 사용자 흐름의 실제 E2E/mobile/대량 콘텐츠 검증
 
@@ -260,7 +285,7 @@
 
 ### 콘텐츠 정규화/후보 검토 파이프라인 추가 (기준 HEAD: `da789116dd9f26692360379064f3d5c48bf9152c`, 2026-09-17)
 
-위 "코드 감사 요약"은 `a000656`(Phase 0) 시점 기준이며 그 이후 아래 private 콘텐츠 파이프라인이 새로 추가됐다. 이 섹션만 `da789116dd9f26692360379064f3d5c48bf9152c` 기준으로 별도 갱신하며, 위쪽 기능 매트릭스 행(`[x]`/`[~]`/`[ ]`)은 이번 갱신에서 재검증하지 않았으므로 그대로 유지한다.
+위 "2026-09-15 코드 감사 요약"은 `a000656`(Phase 0) 시점의 historical 기준이며 그 이후 아래 private 콘텐츠 파이프라인이 새로 추가됐다. 이 addendum은 `da789116dd9f26692360379064f3d5c48bf9152c` 기준을 보존한다. 현재 P0 행과 최신 수치는 위 `CURRENT` 섹션에서 2026-09-19 상태로 동기화했다.
 
 새로 추가된 것 (Flyway V4~V8, production과 분리된 private 테이블):
 
@@ -276,6 +301,54 @@ v2.1.1 APKG 실측(2026-09-17): Vocabulary 후보 9,160건, Grammar 후보 1,078
 
 아직 구현되지 않은 것(P0 콘텐츠 게이트와 직결): 실제 production 승격(ContentItem/Word/Grammar/Meaning/Example insert), 후보 쌍의 canonical winner 자동 병합, 공개 publication 자동화. 위 "Ticket 1A-1: 공개 콘텐츠 승인·품질 게이트" 항목은 이 파이프라인이 추가된 뒤에도 여전히 완료 상태가 아니다.
 
+## CURRENT 콘텐츠 파이프라인·release 상태 — 2026-09-19
+
+기존 2026-09-17 파이프라인 addendum 이후 persistent dev DB에서 다음 상태를 확인했다.
+
+- `private_apkg_notes`: **20,650**
+- normalized candidates: **10,238** (`VOCABULARY` 9,160 / `GRAMMAR` 1,078)
+- candidate match pairs: **33**, match evidence: **198**
+- current pair reviews: **33**, review history: **33**
+- human decisions: `DISTINCT_CONTENT` 29 / `SAME_CONTENT` 4 / `NEEDS_FOLLOWUP` 0
+- pair freshness: `FRESH` 33/33; review freshness: `FRESH` 33/33
+- canonical groups/members/edges: **0/0/0**
+- ImportedSourceRecord: **20,649**; linked WORD **9,159** / GRAMMAR **3,605** / total **12,764**
+- publication distribution: published+APPROVED **12**, unpublished+REJECTED **1**, unpublished+PENDING **12,751**
+
+따라서 human pair-review persistence 단계는 **COMPLETED/VERIFIED**다. 단, Grammar `SAME_CONTENT` 4쌍은 canonical/convergence 결정이 남아 있고, 해당 8개 후보는 별도의 unpublished PENDING legacy ContentItem을 가리킨다. 이 curation gap은 해결된 것으로 기록하지 않는다.
+
+Content release infrastructure는 source-rights model/service, release gate, publication invariant/safety, read-only dry-run, gate version/digest, stale preview protection, atomic batch execution, immutable batch manifest/history, rollback support, admin review/release UX까지 실질적으로 구현되어 있다. 이는 실제 public-content readiness와 구분한다. 실제 source-rights/legal 승인, 대표 품질 샘플링, N5 Word/Grammar pilot, release user-flow 검증, rollback rehearsal, production-like release evidence는 남아 있다.
+
+## Web V1 current blockers — 2026-09-19
+
+### Code / product UX
+
+- P0 요구사항으로 유지한다면 ruby/후리가나 표시를 구현·검증한다.
+
+### Operations / verification
+
+- N5 public-content pilot 및 release user-flow 검증
+- backup/restore rehearsal
+- production-like Flyway migration 검증
+- production SMTP 및 실제 recovery delivery 검증
+- 대규모 콘텐츠 Today/due/search 쿼리 EXPLAIN·성능 점검
+- 대표 브라우저 E2E 검증
+
+### Product / legal / curation
+
+- JLPT-MAX source-rights·attribution·release 승인
+- Grammar `SAME_CONTENT` 4쌍의 curation/canonical 결정
+
+Social login, FSRS, audio/TTS, Kanji, mock JLPT exams, Flutter는 현재 Web V1 blocker가 아니다.
+
+## Web V1 closure sequence — 2026-09-19
+
+1. ruby/후리가나가 V1 요구사항인지 결정하고, 유지할 경우 구현한다.
+2. source-rights와 대표 콘텐츠 품질 승인을 완료한다.
+3. N5 Word/Grammar release pilot과 rollback rehearsal을 수행한다.
+4. backup/restore, Flyway, SMTP 운영 rehearsal을 수행한다.
+5. 대규모 콘텐츠 및 대표 브라우저 E2E를 최종 검증한다.
+
 ## Phase 1 추천 우선순위 — dependency 기준
 
 제품 우선순위는 `콘텐츠 신뢰성 > 회상/복습 품질 > 학습 흐름 UX > 통계/개인화 > Haru 보상 > 부가 게임화`를 유지한다.
@@ -284,7 +357,7 @@ v2.1.1 APKG 실측(2026-09-17): Vocabulary 후보 9,160건, Grammar 후보 1,078
 
 #### Ticket 1A-1: 공개 콘텐츠 승인·품질 게이트
 - 목표: PENDING 콘텐츠를 출처·라이선스·필수 필드·중복·예문 품질 기준으로 검수해 실제 공개 가능한 JLPT 체급을 만든다.
-- 현재 상태: 미커밋 working tree에서 A Source Rights, B Release Gate, C Publication Safety, D Dry-run, E Batch Execution/History, F Admin Batch UX infrastructure 구현 완료. 실제 source license verification, actual N5 dry-run, duplicate adjudication, production-like rehearsal, N5 Word pilot 및 Grammar pilot은 남아 있어 1A-1 전체 완료 상태는 아니다.
+- 현재 상태: A Source Rights, B Release Gate, C Publication Safety, D Dry-run, E Batch Execution/History, F Admin Batch UX infrastructure가 현재 HEAD에 포함되어 있다. 실제 source license verification, actual N5 dry-run, duplicate adjudication, production-like rehearsal, N5 Word pilot 및 Grammar pilot은 남아 있어 1A-1 전체 완료 상태는 아니다.
 - 예상 영역: content review service/controller, import validator, quality issue 모델/테스트, 운영 문서.
 - 선행 dependency: 없음. Phase 0 migration 완료 후 진행.
 - 난이도: Large / 추천 모델: Sol High.

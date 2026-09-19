@@ -18,6 +18,7 @@
         <p class="login-description">학습 기록과 오늘의 복습이 기다리고 있어요.</p>
     </section>
     <section class="login-panel" aria-labelledby="login-title" th:with="loginFailed=${param.error != null}">
+        <p class="form-message success" role="status" th:if="${param.accountDeleted != null}">계정이 삭제되었습니다.</p>
         <h2 id="login-title">로그인</h2>
         <p id="login-error" class="form-message" role="alert" th:if="${param.error != null}">로그인 ID 또는 비밀번호를 확인하세요.</p>
         <p class="form-message success" role="status" th:if="${signupMessage != null}" th:text="${signupMessage}">가입 완료</p>
